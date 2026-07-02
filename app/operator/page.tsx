@@ -1,28 +1,52 @@
 "use client";
 
 import { saveCaptionState } from "@/lib/captionState";
-import { useEffect, useState } from "react";
 import { translateChineseToEnglish } from "@/lib/translation";
+import { useEffect, useState } from "react";
+
 export default function OperatorPage() {
+  // Operator session state
   const [isLive, setIsLive] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // Manual test caption state
+  const [testCaption, setTestCaption] = useState(
+    "Welcome to today's worship service."
+  );
+
+  // Microphone and translation state
+  const [isListening, setIsListening] = useState(false);
+  const [micTranscript, setMicTranscript] = useState("");
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState("");
+  const [lastTranslationMs, setLastTranslationMs] = useState<number | null>(
+    null
+  );
+
+  /**
+   * Start or stop the live caption session.
+   *
+   * This updates the operator UI and broadcasts the current
+   * live status to the audience page.
+   */
   const handleToggleLive = () => {
     const nextIsLive = !isLive;
     setIsLive(nextIsLive);
 
     saveCaptionState({
-  isLive: nextIsLive,
-  caption: nextIsLive ? "Live captions have started." : "",
-  updatedAt: Date.now(),
-});
+      isLive: nextIsLive,
+      caption: nextIsLive ? "Live captions have started." : "",
+      updatedAt: Date.now(),
+    });
   };
 
-  const [testCaption, setTestCaption] = useState(
-  "Welcome to today's worship service."
-);
-
+  /**
+   * Send a manual test caption.
+   *
+   * This lets us test the full operator-to-audience pipeline
+   * before relying on microphone input or AI translation.
+   */
   const handleSendTestCaption = () => {
     setIsLive(true);
 
@@ -33,38 +57,20 @@ export default function OperatorPage() {
     });
   };
 
-  const [isListening, setIsListening] = useState(false);
-  const [micTranscript, setMicTranscript] = useState("");
-
-  useEffect(() => {
-    if (!isLive) {
-      setSeconds(0);
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setSeconds((value) => value + 1);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isLive]);
-
-  const formatTime = (totalSeconds: number) => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const secs = totalSeconds % 60;
-
-    return [hours, minutes, secs]
-      .map((value) => value.toString().padStart(2, "0"))
-      .join(":");
-  };
-
+  /**
+   * Start browser speech recognition.
+   *
+   * Pipeline:
+   * Microphone → Chinese transcript → Gemini translation → Audience page
+   */
   const handleStartMicrophone = () => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      alert("Speech recognition is not supported in this browser. Please use Chrome.");
+      alert(
+        "Speech recognition is not supported in this browser. Please use Chrome."
+      );
       return;
     }
 
@@ -76,6 +82,7 @@ export default function OperatorPage() {
     recognition.onstart = () => {
       setIsListening(true);
       setIsLive(true);
+      setTranslationError("");
     };
 
     recognition.onresult = async (event) => {
@@ -92,22 +99,41 @@ export default function OperatorPage() {
         }
       }
 
+      // Show interim Chinese text on the operator page only.
       setMicTranscript(finalTranscript || interimTranscript);
 
+      // Translate only finalized speech.
+      // Interim results change constantly and create unstable captions.
       if (!finalTranscript.trim()) {
         return;
       }
 
-      const english = await translateChineseToEnglish(finalTranscript);
+      setIsTranslating(true);
+      setTranslationError("");
 
-      saveCaptionState({
-        isLive: true,
-        caption: english,
-        updatedAt: Date.now(),
-      });
+      const startedAt = Date.now();
+
+      try {
+        const english = await translateChineseToEnglish(finalTranscript);
+
+        setLastTranslationMs(Date.now() - startedAt);
+
+        saveCaptionState({
+          isLive: true,
+          caption: english,
+          updatedAt: Date.now(),
+        });
+      } catch (error) {
+        console.error(error);
+        setTranslationError("Translation unavailable. Please try again.");
+      } finally {
+        setIsTranslating(false);
+      }
     };
+
     recognition.onerror = () => {
       setIsListening(false);
+      setTranslationError("Microphone error. Please try again.");
     };
 
     recognition.onend = () => {
@@ -115,7 +141,37 @@ export default function OperatorPage() {
     };
 
     recognition.start();
-};
+  };
+
+  /**
+   * Count how long the live caption session has been running.
+   */
+  useEffect(() => {
+    if (!isLive) {
+      setSeconds(0);
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setSeconds((value) => value + 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isLive]);
+
+  /**
+   * Format elapsed caption time as HH:MM:SS.
+   */
+  const formatTime = (totalSeconds: number) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+
+    return [hours, minutes, secs]
+      .map((value) => value.toString().padStart(2, "0"))
+      .join(":");
+  };
+
   return (
     <main className="min-h-screen bg-stone-50 px-6 py-10 text-slate-900">
       <div className="mx-auto max-w-3xl space-y-8">
@@ -130,6 +186,7 @@ export default function OperatorPage() {
           </p>
         </header>
 
+        {/* Status Card */}
         <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 text-center space-y-6">
           <p className="text-sm font-bold tracking-widest text-slate-500">
             STATUS
@@ -158,10 +215,12 @@ export default function OperatorPage() {
             {isLive ? "🔴 Stop Live Caption" : "🟢 Start Live Caption"}
           </button>
         </section>
-        
+
         {/* Broadcast Test Caption */}
         <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 space-y-5">
-          <h2 className="text-2xl font-bold text-center">Broadcast Test Caption</h2>
+          <h2 className="text-2xl font-bold text-center">
+            Broadcast Test Caption
+          </h2>
 
           <textarea
             value={testCaption}
@@ -177,13 +236,18 @@ export default function OperatorPage() {
           </button>
         </section>
 
-       {/* Microphone Test */}
+        {/* Microphone Test */}
         <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 space-y-5">
           <h2 className="text-2xl font-bold text-center">Microphone Test</h2>
 
           <button
             onClick={handleStartMicrophone}
-            className="w-full rounded-2xl bg-blue-600 px-6 py-5 text-2xl font-bold text-white hover:bg-blue-700"
+            disabled={isListening}
+            className={`w-full rounded-2xl px-6 py-5 text-2xl font-bold text-white ${
+              isListening
+                ? "cursor-not-allowed bg-blue-400"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}
           >
             {isListening ? "Listening..." : "Start Microphone"}
           </button>
@@ -191,8 +255,35 @@ export default function OperatorPage() {
           <div className="rounded-2xl bg-slate-50 p-4 min-h-24 text-lg text-slate-700">
             {micTranscript || "Chinese transcript will appear here."}
           </div>
+
+          <div className="rounded-2xl bg-stone-50 p-4 text-sm text-slate-600 space-y-1">
+            <p>
+              Listening status:{" "}
+              <span className="font-semibold">
+                {isListening ? "Listening" : "Not listening"}
+              </span>
+            </p>
+            <p>
+              Translation status:{" "}
+              <span className="font-semibold">
+                {isTranslating ? "Translating..." : "Ready"}
+              </span>
+            </p>
+            {lastTranslationMs !== null && (
+              <p>
+                Last translation:{" "}
+                <span className="font-semibold">
+                  {(lastTranslationMs / 1000).toFixed(1)}s
+                </span>
+              </p>
+            )}
+            {translationError && (
+              <p className="font-semibold text-red-600">{translationError}</p>
+            )}
+          </div>
         </section>
 
+        {/* Audience Preview */}
         <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 text-center space-y-5">
           <h2 className="text-2xl font-bold">Audience</h2>
 
@@ -206,9 +297,9 @@ export default function OperatorPage() {
                 <div
                   key={index}
                   className={`h-8 w-8 rounded-sm ${
-                    [0, 1, 2, 5, 7, 10, 12, 14, 17, 19, 20, 22, 23, 24].includes(
-                      index
-                    )
+                    [
+                      0, 1, 2, 5, 7, 10, 12, 14, 17, 19, 20, 22, 23, 24,
+                    ].includes(index)
                       ? "bg-slate-900"
                       : "bg-slate-100"
                   }`}
@@ -224,6 +315,7 @@ export default function OperatorPage() {
           <p className="text-sm text-slate-500">localhost:3000/live</p>
         </section>
 
+        {/* Advanced Settings */}
         <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
           <button
             onClick={() => setShowAdvanced((value) => !value)}
