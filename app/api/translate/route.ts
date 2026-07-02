@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
+import { LIVE_SERMON_PROMPT } from "@/lib/translationPrompt";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -18,20 +19,12 @@ export async function POST(request: NextRequest) {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `
-Translate this Chinese sermon transcript into natural English captions.
+        model: "gemini-2.5-flash",
+        contents: `${LIVE_SERMON_PROMPT}
 
-Rules:
-- Output English only.
-- Keep it concise for live captions.
-- Preserve biblical terminology.
-- Do not add anything not present in the Chinese.
-
-Chinese:
-${text}
-`,
-    });
+        Chinese:
+        ${text}`,
+        });
 
     return NextResponse.json({
       translation: response.text,
