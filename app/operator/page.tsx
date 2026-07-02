@@ -32,6 +32,9 @@ export default function OperatorPage() {
     });
   };
 
+  const [isListening, setIsListening] = useState(false);
+  const [micTranscript, setMicTranscript] = useState("");
+
   useEffect(() => {
     if (!isLive) {
       setSeconds(0);
@@ -55,7 +58,51 @@ export default function OperatorPage() {
       .join(":");
   };
 
+  const handleStartMicrophone = () => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
 
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in this browser. Please use Chrome.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "zh-CN";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      setIsLive(true);
+    };
+
+    recognition.onresult = (event) => {
+      let transcript = "";
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+
+      setMicTranscript(transcript);
+
+      saveCaptionState({
+        isLive: true,
+        caption: transcript,
+        updatedAt: Date.now(),
+      });
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
+};
   return (
     <main className="min-h-screen bg-stone-50 px-6 py-10 text-slate-900">
       <div className="mx-auto max-w-3xl space-y-8">
@@ -99,22 +146,6 @@ export default function OperatorPage() {
           </button>
         </section>
         
-        <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 space-y-5">
-          <h2 className="text-2xl font-bold text-center">Broadcast Test Caption</h2>
-
-          <textarea
-            value={testCaption}
-            onChange={(event) => setTestCaption(event.target.value)}
-            className="h-32 w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-lg outline-none focus:ring-2 focus:ring-slate-300"
-          />
-
-          <button
-            onClick={handleSendTestCaption}
-            className="w-full rounded-2xl bg-slate-900 px-6 py-5 text-2xl font-bold text-white hover:bg-slate-800"
-          >
-            Send Test Caption
-          </button>
-        </section>
         // add broadcast card.
         <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 space-y-5">
           <h2 className="text-2xl font-bold text-center">Broadcast Test Caption</h2>
@@ -131,6 +162,22 @@ export default function OperatorPage() {
           >
             Send Test Caption
           </button>
+        </section>
+        
+        // add microphone card
+        <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 space-y-5">
+          <h2 className="text-2xl font-bold text-center">Microphone Test</h2>
+
+          <button
+            onClick={handleStartMicrophone}
+            className="w-full rounded-2xl bg-blue-600 px-6 py-5 text-2xl font-bold text-white hover:bg-blue-700"
+          >
+            {isListening ? "Listening..." : "Start Microphone"}
+          </button>
+
+          <div className="rounded-2xl bg-slate-50 p-4 min-h-24 text-lg text-slate-700">
+            {micTranscript || "Chinese transcript will appear here."}
+          </div>
         </section>
 
         <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 text-center space-y-5">
