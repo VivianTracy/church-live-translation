@@ -1,3 +1,53 @@
+# Church Caption
+
+## Mission
+
+Help churches remove language barriers during worship through simple, reliable AI-powered captions.
+
+## MVP Scope
+
+Version 1 only supports:
+
+- Chinese sermon
+- English captions
+- One operator
+- Audience watches on mobile phones
+
+## Principles
+
+- Simplicity over features.
+- Reliability over cleverness.
+- One-click operation.
+- Designed for volunteers.
+- Optimize for Sunday morning, not software demos.
+
+## When generating code
+
+Prefer:
+
+- Clear code
+- Readability
+- Small components
+- Accessibility
+- Mobile-friendly design
+
+Avoid:
+
+- Premature optimization
+- Extra language options
+- Features not required for Version 1
+
+## Future Vision
+
+After the MVP succeeds, this platform may expand to:
+
+- Scripture recognition
+- Bible verse display
+- Sermon summaries
+- Small group discussion questions
+- Church sermon archive
+- Multi-language support
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 
