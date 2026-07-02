@@ -2,6 +2,7 @@
 
 import { saveCaptionState } from "@/lib/captionState";
 import { useEffect, useState } from "react";
+import { translateChineseToEnglish } from "@/lib/translation";
 export default function OperatorPage() {
   const [isLive, setIsLive] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -77,22 +78,34 @@ export default function OperatorPage() {
       setIsLive(true);
     };
 
-    recognition.onresult = (event) => {
-      let transcript = "";
+    recognition.onresult = async (event) => {
+      let finalTranscript = "";
+      let interimTranscript = "";
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
+        const transcript = event.results[i][0].transcript;
+
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
       }
 
-      setMicTranscript(transcript);
+      setMicTranscript(finalTranscript || interimTranscript);
+
+      if (!finalTranscript.trim()) {
+        return;
+      }
+
+      const english = await translateChineseToEnglish(finalTranscript);
 
       saveCaptionState({
         isLive: true,
-        caption: transcript,
+        caption: english,
         updatedAt: Date.now(),
       });
     };
-
     recognition.onerror = () => {
       setIsListening(false);
     };
@@ -146,7 +159,7 @@ export default function OperatorPage() {
           </button>
         </section>
         
-        // add broadcast card.
+        {/* Broadcast Test Caption */}
         <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 space-y-5">
           <h2 className="text-2xl font-bold text-center">Broadcast Test Caption</h2>
 
@@ -163,8 +176,8 @@ export default function OperatorPage() {
             Send Test Caption
           </button>
         </section>
-        
-        // add microphone card
+
+       {/* Microphone Test */}
         <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 space-y-5">
           <h2 className="text-2xl font-bold text-center">Microphone Test</h2>
 
