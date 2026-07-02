@@ -1,5 +1,7 @@
 "use client";
 
+import { loadCaptionState } from "@/lib/captionState";
+import { CaptionState } from "@/types/caption";
 import { useEffect, useState } from "react";
 
 type CaptionState = {
@@ -17,10 +19,8 @@ export default function LivePage() {
 
   useEffect(() => {
     const loadState = () => {
-      const saved = localStorage.getItem("church-caption-state");
-      if (!saved) return;
-
-      setCaptionState(JSON.parse(saved));
+      const saved = loadCaptionState();
+      if (saved) setCaptionState(saved);
     };
 
     loadState();

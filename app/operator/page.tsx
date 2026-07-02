@@ -1,7 +1,7 @@
 "use client";
 
+import { saveCaptionState } from "@/lib/captionState";
 import { useEffect, useState } from "react";
-
 export default function OperatorPage() {
   const [isLive, setIsLive] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -11,21 +11,26 @@ export default function OperatorPage() {
     const nextIsLive = !isLive;
     setIsLive(nextIsLive);
 
-    localStorage.setItem(
-      "church-caption-state",
-      JSON.stringify({
-        isLive: nextIsLive,
-        caption: nextIsLive ? "Live captions have started." : "",
-        updatedAt: Date.now(),
-      })
-    );
-
-    window.dispatchEvent(new Event("church-caption-updated"));
+    saveCaptionState({
+  isLive: nextIsLive,
+  caption: nextIsLive ? "Live captions have started." : "",
+  updatedAt: Date.now(),
+});
   };
 
   const [testCaption, setTestCaption] = useState(
   "Welcome to today's worship service."
 );
+
+  const handleSendTestCaption = () => {
+    setIsLive(true);
+
+    saveCaptionState({
+      isLive: true,
+      caption: testCaption,
+      updatedAt: Date.now(),
+    });
+  };
 
   useEffect(() => {
     if (!isLive) {
@@ -50,19 +55,6 @@ export default function OperatorPage() {
       .join(":");
   };
 
-  const handleSendTestCaption = () => {
-  localStorage.setItem(
-    "church-caption-state",
-    JSON.stringify({
-      isLive: true,
-      caption: testCaption,
-      updatedAt: Date.now(),
-    })
-  );
-
-  setIsLive(true);
-  window.dispatchEvent(new Event("church-caption-updated"));
-};
 
   return (
     <main className="min-h-screen bg-stone-50 px-6 py-10 text-slate-900">
@@ -107,6 +99,23 @@ export default function OperatorPage() {
           </button>
         </section>
         
+        <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 space-y-5">
+          <h2 className="text-2xl font-bold text-center">Broadcast Test Caption</h2>
+
+          <textarea
+            value={testCaption}
+            onChange={(event) => setTestCaption(event.target.value)}
+            className="h-32 w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-lg outline-none focus:ring-2 focus:ring-slate-300"
+          />
+
+          <button
+            onClick={handleSendTestCaption}
+            className="w-full rounded-2xl bg-slate-900 px-6 py-5 text-2xl font-bold text-white hover:bg-slate-800"
+          >
+            Send Test Caption
+          </button>
+        </section>
+        // add broadcast card.
         <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 space-y-5">
           <h2 className="text-2xl font-bold text-center">Broadcast Test Caption</h2>
 
