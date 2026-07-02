@@ -2,10 +2,26 @@
 
 import { useEffect, useState } from "react";
 
-export default function AdminPage() {
+export default function OperatorPage() {
   const [isLive, setIsLive] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const handleToggleLive = () => {
+    const nextIsLive = !isLive;
+    setIsLive(nextIsLive);
+
+    localStorage.setItem(
+      "church-caption-state",
+      JSON.stringify({
+        isLive: nextIsLive,
+        caption: nextIsLive ? "Live captions have started." : "",
+        updatedAt: Date.now(),
+      })
+    );
+
+    window.dispatchEvent(new Event("church-caption-updated"));
+  };
 
   useEffect(() => {
     if (!isLive) {
@@ -62,7 +78,7 @@ export default function AdminPage() {
           </div>
 
           <button
-            onClick={() => setIsLive((value) => !value)}
+            onClick={handleToggleLive}
             className={`w-full rounded-2xl px-8 py-7 text-3xl font-bold text-white shadow-sm transition ${
               isLive
                 ? "bg-red-600 hover:bg-red-700"
