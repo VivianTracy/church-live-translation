@@ -8,7 +8,8 @@ import { MicrophoneCard } from "@/components/MicrophoneCard";
 import { StatusCard } from "@/components/StatusCard";
 import { saveCaptionState } from "@/lib/captionApi";
 import { translateChineseToEnglish } from "@/lib/translation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createSpeechBuffer } from "@/lib/speechBuffer";
 
 export default function OperatorPage() {
   const [isLive, setIsLive] = useState(false);
@@ -26,8 +27,6 @@ export default function OperatorPage() {
   const [lastTranslationMs, setLastTranslationMs] = useState<number | null>(
     null
   );
-
-  const translationTimer = useRef<NodeJS.Timeout | null>(null);
 
   const handleToggleLive = async () => {
     const nextIsLive = !isLive;
@@ -77,16 +76,17 @@ export default function OperatorPage() {
     }
   };
 
-  const scheduleTranslation = (text: string) => {
-    if (translationTimer.current) {
-      clearTimeout(translationTimer.current);
-    }
-
-    translationTimer.current = setTimeout(() => {
-      translateAndBroadcast(text);
-    }, 1000);
-  };
-
+  
+  const speechBuffer = useMemo(
+  () =>
+    createSpeechBuffer({
+      delayMs: 2000,
+      onFlush: (text) => {
+        translateAndBroadcast(text);
+      },
+    }),
+  []
+);
   const handleStartMicrophone = () => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -131,7 +131,7 @@ export default function OperatorPage() {
         return;
       }
 
-      scheduleTranslation(text);
+      speechBuffer.add(text);
     };
 
     recognition.onerror = () => {
@@ -159,13 +159,7 @@ export default function OperatorPage() {
     return () => clearInterval(timer);
   }, [isLive]);
 
-  useEffect(() => {
-    return () => {
-      if (translationTimer.current) {
-        clearTimeout(translationTimer.current);
-      }
-    };
-  }, []);
+
 
   return (
     <main className="min-h-screen bg-stone-50 px-6 py-10 text-slate-900">
