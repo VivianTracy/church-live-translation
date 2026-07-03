@@ -1,3 +1,4 @@
+> This project was built to help bilingual churches make worship services more accessible for English-speaking attendees through real-time AI translation.
 # Church Caption
 
 Real-time AI-powered bilingual captions for church worship services.
@@ -146,3 +147,13 @@ The translation policy includes:
 Current milestone:
 
 ✅ First Sunday Demo
+
+## Design Principles
+
+Church Caption follows a few core principles:
+
+- Keep the operator workflow simple.
+- Optimize for readability over literal translation.
+- Preserve biblical accuracy.
+- Prefer church terminology familiar to English-speaking Christians.
+- Build small, testable features incrementally.
