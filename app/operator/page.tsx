@@ -1,28 +1,24 @@
 "use client";
 
-import { saveCaptionState } from "@/lib/captionState";
+import { AdvancedSettings } from "@/components/AdvancedSettings";
+import { AudienceCard } from "@/components/AudienceCard";
+import { BroadcastCard } from "@/components/BroadcastCard";
+import { Header } from "@/components/Header";
+import { MicrophoneCard } from "@/components/MicrophoneCard";
+import { StatusCard } from "@/components/StatusCard";
+import { saveCaptionState } from "@/lib/captionApi";
 import { translateChineseToEnglish } from "@/lib/translation";
 import { useEffect, useState } from "react";
-import { Header } from "@/components/Header";
-import { StatusCard } from "@/components/StatusCard";
-import { BroadcastCard } from "@/components/BroadcastCard";
-import { MicrophoneCard } from "@/components/MicrophoneCard";
-import { AudienceCard } from "@/components/AudienceCard";
-import { AdvancedSettings } from "@/components/AdvancedSettings";
-
 
 export default function OperatorPage() {
-  // Operator session state
   const [isLive, setIsLive] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Manual test caption state
   const [testCaption, setTestCaption] = useState(
     "Welcome to today's worship service."
   );
 
-  // Microphone and translation state
   const [isListening, setIsListening] = useState(false);
   const [micTranscript, setMicTranscript] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
@@ -31,45 +27,27 @@ export default function OperatorPage() {
     null
   );
 
-  /**
-   * Start or stop the live caption session.
-   *
-   * This updates the operator UI and broadcasts the current
-   * live status to the audience page.
-   */
-  const handleToggleLive = () => {
+  const handleToggleLive = async () => {
     const nextIsLive = !isLive;
     setIsLive(nextIsLive);
 
-    saveCaptionState({
+    await saveCaptionState({
       isLive: nextIsLive,
       caption: nextIsLive ? "Live captions have started." : "",
       updatedAt: Date.now(),
     });
   };
 
-  /**
-   * Send a manual test caption.
-   *
-   * This lets us test the full operator-to-audience pipeline
-   * before relying on microphone input or AI translation.
-   */
-  const handleSendTestCaption = () => {
+  const handleSendTestCaption = async () => {
     setIsLive(true);
 
-    saveCaptionState({
+    await saveCaptionState({
       isLive: true,
       caption: testCaption,
       updatedAt: Date.now(),
     });
   };
 
-  /**
-   * Start browser speech recognition.
-   *
-   * Pipeline:
-   * Microphone → Chinese transcript → Gemini translation → Audience page
-   */
   const handleStartMicrophone = () => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -106,11 +84,8 @@ export default function OperatorPage() {
         }
       }
 
-      // Show interim Chinese text on the operator page only.
       setMicTranscript(finalTranscript || interimTranscript);
 
-      // Translate only finalized speech.
-      // Interim results change constantly and create unstable captions.
       if (!finalTranscript.trim()) {
         return;
       }
@@ -125,7 +100,7 @@ export default function OperatorPage() {
 
         setLastTranslationMs(Date.now() - startedAt);
 
-        saveCaptionState({
+        await saveCaptionState({
           isLive: true,
           caption: english,
           updatedAt: Date.now(),
@@ -150,9 +125,6 @@ export default function OperatorPage() {
     recognition.start();
   };
 
-  /**
-   * Count how long the live caption session has been running.
-   */
   useEffect(() => {
     if (!isLive) {
       setSeconds(0);
@@ -171,20 +143,17 @@ export default function OperatorPage() {
       <div className="mx-auto max-w-3xl space-y-8">
         <Header />
 
-     
         <StatusCard
           isLive={isLive}
           seconds={seconds}
           onToggleLive={handleToggleLive}
         />
 
-    
         <BroadcastCard
           testCaption={testCaption}
           onChangeTestCaption={setTestCaption}
           onSendTestCaption={handleSendTestCaption}
         />
-
 
         <MicrophoneCard
           isListening={isListening}
@@ -195,10 +164,8 @@ export default function OperatorPage() {
           onStartMicrophone={handleStartMicrophone}
         />
 
-
         <AudienceCard />
 
-        {/* Advanced Settings */}
         <AdvancedSettings
           showAdvanced={showAdvanced}
           onToggleAdvanced={() => setShowAdvanced((value) => !value)}

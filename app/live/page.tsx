@@ -1,10 +1,9 @@
 "use client";
 
-import { loadCaptionState } from "@/lib/captionState";
+import { loadCaptionState } from "@/lib/captionApi";
+import { CURRENT_SERVICE } from "@/lib/service";
 import { CaptionState } from "@/types/caption";
 import { useEffect, useState } from "react";
-import {CURRENT_SERVICE} from "@/lib/service";
-
 
 export default function LivePage() {
   const [captionState, setCaptionState] = useState<CaptionState>({
@@ -14,20 +13,19 @@ export default function LivePage() {
   });
 
   useEffect(() => {
-    const loadState = () => {
-      const saved = loadCaptionState();
-      if (saved) setCaptionState(saved);
+    const loadState = async () => {
+      const saved = await loadCaptionState();
+
+      if (saved) {
+        setCaptionState(saved);
+      }
     };
 
     loadState();
 
-    window.addEventListener("storage", loadState);
-    window.addEventListener("church-caption-updated", loadState);
+    const timer = setInterval(loadState, 1000);
 
-    return () => {
-      window.removeEventListener("storage", loadState);
-      window.removeEventListener("church-caption-updated", loadState);
-    };
+    return () => clearInterval(timer);
   }, []);
 
   const hasCaption = captionState.caption.trim().length > 0;
@@ -39,10 +37,14 @@ export default function LivePage() {
           <p className="text-sm font-medium text-slate-500">
             {CURRENT_SERVICE.churchName}
           </p>
+
           <h1 className="mt-3 text-4xl font-bold tracking-tight">
             {CURRENT_SERVICE.targetLanguage} Live Captions
           </h1>
-          <p className="mt-2 text-lg text-slate-600">{CURRENT_SERVICE.serviceName}</p>
+
+          <p className="mt-2 text-lg text-slate-600">
+            {CURRENT_SERVICE.serviceName}
+          </p>
         </header>
 
         <section className="mt-10 rounded-3xl bg-white p-6 text-center shadow-sm ring-1 ring-slate-200">
