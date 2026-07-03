@@ -4,12 +4,6 @@ import { loadCaptionState } from "@/lib/captionState";
 import { CaptionState } from "@/types/caption";
 import { useEffect, useState } from "react";
 
-type CaptionState = {
-  isLive: boolean;
-  caption: string;
-  updatedAt: number;
-};
-
 export default function LivePage() {
   const [captionState, setCaptionState] = useState<CaptionState>({
     isLive: false,
@@ -34,43 +28,58 @@ export default function LivePage() {
     };
   }, []);
 
+  const hasCaption = captionState.caption.trim().length > 0;
+
   return (
-    <main className="min-h-screen bg-stone-50 flex items-center justify-center px-6">
-      <div className="max-w-2xl w-full text-center">
-        <h1 className="text-5xl font-bold text-slate-900">Church Caption</h1>
+    <main className="min-h-screen bg-stone-50 px-5 py-8 text-slate-900">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-2xl flex-col">
+        <header className="text-center">
+          <p className="text-sm font-medium text-slate-500">
+            Peace Valley Chinese Christian Church
+          </p>
+          <h1 className="mt-3 text-4xl font-bold tracking-tight">
+            English Live Captions
+          </h1>
+          <p className="mt-2 text-lg text-slate-600">Sunday Worship</p>
+        </header>
 
-        <p className="mt-3 text-xl text-slate-600">Live English Captions</p>
+        <section className="mt-10 rounded-3xl bg-white p-6 text-center shadow-sm ring-1 ring-slate-200">
+          <p className="text-sm font-bold tracking-widest text-slate-500">
+            {captionState.isLive ? "LIVE" : "WAITING"}
+          </p>
 
-        <p className="mt-1 text-slate-500">Sunday Worship</p>
+          <div className="mt-4 text-5xl">
+            {captionState.isLive ? "●" : "💬"}
+          </div>
 
-        <div className="mt-12 rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 p-10">
-          <div className="text-6xl mb-6">{captionState.isLive ? "🟢" : "💬"}</div>
-
-          <h2 className="text-3xl font-semibold">
+          <h2 className="mt-4 text-2xl font-semibold">
             {captionState.isLive
               ? "Live captions are on"
-              : "Waiting for today's sermon..."}
+              : "Waiting for worship to begin..."}
           </h2>
 
-          <p className="mt-4 text-slate-600">
+          <p className="mt-3 text-slate-600">
             Please keep this page open during the worship service.
           </p>
-        </div>
+        </section>
 
-        <div className="mt-10 rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 p-8">
-          <h3 className="text-lg font-semibold text-slate-700 mb-6">
-            Live Caption
-          </h3>
-
-          <p className="text-2xl leading-relaxed text-slate-800">
-            {captionState.caption ||
-              "Today's English captions will appear here."}
+        <section className="mt-8 flex flex-1 items-center rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
+          <p
+            className={`w-full text-center leading-relaxed ${
+              hasCaption
+                ? "text-4xl font-semibold text-slate-900"
+                : "text-2xl text-slate-400"
+            }`}
+          >
+            {hasCaption
+              ? captionState.caption
+              : "Today’s English captions will appear here."}
           </p>
-        </div>
+        </section>
 
-        <p className="mt-10 text-sm text-slate-400">
-          Peace Valley Chinese Christian Church
-        </p>
+        <footer className="mt-8 text-center text-xs text-slate-400">
+          Church Caption · Please silence your phone during worship
+        </footer>
       </div>
     </main>
   );
