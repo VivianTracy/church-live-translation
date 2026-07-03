@@ -1,113 +1,148 @@
 # Church Caption
 
-Version: MVP 0.1
-Status: Active Development 
+Real-time AI-powered bilingual captions for church worship services.
 
-Church Caption is an open-source project that helps churches remove language barriers during worship by providing real-time AI-powered captions.  It was inspired by the need to help English-speaking family members, youth, visitors, and multilingual congregations participate more fully in Chinese-language worship services through real-time AI-powered captions.
+Church Caption listens to a live Chinese sermon, translates it into natural English using AI, and broadcasts captions instantly to English-speaking attendees.
 
-Many congregations include members who do not fully understand the sermon language. Church Caption gives English-speaking spouses, ABC youth, and visitors a simple way to follow along—without requiring extra AV staff or complex equipment.
+---
 
-## MVP Scope
+## Features
 
-Version 1 is intentionally narrow:
+- 🎤 Browser-based speech recognition
+- 🤖 AI-powered Chinese → English translation
+- 📱 Live audience caption page
+- ⛪ Church-specific translation policy
+- 📖 Bible-aware terminology
+- ⚡ Near real-time caption broadcasting
 
-- **Chinese sermon** as the source language
-- **English live captions** for the audience
-- **Simple operator interface** for a single volunteer in the sound booth
-- **Mobile audience experience** via QR code
+---
 
-The goal is not to support every language or workflow on day one. The goal is to make one use case work reliably on Sunday morning.
+## Current Architecture
 
-## Vision
-
-If the MVP succeeds, Church Caption may grow to support:
-
-- Scripture recognition
-- Automatic Bible verse display
-- Sermon summaries
-- Sermon archive
-- Discussion question generation
-- Additional language support
-
-These are future directions—not current features.
-
-## Project Goals
-
-- **Reliable over feature-rich** — captions should work when the service starts
-- **Simple enough for church volunteers** — minimal training, minimal friction
-- **Modern web architecture** — maintainable, deployable, and extensible
-- **Open source** — built for and with the church community
-- **Designed for churches** — optimized for real worship environments, not demos
-
-## Development Philosophy
-
-- Build the smallest useful feature first
-- Optimize for Sunday morning reliability
-- Avoid unnecessary complexity
-
-## Technology Stack
-
-| Layer | Technology |
-| --- | --- |
-| Framework | [Next.js](https://nextjs.org) (App Router) |
-| UI | [React](https://react.dev) |
-| Language | [TypeScript](https://www.typescriptlang.org) |
-| Styling | [Tailwind CSS](https://tailwindcss.com) |
-
-## Development Status
-
-**Early MVP — UI foundation in place, live captioning not yet implemented.**
-
-| Area | Status |
-| --- | --- |
-| Admin page | Done |
-| Audience page | Done |
-| QR code for mobile viewing | Done |
-| Glossary input | Done |
-| Browser microphone capture | Not started |
-| Live subtitles | Not started |
-
-See [ROADMAP.md](./ROADMAP.md) for the full phased plan.
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 20+
-- npm
-
-### Run locally
-
-```bash
-npm install
-npm run dev
+```
+Pastor
+    │
+    ▼
+Microphone (Chrome)
+    │
+    ▼
+Speech Recognition
+    │
+    ▼
+Church Translation Policy
+    │
+    ▼
+Gemini 2.5 Flash
+    │
+    ▼
+Live Caption Broadcast
+    │
+    ▼
+Audience Devices
 ```
 
-Open [http://localhost:3000/admin](http://localhost:3000/admin) for the operator interface, or [http://localhost:3000/captions](http://localhost:3000/captions) for the audience view.
+---
 
-### Build
+## Project Structure
 
-```bash
-npm run build
-npm start
 ```
+app/
+    operator/
+    live/
+    api/
+        translate/
+
+components/
+    Header
+    StatusCard
+    BroadcastCard
+    MicrophoneCard
+    AudienceCard
+    AdvancedSettings
+
+lib/
+    captionState
+    translation
+    translationPrompt
+    service
+```
+
+---
+
+## Technology
+
+- Next.js 15
+- React
+- TypeScript
+- Tailwind CSS
+- Google Gemini API
+- Chrome Speech Recognition
+
+---
+
+## Current MVP
+
+### Operator
+
+- Start / Stop live captions
+- Broadcast manual captions
+- Live microphone recognition
+- AI translation
+- Translation status
+- Translation latency
+
+### Audience
+
+- Mobile-friendly caption display
+- Live updates
+- Waiting state
+- Shared worship service information
+
+---
+
+## Translation Policy
+
+Church Caption is designed specifically for bilingual Christian worship.
+
+The translation policy includes:
+
+- Biblical terminology
+- Standard English Bible book names
+- Natural church English
+- Church-specific style guide
+- Worship vocabulary
+
+---
 
 ## Roadmap
 
-Progress and upcoming work are tracked in [ROADMAP.md](./ROADMAP.md).
+### Version 0.2
 
-## Contributing
+- QR code generation
+- Connected audience count
+- Editable glossary
+- Session management
+- Multiple worship services
 
-Contributions are welcome. This project is in early development, and guidelines are still being defined.
+### Version 0.3
 
-If you would like to help:
+- Whisper transcription
+- Speaker detection
+- Translation memory
+- Caption history
 
-1. Open an issue to discuss a bug or feature
-2. Fork the repository and open a pull request
-3. Keep changes focused on the current MVP scope
+### Future Ideas
 
-More detailed contribution guidelines will be added as the project matures.
+- Bible reference detection
+- Bible verse panel
+- Pastor-specific translation profiles
+- Multi-language support
+- Cloud deployment
 
-## License
+---
 
-License information will be added soon.
+## Status
+
+Current milestone:
+
+✅ First Sunday Demo
