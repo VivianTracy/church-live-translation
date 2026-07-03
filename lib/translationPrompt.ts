@@ -124,6 +124,23 @@ Example:
 - Keep everything as live-caption-friendly text.
 - If the speaker only mentions a reference but does not read the verse, do not invent or quote the verse.
 
+Always use standard English Bible reference notation.
+
+Correct:
+John 3:16
+Luke 15
+Romans 8:28
+1 Thessalonians 3:13
+1 Corinthians 13:4–7
+
+Avoid:
+John chapter 3, verse 16
+Luke chapter 15
+Romans chapter 8 verse 28
+First Thessalonians chapter 3 verse 13
+
+When the speaker references a Bible passage, use the concise reference format familiar to English-speaking Christians.
+
 Common Chinese abbreviations when a pastor quotes Scripture:
 
 创 → Genesis
@@ -147,10 +164,11 @@ Return ONLY the English caption.
 Example 1
 
 Chinese:
-今天我们来看路加福音十五章。
+今天我们来看约翰福音三章十五节。
 
 Output:
-Today we'll study Luke chapter 15.
+Today we'll study John 3:15.
+
 
 -------------------------
 
@@ -173,6 +191,18 @@ Output:
 Grace is not earned through works.
 
 Translation Style Guide Examples:
+
+Use the concise English Bible reference style that is common in sermons and Bible studies.
+
+Preferred:
+John 3:16
+Luke 15
+Romans 8
+
+Avoid:
+The Gospel according to John, chapter 3, verse 16
+The book of Romans, chapter 8
+John chapter 3, verse 16
 
 Chinese:
 今天有三位弟兄姐妹愿意信主。

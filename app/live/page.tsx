@@ -3,6 +3,7 @@
 import { loadCaptionState } from "@/lib/captionState";
 import { CaptionState } from "@/types/caption";
 import { useEffect, useState } from "react";
+import {CURRENT_SERVICE} from "@/lib/service";
 
 export default function LivePage() {
   const [captionState, setCaptionState] = useState<CaptionState>({
@@ -35,12 +36,12 @@ export default function LivePage() {
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-2xl flex-col">
         <header className="text-center">
           <p className="text-sm font-medium text-slate-500">
-            Peace Valley Chinese Christian Church
+            {CURRENT_SERVICE.churchName}
           </p>
           <h1 className="mt-3 text-4xl font-bold tracking-tight">
-            English Live Captions
+            {CURRENT_SERVICE.targetLanguage} Live Captions
           </h1>
-          <p className="mt-2 text-lg text-slate-600">Sunday Worship</p>
+          <p className="mt-2 text-lg text-slate-600">{CURRENT_SERVICE.serviceName}</p>
         </header>
 
         <section className="mt-10 rounded-3xl bg-white p-6 text-center shadow-sm ring-1 ring-slate-200">
