@@ -10,6 +10,24 @@ import { MicrophoneCard } from "@/components/MicrophoneCard";
 import { AudienceCard } from "@/components/AudienceCard";
 import { AdvancedSettings } from "@/components/AdvancedSettings";
 
+type SpeechRecognitionConstructor = new () => {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onstart: (() => void) | null;
+  onresult: ((event: any) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+};
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
 export default function OperatorPage() {
   // Operator session state
   const [isLive, setIsLive] = useState(false);

@@ -4,7 +4,7 @@ import { loadCaptionState } from "@/lib/captionState";
 import { CaptionState } from "@/types/caption";
 import { useEffect, useState } from "react";
 import {CURRENT_SERVICE} from "@/lib/service";
-import { CaptionState } from "@/types/caption";
+
 
 export default function LivePage() {
   const [captionState, setCaptionState] = useState<CaptionState>({
