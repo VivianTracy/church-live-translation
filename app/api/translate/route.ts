@@ -29,12 +29,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       translation: response.text,
     });
-  } catch (error) {
-    console.error("Translation error:", error);
+} catch (error: any) {
+  console.error("Gemini error:", error);
 
-    return NextResponse.json(
-      { error: "Translation failed" },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(
+    {
+      error: error?.message ?? "Translation failed",
+      status: error?.status,
+    },
+    {
+      status: error?.status || 500,
+    }
+  );
+}
 }

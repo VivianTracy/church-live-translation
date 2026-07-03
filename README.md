@@ -1,159 +1,267 @@
-> This project was built to help bilingual churches make worship services more accessible for English-speaking attendees through real-time AI translation.
 # Church Caption
 
 Real-time AI-powered bilingual captions for church worship services.
 
-Church Caption listens to a live Chinese sermon, translates it into natural English using AI, and broadcasts captions instantly to English-speaking attendees.
+Church Caption helps bilingual churches make worship services more accessible for English-speaking attendees by translating live Chinese sermons into natural English and broadcasting captions in real time to any device.
 
 ---
 
-## Features
+# Current Version
+
+## Version 0.2 – Cloud Beta
+
+### Highlights
+
+- ☁️ Cloud deployment with Vercel
+- 🌐 Cross-browser and cross-device synchronization
+- ⚡ Shared caption state using Redis
+- 🤖 AI-powered Chinese → English translation
+- 📱 Mobile-friendly live caption page
+- 📖 Church-aware and Bible-aware translation
+
+---
+
+# Features
 
 - 🎤 Browser-based speech recognition
 - 🤖 AI-powered Chinese → English translation
 - 📱 Live audience caption page
+- ⚡ Real-time caption broadcasting
+- ☁️ Shared cloud caption state
 - ⛪ Church-specific translation policy
 - 📖 Bible-aware terminology
-- ⚡ Near real-time caption broadcasting
+- 📱 Works across browsers and devices
 
 ---
 
-## Current Architecture
+# System Architecture
 
 ```
-Pastor
-    │
-    ▼
-Microphone (Chrome)
-    │
-    ▼
-Speech Recognition
-    │
-    ▼
-Church Translation Policy
-    │
-    ▼
-Gemini 2.5 Flash
-    │
-    ▼
-Live Caption Broadcast
-    │
-    ▼
-Audience Devices
+                 Pastor
+                    │
+                    ▼
+          Chrome Speech Recognition
+                    │
+                    ▼
+             Operator Page
+                    │
+          ┌─────────┴─────────┐
+          ▼                   ▼
+   /api/translate      /api/caption-state
+          │                   │
+          ▼                   ▼
+     Gemini 2.5 Flash       Redis
+                              ▲
+                              │
+                    Live Audience Page
+                              │
+                              ▼
+                     Audience Devices
 ```
 
 ---
 
-## Project Structure
+# Project Structure
 
 ```
 app/
-    operator/
-    live/
-    api/
-        translate/
-
+│
+├── operator/
+├── live/
+│
+├── api/
+│   ├── translate/
+│   └── caption-state/
+│
 components/
-    Header
-    StatusCard
-    BroadcastCard
-    MicrophoneCard
-    AudienceCard
-    AdvancedSettings
-
+│   Header
+│   StatusCard
+│   BroadcastCard
+│   MicrophoneCard
+│   AudienceCard
+│   AdvancedSettings
+│
 lib/
-    captionState
-    translation
-    translationPrompt
-    service
+│   captionApi
+│   redis
+│   translation
+│   translationPrompt
+│   service
+│
+types/
+│   caption.ts
 ```
 
 ---
 
-## Technology
+# Technology Stack
 
-- Next.js 15
+### Frontend
+
+- Next.js
 - React
 - TypeScript
 - Tailwind CSS
-- Google Gemini API
+
+### AI
+
+- Google Gemini 2.5 Flash
 - Chrome Speech Recognition
+
+### Backend
+
+- Next.js API Routes
+- Upstash Redis
+- Vercel
 
 ---
 
-## Current MVP
+# Current MVP
 
-### Operator
+## Operator Console
 
 - Start / Stop live captions
-- Broadcast manual captions
+- Manual caption broadcasting
 - Live microphone recognition
 - AI translation
 - Translation status
 - Translation latency
+- Shared cloud broadcasting
 
-### Audience
+## Audience Page
 
-- Mobile-friendly caption display
-- Live updates
-- Waiting state
-- Shared worship service information
+- Mobile-friendly display
+- Live caption updates
+- Waiting screen
+- Church information
+- Works on any browser
 
 ---
 
-## Translation Policy
+# Translation Policy
 
 Church Caption is designed specifically for bilingual Christian worship.
 
-The translation policy includes:
+The translation engine is instructed to:
 
-- Biblical terminology
-- Standard English Bible book names
-- Natural church English
-- Church-specific style guide
-- Worship vocabulary
+- Preserve biblical meaning
+- Use standard English Bible book names
+- Detect Bible references
+- Use natural church English
+- Avoid word-for-word translation
+- Follow a church-specific translation style
+
+Example:
+
+Chinese
+
+```
+今天我们来看约翰福音三章十五节。
+```
+
+↓
+
+English
+
+```
+Today we'll study John 3:15.
+```
 
 ---
 
-## Roadmap
+# Design Principles
 
-### Version 0.2
+Church Caption follows a few core principles.
 
-- QR code generation
+### Keep the operator workflow simple.
+
+Technology should disappear during worship.
+
+---
+
+### Optimize for readability.
+
+Audience members should read naturally rather than literally.
+
+---
+
+### Preserve biblical accuracy.
+
+Bible terminology should remain consistent with common English translations.
+
+---
+
+### Separate UI from infrastructure.
+
+The user interface should not know whether captions come from Redis, Gemini, or another service.
+
+---
+
+### Build incrementally.
+
+Small, testable improvements are preferred over large rewrites.
+
+---
+
+# Roadmap
+
+## Version 0.3 – Translation Stability
+
+- Debounce translation requests
+- Speech buffering
+- Retry transient AI failures
+- Better translation diagnostics
+- Translation performance metrics
+
+---
+
+## Version 0.4 – Operator Experience
+
+- QR code audience onboarding
 - Connected audience count
+- Service management
+- Caption history
 - Editable glossary
-- Session management
-- Multiple worship services
 
-### Version 0.3
+---
+
+## Version 0.5 – Production Readiness
 
 - Whisper transcription
 - Speaker detection
 - Translation memory
-- Caption history
-
-### Future Ideas
-
-- Bible reference detection
-- Bible verse panel
-- Pastor-specific translation profiles
+- Authentication
+- Analytics
 - Multi-language support
-- Cloud deployment
 
 ---
 
-## Status
+# Status
 
 Current milestone:
 
-✅ First Sunday Demo
+✅ Version 0.2 – Cloud Beta
 
-## Design Principles
+Completed
 
-Church Caption follows a few core principles:
+- ✅ Cloud deployment
+- ✅ Redis shared caption state
+- ✅ Cross-device synchronization
+- ✅ AI translation
+- ✅ Bible-aware translation policy
+- ✅ Mobile audience page
+- ✅ REST API architecture
 
-- Keep the operator workflow simple.
-- Optimize for readability over literal translation.
-- Preserve biblical accuracy.
-- Prefer church terminology familiar to English-speaking Christians.
-- Build small, testable features incrementally.
+Currently in progress
+
+- 🚧 Translation stability
+- 🚧 Speech buffering
+- 🚧 Translation request optimization
+
+---
+
+# Vision
+
+Church Caption aims to make bilingual worship services accessible without requiring expensive AV systems or dedicated hardware.
+
+A single operator should be able to translate a live sermon into natural English and instantly share captions with every attendee using only a web browser.

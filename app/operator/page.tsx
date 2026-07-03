@@ -8,7 +8,7 @@ import { MicrophoneCard } from "@/components/MicrophoneCard";
 import { StatusCard } from "@/components/StatusCard";
 import { saveCaptionState } from "@/lib/captionApi";
 import { translateChineseToEnglish } from "@/lib/translation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function OperatorPage() {
   const [isLive, setIsLive] = useState(false);
@@ -26,6 +26,8 @@ export default function OperatorPage() {
   const [lastTranslationMs, setLastTranslationMs] = useState<number | null>(
     null
   );
+
+  const translationTimer = useRef<NodeJS.Timeout | null>(null);
 
   const handleToggleLive = async () => {
     const nextIsLive = !isLive;
@@ -46,6 +48,43 @@ export default function OperatorPage() {
       caption: testCaption,
       updatedAt: Date.now(),
     });
+  };
+
+  const translateAndBroadcast = async (text: string) => {
+    setIsTranslating(true);
+    setTranslationError("");
+
+    const startedAt = Date.now();
+
+    try {
+      const english = await translateChineseToEnglish(text);
+
+      setTranslationError("");
+      setLastTranslationMs(Date.now() - startedAt);
+
+      await saveCaptionState({
+        isLive: true,
+        caption: english,
+        updatedAt: Date.now(),
+      });
+    } catch (error) {
+      console.error(error);
+      setTranslationError(
+        "The last speech segment could not be translated. Still listening..."
+      );
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const scheduleTranslation = (text: string) => {
+    if (translationTimer.current) {
+      clearTimeout(translationTimer.current);
+    }
+
+    translationTimer.current = setTimeout(() => {
+      translateAndBroadcast(text);
+    }, 1000);
   };
 
   const handleStartMicrophone = () => {
@@ -70,7 +109,7 @@ export default function OperatorPage() {
       setTranslationError("");
     };
 
-    recognition.onresult = async (event) => {
+    recognition.onresult = (event) => {
       let finalTranscript = "";
       let interimTranscript = "";
 
@@ -86,31 +125,13 @@ export default function OperatorPage() {
 
       setMicTranscript(finalTranscript || interimTranscript);
 
-      if (!finalTranscript.trim()) {
+      const text = finalTranscript.trim();
+
+      if (!text) {
         return;
       }
 
-      setIsTranslating(true);
-      setTranslationError("");
-
-      const startedAt = Date.now();
-
-      try {
-        const english = await translateChineseToEnglish(finalTranscript);
-
-        setLastTranslationMs(Date.now() - startedAt);
-
-        await saveCaptionState({
-          isLive: true,
-          caption: english,
-          updatedAt: Date.now(),
-        });
-      } catch (error) {
-        console.error(error);
-        setTranslationError("Translation unavailable. Please try again.");
-      } finally {
-        setIsTranslating(false);
-      }
+      scheduleTranslation(text);
     };
 
     recognition.onerror = () => {
@@ -133,10 +154,18 @@ export default function OperatorPage() {
 
     const timer = setInterval(() => {
       setSeconds((value) => value + 1);
-    }, 1000);
+    }, 2000);
 
     return () => clearInterval(timer);
   }, [isLive]);
+
+  useEffect(() => {
+    return () => {
+      if (translationTimer.current) {
+        clearTimeout(translationTimer.current);
+      }
+    };
+  }, []);
 
   return (
     <main className="min-h-screen bg-stone-50 px-6 py-10 text-slate-900">

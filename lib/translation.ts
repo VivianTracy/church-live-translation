@@ -9,11 +9,12 @@ export async function translateChineseToEnglish(
     body: JSON.stringify({ text: chinese }),
   });
 
-  if (!response.ok) {
-    throw new Error("Translation failed");
-  }
-
   const data = await response.json();
+
+  if (!response.ok) {
+    console.error("Translation API error:", data);
+    throw new Error(data.error || "Translation failed");
+  }
 
   return data.translation;
 }
