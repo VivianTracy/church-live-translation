@@ -17,6 +17,10 @@ Rules:
 - When Scripture is quoted: "Reference: verse text" with no quotation marks.
 - Preserve church terms: grace, gospel, Holy Spirit, faith, salvation, fellowship, devotion.
 
+Common Chinese Bible abbreviations:
+太 → Matthew, 约 → John, 罗 → Romans, 弗 → Ephesians,
+林前 → 1 Corinthians, 诗 → Psalms, 创 → Genesis, 启 → Revelation.
+
 Return ONLY the English caption for the latest Chinese input.
 `;
 
