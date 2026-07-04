@@ -1,9 +1,5 @@
 import { ApiError, GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
-import {
-  describeEmptyTranslation,
-  extractTranslation,
-} from "@/lib/extractTranslation";
 import { LIVE_SERMON_PROMPT } from "@/lib/translationPrompt";
 
 const ai = new GoogleGenAI({
@@ -68,7 +64,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const response = await ai.models.generateContent({
+    const stream = await ai.models.generateContentStream({
       model: "gemini-2.5-flash",
       contents: text,
       config: {
@@ -81,16 +77,19 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const translation = extractTranslation(response);
+    let translation = "";
+
+    for await (const chunk of stream) {
+      translation += chunk.text ?? "";
+    }
+
+    translation = translation.trim();
 
     if (!translation) {
       return NextResponse.json(
         {
-          error: describeEmptyTranslation(response),
-          geminiResponse: {
-            promptFeedback: response.promptFeedback,
-            candidates: response.candidates,
-          },
+          error: "Gemini returned no caption text",
+          geminiResponse: null,
         },
         { status: 502 }
       );

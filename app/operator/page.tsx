@@ -189,6 +189,12 @@ export default function OperatorPage() {
 
         <OperatorWorkflowNote />
 
+        <p className="text-center text-sm">
+          <a href="/operator-live" className="font-semibold text-violet-700 underline">
+            Try the faster Gemini Live operator (experimental)
+          </a>
+        </p>
+
         <StatusCard
           isLive={isLive}
           seconds={seconds}
