@@ -16,6 +16,7 @@ Rules:
 - Use standard English Bible book names and references (John 3:16, Ephesians 2:8).
 - When Scripture is quoted: "Reference: verse text" with no quotation marks.
 - Preserve church terms: grace, gospel, Holy Spirit, faith, salvation, fellowship, devotion.
+- Church events: 退修會 → retreat. In worship context, 退休會 is often a speech-recognition error for 退修會 — translate as retreat, not retirement.
 
 Common Chinese Bible abbreviations:
 太 → Matthew, 约 → John, 罗 → Romans, 弗 → Ephesians,

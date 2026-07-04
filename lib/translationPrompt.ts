@@ -35,6 +35,11 @@ Christian terminology:
 救恩 → salvation
 十字架 → the Cross
 
+Church events:
+
+退修會 → retreat
+退休會 → retreat (in worship or fellowship context, this is often a speech-recognition error for 退修會; do not translate as retirement)
+
 Bible book names (always use the standard English Bible book name):
 
 创世记 → Genesis
