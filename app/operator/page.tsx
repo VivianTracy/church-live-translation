@@ -12,7 +12,8 @@ import {
   TranslationError,
   translateChineseToEnglish,
 } from "@/lib/translation";
-import { useEffect, useMemo, useState } from "react";
+import { createDesktopSpeechRecognition } from "@/lib/desktopSpeechRecognition";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createSpeechBuffer } from "@/lib/speechBuffer";
 
 export default function OperatorPage() {
@@ -86,72 +87,51 @@ export default function OperatorPage() {
 
   
   const speechBuffer = useMemo(
-  () =>
-    createSpeechBuffer({
-      delayMs: 2000,
-      onFlush: (text) => {
-        translateAndBroadcast(text);
-      },
-    }),
-  []
-);
-  const handleStartMicrophone = () => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+    () =>
+      createSpeechBuffer({
+        delayMs: 2000,
+        onFlush: (text) => {
+          translateAndBroadcast(text);
+        },
+      }),
+    []
+  );
 
-    if (!SpeechRecognition) {
+  const speechRecognitionRef = useRef<ReturnType<
+    typeof createDesktopSpeechRecognition
+  > | null>(null);
+
+  useEffect(() => {
+    speechRecognitionRef.current = createDesktopSpeechRecognition({
+      onTranscript: (finalText, displayText) => {
+        setMicTranscript(displayText);
+
+        if (finalText) {
+          speechBuffer.add(finalText);
+        }
+      },
+      onListeningChange: setIsListening,
+      onError: setTranslationError,
+    });
+
+    return () => {
+      speechRecognitionRef.current?.stop();
+    };
+  }, [speechBuffer]);
+
+  const handleStartMicrophone = () => {
+    const result = speechRecognitionRef.current?.start();
+
+    if (!result?.ok) {
       alert(
-        "Speech recognition is not supported in this browser. Please use Chrome."
+        result?.error ??
+          "Speech recognition is not supported in this browser. Please use Chrome."
       );
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = "zh-CN";
-    recognition.continuous = true;
-    recognition.interimResults = true;
-
-    recognition.onstart = () => {
-      setIsListening(true);
-      setIsLive(true);
-      setTranslationError("");
-    };
-
-    recognition.onresult = (event) => {
-      let finalTranscript = "";
-      let interimTranscript = "";
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript;
-        } else {
-          interimTranscript += transcript;
-        }
-      }
-
-      setMicTranscript(finalTranscript || interimTranscript);
-
-      const text = finalTranscript.trim();
-
-      if (!text) {
-        return;
-      }
-
-      speechBuffer.add(text);
-    };
-
-    recognition.onerror = () => {
-      setIsListening(false);
-      setTranslationError("Microphone error. Please try again.");
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognition.start();
+    setIsLive(true);
+    setTranslationError("");
   };
 
   useEffect(() => {
