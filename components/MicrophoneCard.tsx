@@ -2,6 +2,7 @@ type MicrophoneCardProps = {
   isListening: boolean;
   micTranscript: string;
   isTranslating: boolean;
+  micError: string;
   translationError: string;
   lastTranslationMs: number | null;
   onStartMicrophone: () => void;
@@ -11,6 +12,7 @@ export function MicrophoneCard({
   isListening,
   micTranscript,
   isTranslating,
+  micError,
   translationError,
   lastTranslationMs,
   onStartMicrophone,
@@ -61,9 +63,15 @@ export function MicrophoneCard({
           </p>
         )}
 
+        {micError && (
+          <pre className="whitespace-pre-wrap font-semibold text-amber-700 text-xs">
+            Microphone: {micError}
+          </pre>
+        )}
+
         {translationError && (
           <pre className="whitespace-pre-wrap font-semibold text-red-600 text-xs">
-            {translationError}
+            Translation: {translationError}
           </pre>
         )}
       </div>

@@ -1,5 +1,9 @@
 import { ApiError, GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  describeEmptyTranslation,
+  extractTranslation,
+} from "@/lib/extractTranslation";
 import { LIVE_SERMON_PROMPT } from "@/lib/translationPrompt";
 
 const ai = new GoogleGenAI({
@@ -66,14 +70,34 @@ export async function POST(request: NextRequest) {
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `${LIVE_SERMON_PROMPT}
-
-        Chinese:
-        ${text}`,
+      contents: text,
+      config: {
+        systemInstruction: LIVE_SERMON_PROMPT,
+        temperature: 0,
+        maxOutputTokens: 300,
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
+      },
     });
 
+    const translation = extractTranslation(response);
+
+    if (!translation) {
+      return NextResponse.json(
+        {
+          error: describeEmptyTranslation(response),
+          geminiResponse: {
+            promptFeedback: response.promptFeedback,
+            candidates: response.candidates,
+          },
+        },
+        { status: 502 }
+      );
+    }
+
     return NextResponse.json({
-      translation: response.text,
+      translation,
     });
   } catch (error: unknown) {
     const parsed = parseGeminiError(error);

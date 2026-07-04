@@ -6,10 +6,11 @@ import { BroadcastCard } from "@/components/BroadcastCard";
 import { Header } from "@/components/Header";
 import { MicrophoneCard } from "@/components/MicrophoneCard";
 import { StatusCard } from "@/components/StatusCard";
+import { OperatorWorkflowNote } from "@/components/OperatorWorkflowNote";
 import { saveCaptionState } from "@/lib/captionApi";
 import {
   formatTranslationError,
-  TranslationError,
+  isTranslationError,
   translateChineseToEnglish,
 } from "@/lib/translation";
 import { createDesktopSpeechRecognition } from "@/lib/desktopSpeechRecognition";
@@ -29,9 +30,13 @@ export default function OperatorPage() {
   const [micTranscript, setMicTranscript] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationError, setTranslationError] = useState("");
+  const [micError, setMicError] = useState("");
   const [lastTranslationMs, setLastTranslationMs] = useState<number | null>(
     null
   );
+  const translationRequestIdRef = useRef(0);
+  const translationQueueRef = useRef(Promise.resolve());
+  const activeTranslationsRef = useRef(0);
 
   const handleToggleLive = async () => {
     const nextIsLive = !isLive;
@@ -54,42 +59,64 @@ export default function OperatorPage() {
     });
   };
 
-  const translateAndBroadcast = async (text: string) => {
-    setIsTranslating(true);
-    setTranslationError("");
+  const translateAndBroadcast = (text: string) => {
+    translationQueueRef.current = translationQueueRef.current
+      .then(async () => {
+        const requestId = ++translationRequestIdRef.current;
 
-    const startedAt = Date.now();
+        activeTranslationsRef.current += 1;
+        setIsTranslating(true);
+        setTranslationError("");
 
-    try {
-      const english = await translateChineseToEnglish(text);
+        const startedAt = Date.now();
 
-      setTranslationError("");
-      setLastTranslationMs(Date.now() - startedAt);
+        try {
+          const english = await translateChineseToEnglish(text);
 
-      await saveCaptionState({
-        isLive: true,
-        caption: english,
-        updatedAt: Date.now(),
+          if (requestId !== translationRequestIdRef.current) {
+            return;
+          }
+
+          setTranslationError("");
+          setLastTranslationMs(Date.now() - startedAt);
+
+          void saveCaptionState({
+            isLive: true,
+            caption: english,
+            updatedAt: Date.now(),
+          }).catch((error) => {
+            console.error("Failed to save caption state:", error);
+          });
+        } catch (error) {
+          if (requestId !== translationRequestIdRef.current) {
+            return;
+          }
+
+          console.error(error);
+          if (isTranslationError(error)) {
+            setTranslationError(formatTranslationError(error));
+          } else if (error instanceof Error) {
+            setTranslationError(error.message);
+          } else {
+            setTranslationError(String(error));
+          }
+        } finally {
+          activeTranslationsRef.current -= 1;
+          if (activeTranslationsRef.current === 0) {
+            setIsTranslating(false);
+          }
+        }
+      })
+      .catch((error) => {
+        console.error("Translation queue error:", error);
       });
-    } catch (error) {
-      console.error(error);
-      if (error instanceof TranslationError) {
-        setTranslationError(formatTranslationError(error));
-      } else if (error instanceof Error) {
-        setTranslationError(error.message);
-      } else {
-        setTranslationError(String(error));
-      }
-    } finally {
-      setIsTranslating(false);
-    }
   };
 
   
   const speechBuffer = useMemo(
     () =>
       createSpeechBuffer({
-        delayMs: 2000,
+        delayMs: 800,
         onFlush: (text) => {
           translateAndBroadcast(text);
         },
@@ -110,8 +137,13 @@ export default function OperatorPage() {
           speechBuffer.add(finalText);
         }
       },
-      onListeningChange: setIsListening,
-      onError: setTranslationError,
+      onListeningChange: (listening) => {
+        setIsListening(listening);
+        if (listening) {
+          setMicError("");
+        }
+      },
+      onError: setMicError,
     });
 
     return () => {
@@ -132,6 +164,7 @@ export default function OperatorPage() {
 
     setIsLive(true);
     setTranslationError("");
+    setMicError("");
   };
 
   useEffect(() => {
@@ -154,6 +187,8 @@ export default function OperatorPage() {
       <div className="mx-auto max-w-3xl space-y-8">
         <Header />
 
+        <OperatorWorkflowNote />
+
         <StatusCard
           isLive={isLive}
           seconds={seconds}
@@ -170,6 +205,7 @@ export default function OperatorPage() {
           isListening={isListening}
           micTranscript={micTranscript}
           isTranslating={isTranslating}
+          micError={micError}
           translationError={translationError}
           lastTranslationMs={lastTranslationMs}
           onStartMicrophone={handleStartMicrophone}

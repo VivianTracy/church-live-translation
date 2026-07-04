@@ -10,14 +10,34 @@ export class TranslationError extends Error {
   }
 }
 
-export function formatTranslationError(error: TranslationError): string {
-  const lines = [`HTTP ${error.status}: ${error.message}`];
+export function isTranslationError(error: unknown): error is TranslationError {
+  return error instanceof Error && error.name === "TranslationError";
+}
 
-  if (error.geminiResponse !== null && error.geminiResponse !== undefined) {
-    lines.push(JSON.stringify(error.geminiResponse, null, 2));
+export function formatTranslationError(error: TranslationError): string {
+  const geminiMessage = extractGeminiMessage(error.geminiResponse);
+
+  if (error.status === 429) {
+    return `Gemini quota exceeded (HTTP 429). ${geminiMessage || error.message}\n\nCheck usage at https://aistudio.google.com/ or wait and retry.`;
   }
 
-  return lines.join("\n");
+  if (geminiMessage) {
+    return `HTTP ${error.status}: ${geminiMessage}`;
+  }
+
+  return `HTTP ${error.status}: ${error.message}`;
+}
+
+function extractGeminiMessage(geminiResponse: unknown): string | null {
+  if (!geminiResponse || typeof geminiResponse !== "object") {
+    return null;
+  }
+
+  const response = geminiResponse as {
+    error?: { message?: string };
+  };
+
+  return response.error?.message?.trim() || null;
 }
 
 export async function translateChineseToEnglish(
