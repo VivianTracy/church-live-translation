@@ -19,6 +19,7 @@ export default function OperatorRestPage() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationError, setTranslationError] = useState("");
   const [micError, setMicError] = useState("");
+  const [micNotice, setMicNotice] = useState("");
   const [lastTranslationMs, setLastTranslationMs] = useState<number | null>(
     null
   );
@@ -109,9 +110,15 @@ export default function OperatorRestPage() {
         setIsListening(listening);
         if (listening) {
           setMicError("");
+          setMicNotice("");
         }
       },
-      onError: setMicError,
+      onRecovering: setMicNotice,
+      onError: (message) => {
+        setIsListening(false);
+        setMicNotice("");
+        setMicError(message);
+      },
     });
 
     return () => {
@@ -132,6 +139,29 @@ export default function OperatorRestPage() {
 
     setTranslationError("");
     setMicError("");
+    setMicNotice("");
+  };
+
+  const handleStopMicrophone = () => {
+    speechRecognitionRef.current?.stop();
+    setIsListening(false);
+    setMicNotice("");
+  };
+
+  const handleRestartMicrophone = () => {
+    const result = speechRecognitionRef.current?.restart();
+
+    if (!result?.ok) {
+      alert(
+        result?.error ??
+          "Speech recognition is not supported in this browser. Please use Chrome."
+      );
+      return;
+    }
+
+    setIsListening(true);
+    setMicError("");
+    setMicNotice("Restarting microphone...");
   };
 
   return (
@@ -155,9 +185,12 @@ export default function OperatorRestPage() {
           micTranscript={micTranscript}
           isTranslating={isTranslating}
           micError={micError}
+          micNotice={micNotice}
           translationError={translationError}
           lastTranslationMs={lastTranslationMs}
           onStartMicrophone={handleStartMicrophone}
+          onStopMicrophone={handleStopMicrophone}
+          onRestartMicrophone={handleRestartMicrophone}
         />
       </div>
     </main>

@@ -1,7 +1,7 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 import { NextResponse } from "next/server";
 import {
-  appendSermonContextToPrompt,
+  buildSystemInstructionWithSermonRules,
   readServiceContext,
 } from "@/lib/serviceContext";
 import {
@@ -27,9 +27,9 @@ export async function POST() {
 
   try {
     const serviceContext = await readServiceContext();
-    const systemInstruction = appendSermonContextToPrompt(
+    const systemInstruction = buildSystemInstructionWithSermonRules(
       LIVE_SERMON_PROMPT_COMPACT,
-      serviceContext.sermonText
+      serviceContext.sermonText.length > 0
     );
 
     const token = await ai.authTokens.create({

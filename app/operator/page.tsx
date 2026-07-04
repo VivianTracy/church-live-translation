@@ -24,14 +24,18 @@ export default function OperatorPage() {
   const {
     translationEngine,
     translationStatusLabel,
+    usesSermonContext,
     isListening,
     micTranscript,
     isTranslating,
     translationError,
     micError,
+    micNotice,
     lastTranslationMs,
     liveCaption,
     startMicrophone,
+    stopMicrophone,
+    restartMicrophone,
   } = useGeminiLiveOperator(translationSessionVersion);
 
   const handleToggleLive = async () => {
@@ -93,7 +97,13 @@ export default function OperatorPage() {
             Translation:{" "}
             <span className="font-semibold">{translationStatusLabel}</span>
           </p>
-          {translationEngine === "rest" && (
+          {translationEngine === "rest" && usesSermonContext && (
+            <p className="text-xs text-violet-800">
+              Sermon manuscript context uses REST translation for reliability. Live
+              API stays off while manuscript context is saved.
+            </p>
+          )}
+          {translationEngine === "rest" && !usesSermonContext && (
             <p className="text-xs text-violet-800">
               Available Live models on this key do not support TEXT captions with
               a custom sermon prompt, so translation uses REST streaming.
@@ -135,9 +145,12 @@ export default function OperatorPage() {
           micTranscript={micTranscript}
           isTranslating={isTranslating}
           micError={micError}
+          micNotice={micNotice}
           translationError={translationError}
           lastTranslationMs={lastTranslationMs}
           onStartMicrophone={handleStartMicrophone}
+          onStopMicrophone={stopMicrophone}
+          onRestartMicrophone={restartMicrophone}
         />
 
         <AudienceCard />

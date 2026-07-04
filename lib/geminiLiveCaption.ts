@@ -1,16 +1,28 @@
 import { GoogleGenAI } from "@google/genai";
+import {
+  buildLiveUtteranceMessage,
+  buildSermonReferenceSetupMessage,
+} from "@/lib/serviceContextPrompt";
 import { LIVE_CAPTION_MODEL } from "@/lib/translationPromptLive";
 
 export type GeminiLiveCaptionCallbacks = {
-  onOpen: () => void;
   onCaption: (text: string, isFinal: boolean) => void;
   onError: (message: string) => void;
   onClose: (reason?: string) => void;
 };
 
+type ConnectGeminiLiveCaptionOptions = {
+  sermonText?: string;
+};
+
 export async function connectGeminiLiveCaption(
-  callbacks: GeminiLiveCaptionCallbacks
+  callbacks: GeminiLiveCaptionCallbacks,
+  options: ConnectGeminiLiveCaptionOptions = {}
 ) {
+  const sermonText = options.sermonText?.trim() ?? "";
+  const hasSermonContext = sermonText.length > 0;
+  let acceptCaptions = !hasSermonContext;
+
   const tokenResponse = await fetch("/api/live/token", { method: "POST" });
 
   if (!tokenResponse.ok) {
@@ -33,10 +45,12 @@ export async function connectGeminiLiveCaption(
   const session = await ai.live.connect({
     model: model || LIVE_CAPTION_MODEL,
     callbacks: {
-      onopen: () => {
-        callbacks.onOpen();
-      },
+      onopen: () => {},
       onmessage: (message) => {
+        if (!acceptCaptions) {
+          return;
+        }
+
         const content = message.serverContent;
         if (!content) {
           return;
@@ -74,12 +88,33 @@ export async function connectGeminiLiveCaption(
     },
   });
 
+  if (hasSermonContext) {
+    session.sendClientContent({
+      turns: [
+        {
+          role: "user",
+          parts: [{ text: buildSermonReferenceSetupMessage(sermonText) }],
+        },
+      ],
+      turnComplete: true,
+    });
+  }
+
   return {
     translateChinese(chinese: string) {
+      acceptCaptions = true;
       session.sendClientContent({
-        turns: [{ role: "user", parts: [{ text: chinese }] }],
+        turns: [
+          {
+            role: "user",
+            parts: [{ text: buildLiveUtteranceMessage(chinese) }],
+          },
+        ],
         turnComplete: true,
       });
+    },
+    canAcceptCaption() {
+      return acceptCaptions;
     },
     close() {
       session.close();

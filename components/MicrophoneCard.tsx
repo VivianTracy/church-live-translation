@@ -3,9 +3,12 @@ type MicrophoneCardProps = {
   micTranscript: string;
   isTranslating: boolean;
   micError: string;
+  micNotice: string;
   translationError: string;
   lastTranslationMs: number | null;
   onStartMicrophone: () => void;
+  onStopMicrophone: () => void;
+  onRestartMicrophone: () => void;
 };
 
 export function MicrophoneCard({
@@ -13,27 +16,54 @@ export function MicrophoneCard({
   micTranscript,
   isTranslating,
   micError,
+  micNotice,
   translationError,
   lastTranslationMs,
   onStartMicrophone,
+  onStopMicrophone,
+  onRestartMicrophone,
 }: MicrophoneCardProps) {
   return (
     <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 space-y-5">
-      <h2 className="text-2xl font-bold text-center">
-        Microphone Test
-      </h2>
+      <h2 className="text-2xl font-bold text-center">Microphone Test</h2>
 
-      <button
-        onClick={onStartMicrophone}
-        disabled={isListening}
-        className={`w-full rounded-2xl px-6 py-5 text-2xl font-bold text-white ${
-          isListening
-            ? "cursor-not-allowed bg-blue-400"
-            : "bg-blue-600 hover:bg-blue-700"
-        }`}
-      >
-        {isListening ? "Listening..." : "Start Microphone"}
-      </button>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={onStartMicrophone}
+          disabled={isListening}
+          className={`rounded-2xl px-6 py-5 text-xl font-bold text-white ${
+            isListening
+              ? "cursor-not-allowed bg-blue-400"
+              : "bg-blue-600 hover:bg-blue-700"
+          }`}
+        >
+          Start Microphone
+        </button>
+
+        <button
+          type="button"
+          onClick={onStopMicrophone}
+          disabled={!isListening}
+          className={`rounded-2xl px-6 py-5 text-xl font-bold text-white ${
+            !isListening
+              ? "cursor-not-allowed bg-slate-400"
+              : "bg-slate-700 hover:bg-slate-800"
+          }`}
+        >
+          Stop Microphone
+        </button>
+      </div>
+
+      {isListening && (
+        <button
+          type="button"
+          onClick={onRestartMicrophone}
+          className="w-full rounded-2xl border border-amber-300 bg-amber-50 px-6 py-4 text-lg font-semibold text-amber-950 hover:bg-amber-100"
+        >
+          Restart Microphone
+        </button>
+      )}
 
       <div className="rounded-2xl bg-slate-50 p-4 min-h-24 text-lg text-slate-700">
         {micTranscript || "Chinese transcript will appear here."}
@@ -63,8 +93,14 @@ export function MicrophoneCard({
           </p>
         )}
 
-        {micError && (
+        {micNotice && (
           <pre className="whitespace-pre-wrap font-semibold text-amber-700 text-xs">
+            {micNotice}
+          </pre>
+        )}
+
+        {micError && (
+          <pre className="whitespace-pre-wrap font-semibold text-red-700 text-xs">
             Microphone: {micError}
           </pre>
         )}

@@ -1,7 +1,8 @@
 import { ApiError, GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 import {
-  appendSermonContextToPrompt,
+  buildRestTranslationInput,
+  buildSystemInstructionWithSermonRules,
   readServiceContext,
 } from "@/lib/serviceContext";
 import { LIVE_SERMON_PROMPT } from "@/lib/translationPrompt";
@@ -69,14 +70,15 @@ export async function POST(request: NextRequest) {
     }
 
     const serviceContext = await readServiceContext();
-    const systemInstruction = appendSermonContextToPrompt(
+    const systemInstruction = buildSystemInstructionWithSermonRules(
       LIVE_SERMON_PROMPT,
-      serviceContext.sermonText
+      serviceContext.sermonText.length > 0
     );
+    const contents = buildRestTranslationInput(text, serviceContext.sermonText);
 
     const stream = await ai.models.generateContentStream({
       model: "gemini-2.5-flash",
-      contents: text,
+      contents,
       config: {
         systemInstruction,
         temperature: 0,
