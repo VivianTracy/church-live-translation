@@ -103,7 +103,7 @@ export function createDesktopSpeechRecognition(
 
       callbacks.onTranscript(
         finalTranscript.trim(),
-        finalTranscript || interimTranscript
+        `${finalTranscript}${interimTranscript}`.trim()
       );
     };
 

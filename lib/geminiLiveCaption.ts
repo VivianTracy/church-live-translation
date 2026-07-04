@@ -5,7 +5,7 @@ export type GeminiLiveCaptionCallbacks = {
   onOpen: () => void;
   onCaption: (text: string, isFinal: boolean) => void;
   onError: (message: string) => void;
-  onClose: () => void;
+  onClose: (reason?: string) => void;
 };
 
 export async function connectGeminiLiveCaption(
@@ -61,8 +61,15 @@ export async function connectGeminiLiveCaption(
       onerror: (event) => {
         callbacks.onError(event.message || "Live API error");
       },
-      onclose: () => {
-        callbacks.onClose();
+      onclose: (event) => {
+        const reason =
+          typeof event === "object" &&
+          event !== null &&
+          "reason" in event &&
+          typeof event.reason === "string"
+            ? event.reason
+            : undefined;
+        callbacks.onClose(reason);
       },
     },
   });

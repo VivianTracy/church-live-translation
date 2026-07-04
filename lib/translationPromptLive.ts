@@ -25,4 +25,4 @@ Common Chinese Bible abbreviations:
 Return ONLY the English caption for the latest Chinese input.
 `;
 
-export const LIVE_CAPTION_MODEL = "gemini-live-2.5-flash-preview";
+export const LIVE_CAPTION_MODEL = "gemini-3.1-flash-live-preview";

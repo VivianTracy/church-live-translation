@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "list-models": "node scripts/list-models.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.10.0",

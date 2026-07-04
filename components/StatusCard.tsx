@@ -1,5 +1,6 @@
 type StatusCardProps = {
   isLive: boolean;
+  isListening?: boolean;
   seconds: number;
   onToggleLive: () => void;
 };
@@ -16,6 +17,7 @@ function formatTime(totalSeconds: number) {
 
 export function StatusCard({
   isLive,
+  isListening = false,
   seconds,
   onToggleLive,
 }: StatusCardProps) {
@@ -28,7 +30,13 @@ export function StatusCard({
       <div className="space-y-2">
         <p className="text-6xl font-bold">{isLive ? "🟢 LIVE" : "⚪ OFF"}</p>
         <p className="text-2xl text-slate-600">
-          {isLive ? "Captions are Broadcasting" : "Ready to Start"}
+          {isLive
+            ? isListening
+              ? "Captions are Broadcasting · Microphone Listening"
+              : "Captions are Broadcasting"
+            : isListening
+              ? "Microphone Listening"
+              : "Ready to Start"}
         </p>
         <p className="text-4xl font-mono font-semibold text-slate-800">
           {formatTime(seconds)}

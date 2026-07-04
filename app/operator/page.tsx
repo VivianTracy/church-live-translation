@@ -20,7 +20,8 @@ export default function OperatorPage() {
   );
 
   const {
-    isConnected,
+    translationEngine,
+    translationStatusLabel,
     isListening,
     micTranscript,
     isTranslating,
@@ -81,11 +82,20 @@ export default function OperatorPage() {
         <section className="rounded-3xl border border-violet-200 bg-violet-50 p-6 text-sm text-violet-950 space-y-2">
           <p className="font-semibold">Gemini Live API</p>
           <p>
-            Live session:{" "}
-            <span className="font-semibold">
-              {isConnected ? "Connected" : "Connecting..."}
-            </span>
+            Translation:{" "}
+            <span className="font-semibold">{translationStatusLabel}</span>
           </p>
+          {translationEngine === "rest" && (
+            <p className="text-xs text-violet-800">
+              Available Live models on this key do not support TEXT captions with
+              a custom sermon prompt, so translation uses REST streaming.
+            </p>
+          )}
+          {translationError && (
+            <pre className="whitespace-pre-wrap rounded-2xl bg-white/70 p-3 text-xs font-semibold text-red-700">
+              {translationError}
+            </pre>
+          )}
           {liveCaption && (
             <p className="rounded-2xl bg-white/70 p-3 text-base text-slate-800">
               Latest caption: {liveCaption}
@@ -101,6 +111,7 @@ export default function OperatorPage() {
 
         <StatusCard
           isLive={isLive}
+          isListening={isListening}
           seconds={seconds}
           onToggleLive={handleToggleLive}
         />

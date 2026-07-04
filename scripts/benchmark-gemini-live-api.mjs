@@ -107,7 +107,7 @@ async function benchmarkLive(ai, sentence) {
 
     ai.live
       .connect({
-        model: "gemini-live-2.5-flash-preview",
+        model: "gemini-3.1-flash-live-preview",
         config: {
           responseModalities: [Modality.TEXT],
           systemInstruction: COMPACT_PROMPT,

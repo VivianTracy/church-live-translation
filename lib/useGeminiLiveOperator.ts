@@ -2,12 +2,20 @@
 
 import { saveCaptionState } from "@/lib/captionApi";
 import { connectGeminiLiveCaption } from "@/lib/geminiLiveCaption";
+import {
+  formatTranslationError,
+  isTranslationError,
+  translateChineseToEnglish,
+} from "@/lib/translation";
 import { createDesktopSpeechRecognition } from "@/lib/desktopSpeechRecognition";
 import { createSpeechBuffer } from "@/lib/speechBuffer";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+export type TranslationEngine = "checking" | "live" | "rest";
+
 export function useGeminiLiveOperator() {
-  const [isConnected, setIsConnected] = useState(false);
+  const [translationEngine, setTranslationEngine] =
+    useState<TranslationEngine>("checking");
   const [isListening, setIsListening] = useState(false);
   const [micTranscript, setMicTranscript] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
@@ -22,18 +30,120 @@ export function useGeminiLiveOperator() {
     ReturnType<typeof connectGeminiLiveCaption>
   > | null>(null);
   const translationStartedAtRef = useRef<number | null>(null);
+  const pendingChineseRef = useRef<string[]>([]);
+  const connectionEpochRef = useRef(0);
+  const checkingLiveRef = useRef(true);
+  const translationRequestIdRef = useRef(0);
+  const translationQueueRef = useRef(Promise.resolve());
+  const activeTranslationsRef = useRef(0);
+  const useLiveRef = useRef(false);
+
+  const switchToRest = (reason?: string) => {
+    useLiveRef.current = false;
+    checkingLiveRef.current = false;
+    liveSessionRef.current?.close();
+    liveSessionRef.current = null;
+    pendingChineseRef.current = [];
+    setTranslationEngine("rest");
+
+    if (reason?.includes("TEXT")) {
+      setTranslationError("");
+      return;
+    }
+
+    if (reason) {
+      console.warn("Gemini Live unavailable, using REST streaming:", reason);
+    }
+  };
+
+  const flushPendingLiveTranslations = () => {
+    if (!useLiveRef.current || !liveSessionRef.current) {
+      return;
+    }
+
+    const pending = [...pendingChineseRef.current];
+    pendingChineseRef.current = [];
+
+    for (const text of pending) {
+      translationStartedAtRef.current = Date.now();
+      setIsTranslating(true);
+      liveSessionRef.current.translateChinese(text);
+    }
+  };
+
+  const translateViaRest = (text: string) => {
+    translationQueueRef.current = translationQueueRef.current
+      .then(async () => {
+        const requestId = ++translationRequestIdRef.current;
+
+        activeTranslationsRef.current += 1;
+        setIsTranslating(true);
+        setTranslationError("");
+
+        const startedAt = Date.now();
+
+        try {
+          const english = await translateChineseToEnglish(text);
+
+          if (requestId !== translationRequestIdRef.current) {
+            return;
+          }
+
+          setLiveCaption(english);
+          setLastTranslationMs(Date.now() - startedAt);
+          setTranslationError("");
+
+          await saveCaptionState({
+            isLive: true,
+            caption: english,
+            updatedAt: Date.now(),
+          });
+        } catch (error) {
+          if (requestId !== translationRequestIdRef.current) {
+            return;
+          }
+
+          console.error(error);
+          if (isTranslationError(error)) {
+            setTranslationError(formatTranslationError(error));
+          } else if (error instanceof Error) {
+            setTranslationError(error.message);
+          } else {
+            setTranslationError(String(error));
+          }
+        } finally {
+          activeTranslationsRef.current -= 1;
+          if (activeTranslationsRef.current === 0) {
+            setIsTranslating(false);
+          }
+        }
+      })
+      .catch((error) => {
+        console.error("Translation queue error:", error);
+      });
+  };
 
   useEffect(() => {
     let cancelled = false;
+    const epoch = ++connectionEpochRef.current;
 
     connectGeminiLiveCaption({
       onOpen: () => {
-        if (!cancelled) {
-          setIsConnected(true);
-          setTranslationError("");
+        if (cancelled || epoch !== connectionEpochRef.current) {
+          return;
         }
+
+        useLiveRef.current = true;
+        checkingLiveRef.current = false;
+        setTranslationEngine("live");
+        setTranslationError("");
+        flushPendingLiveTranslations();
       },
       onCaption: (text, isFinal) => {
+        if (!useLiveRef.current) {
+          return;
+        }
+
         setLiveCaption(text);
         setIsTranslating(!isFinal);
 
@@ -53,47 +163,64 @@ export function useGeminiLiveOperator() {
         }
       },
       onError: (message) => {
-        setTranslationError(message);
-        setIsConnected(false);
+        if (cancelled || epoch !== connectionEpochRef.current) {
+          return;
+        }
+
+        switchToRest(message);
         setIsTranslating(false);
       },
-      onClose: () => {
-        setIsConnected(false);
+      onClose: (reason) => {
+        if (cancelled || epoch !== connectionEpochRef.current) {
+          return;
+        }
+
+        if (useLiveRef.current || checkingLiveRef.current) {
+          switchToRest(reason);
+        }
+
         setIsTranslating(false);
       },
     })
       .then((session) => {
-        if (cancelled) {
+        if (cancelled || epoch !== connectionEpochRef.current) {
           session.close();
           return;
         }
+
         liveSessionRef.current = session;
       })
       .catch((error) => {
-        setTranslationError(
+        if (cancelled || epoch !== connectionEpochRef.current) {
+          return;
+        }
+
+        switchToRest(
           error instanceof Error ? error.message : String(error)
         );
       });
 
     return () => {
       cancelled = true;
+      connectionEpochRef.current += 1;
       liveSessionRef.current?.close();
       liveSessionRef.current = null;
+      pendingChineseRef.current = [];
     };
   }, []);
 
-  const translateAndBroadcastRef = useRef<(text: string) => void>(() => {});
+  const sendChineseForTranslationRef = useRef<(text: string) => void>(() => {});
 
-  translateAndBroadcastRef.current = (text: string) => {
-    if (!liveSessionRef.current) {
-      setTranslationError("Live API session is not connected yet.");
+  sendChineseForTranslationRef.current = (text: string) => {
+    if (useLiveRef.current && liveSessionRef.current) {
+      translationStartedAtRef.current = Date.now();
+      setIsTranslating(true);
+      setTranslationError("");
+      liveSessionRef.current.translateChinese(text);
       return;
     }
 
-    translationStartedAtRef.current = Date.now();
-    setIsTranslating(true);
-    setTranslationError("");
-    liveSessionRef.current.translateChinese(text);
+    translateViaRest(text);
   };
 
   const speechBuffer = useMemo(
@@ -101,7 +228,7 @@ export function useGeminiLiveOperator() {
       createSpeechBuffer({
         delayMs: 400,
         onFlush: (text) => {
-          translateAndBroadcastRef.current(text);
+          sendChineseForTranslationRef.current(text);
         },
       }),
     []
@@ -125,7 +252,10 @@ export function useGeminiLiveOperator() {
           setMicError("");
         }
       },
-      onError: setMicError,
+      onError: (message) => {
+        setIsListening(false);
+        setMicError(message);
+      },
     });
 
     return () => {
@@ -134,11 +264,6 @@ export function useGeminiLiveOperator() {
   }, [speechBuffer]);
 
   const startMicrophone = () => {
-    if (!isConnected) {
-      setTranslationError("Waiting for Gemini Live API connection...");
-      return false;
-    }
-
     const result = speechRecognitionRef.current?.start();
     if (!result?.ok) {
       alert(
@@ -148,13 +273,22 @@ export function useGeminiLiveOperator() {
       return false;
     }
 
+    setIsListening(true);
     setMicError("");
-    setTranslationError("");
     return true;
   };
 
+  const translationStatusLabel =
+    translationEngine === "checking"
+      ? "Checking Live API..."
+      : translationEngine === "live"
+        ? "Connected (Live API)"
+        : "Ready (REST streaming)";
+
   return {
-    isConnected,
+    translationEngine,
+    translationStatusLabel,
+    isConnected: translationEngine === "live",
     isListening,
     micTranscript,
     isTranslating,
