@@ -7,7 +7,11 @@ import { Header } from "@/components/Header";
 import { MicrophoneCard } from "@/components/MicrophoneCard";
 import { StatusCard } from "@/components/StatusCard";
 import { saveCaptionState } from "@/lib/captionApi";
-import { translateChineseToEnglish } from "@/lib/translation";
+import {
+  formatTranslationError,
+  TranslationError,
+  translateChineseToEnglish,
+} from "@/lib/translation";
 import { useEffect, useMemo, useState } from "react";
 import { createSpeechBuffer } from "@/lib/speechBuffer";
 
@@ -68,9 +72,13 @@ export default function OperatorPage() {
       });
     } catch (error) {
       console.error(error);
-      setTranslationError(
-        "The last speech segment could not be translated. Still listening..."
-      );
+      if (error instanceof TranslationError) {
+        setTranslationError(formatTranslationError(error));
+      } else if (error instanceof Error) {
+        setTranslationError(error.message);
+      } else {
+        setTranslationError(String(error));
+      }
     } finally {
       setIsTranslating(false);
     }

@@ -62,9 +62,9 @@ export function MicrophoneCard({
         )}
 
         {translationError && (
-          <p className="font-semibold text-red-600">
+          <pre className="whitespace-pre-wrap font-semibold text-red-600 text-xs">
             {translationError}
-          </p>
+          </pre>
         )}
       </div>
     </section>
