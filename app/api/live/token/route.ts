@@ -1,6 +1,10 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 import { NextResponse } from "next/server";
 import {
+  appendSermonContextToPrompt,
+  readServiceContext,
+} from "@/lib/serviceContext";
+import {
   LIVE_CAPTION_MODEL,
   LIVE_SERMON_PROMPT_COMPACT,
 } from "@/lib/translationPromptLive";
@@ -22,6 +26,12 @@ export async function POST() {
   });
 
   try {
+    const serviceContext = await readServiceContext();
+    const systemInstruction = appendSermonContextToPrompt(
+      LIVE_SERMON_PROMPT_COMPACT,
+      serviceContext.sermonText
+    );
+
     const token = await ai.authTokens.create({
       config: {
         uses: 1,
@@ -31,7 +41,7 @@ export async function POST() {
           model: LIVE_CAPTION_MODEL,
           config: {
             responseModalities: [Modality.TEXT],
-            systemInstruction: LIVE_SERMON_PROMPT_COMPACT,
+            systemInstruction,
             temperature: 0,
             maxOutputTokens: 300,
             thinkingConfig: {

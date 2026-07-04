@@ -1,5 +1,6 @@
 "use client";
 
+import { SermonContextCard } from "@/components/SermonContextCard";
 import { AdvancedSettings } from "@/components/AdvancedSettings";
 import { AudienceCard } from "@/components/AudienceCard";
 import { BroadcastCard } from "@/components/BroadcastCard";
@@ -15,6 +16,7 @@ export default function OperatorPage() {
   const [isLive, setIsLive] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [translationSessionVersion, setTranslationSessionVersion] = useState(0);
   const [testCaption, setTestCaption] = useState(
     "Welcome to today's worship service."
   );
@@ -30,7 +32,7 @@ export default function OperatorPage() {
     lastTranslationMs,
     liveCaption,
     startMicrophone,
-  } = useGeminiLiveOperator();
+  } = useGeminiLiveOperator(translationSessionVersion);
 
   const handleToggleLive = async () => {
     const nextIsLive = !isLive;
@@ -78,6 +80,12 @@ export default function OperatorPage() {
         <Header />
 
         <OperatorWorkflowNote />
+
+        <SermonContextCard
+          onContextSaved={() => {
+            setTranslationSessionVersion((value) => value + 1);
+          }}
+        />
 
         <section className="rounded-3xl border border-violet-200 bg-violet-50 p-6 text-sm text-violet-950 space-y-2">
           <p className="font-semibold">Gemini Live API</p>

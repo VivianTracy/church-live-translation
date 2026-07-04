@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 export type TranslationEngine = "checking" | "live" | "rest";
 
-export function useGeminiLiveOperator() {
+export function useGeminiLiveOperator(translationSessionVersion = 0) {
   const [translationEngine, setTranslationEngine] =
     useState<TranslationEngine>("checking");
   const [isListening, setIsListening] = useState(false);
@@ -127,6 +127,13 @@ export function useGeminiLiveOperator() {
     let cancelled = false;
     const epoch = ++connectionEpochRef.current;
 
+    checkingLiveRef.current = true;
+    useLiveRef.current = false;
+    liveSessionRef.current?.close();
+    liveSessionRef.current = null;
+    pendingChineseRef.current = [];
+    setTranslationEngine("checking");
+
     connectGeminiLiveCaption({
       onOpen: () => {
         if (cancelled || epoch !== connectionEpochRef.current) {
@@ -207,7 +214,7 @@ export function useGeminiLiveOperator() {
       liveSessionRef.current = null;
       pendingChineseRef.current = [];
     };
-  }, []);
+  }, [translationSessionVersion]);
 
   const sendChineseForTranslationRef = useRef<(text: string) => void>(() => {});
 
