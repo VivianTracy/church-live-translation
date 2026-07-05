@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "list-models": "node scripts/list-models.mjs"
+    "list-models": "node scripts/list-models.mjs",
+    "extract:av-replay-audio": "node scripts/extract-sermon-replay-audio.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.10.0",

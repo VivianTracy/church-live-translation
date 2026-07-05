@@ -1,5 +1,6 @@
 "use client";
 
+import { AvReplayTestCard } from "@/components/AvReplayTestCard";
 import { SermonContextCard } from "@/components/SermonContextCard";
 import { AdvancedSettings } from "@/components/AdvancedSettings";
 import { AudienceCard } from "@/components/AudienceCard";
@@ -17,6 +18,7 @@ export default function OperatorPage() {
   const [seconds, setSeconds] = useState(0);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [translationSessionVersion, setTranslationSessionVersion] = useState(0);
+  const [showAvReplayTest, setShowAvReplayTest] = useState(false);
   const [testCaption, setTestCaption] = useState(
     "Welcome to today's worship service."
   );
@@ -66,6 +68,11 @@ export default function OperatorPage() {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setShowAvReplayTest(params.get("test") === "1");
+  }, []);
+
+  useEffect(() => {
     if (!isLive) {
       setSeconds(0);
       return;
@@ -84,6 +91,8 @@ export default function OperatorPage() {
         <Header />
 
         <OperatorWorkflowNote />
+
+        {showAvReplayTest ? <AvReplayTestCard /> : null}
 
         <SermonContextCard
           onContextSaved={() => {
@@ -119,6 +128,12 @@ export default function OperatorPage() {
               Latest caption: {liveCaption}
             </p>
           )}
+          <p className="text-xs text-violet-800">
+            AV replay test mode:{" "}
+            <a href="/operator?test=1" className="font-semibold underline">
+              /operator?test=1
+            </a>
+          </p>
           <p className="text-xs text-violet-800">
             Fallback REST operator:{" "}
             <a href="/operator-rest" className="font-semibold underline">
