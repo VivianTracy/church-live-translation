@@ -10,6 +10,7 @@ import {
 } from "@/lib/translation";
 import { createDesktopSpeechRecognition } from "@/lib/desktopSpeechRecognition";
 import { createSpeechBuffer } from "@/lib/speechBuffer";
+import { createSentenceCaptionPipeline } from "@/lib/sentenceCaptionPipeline";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export type TranslationEngine = "checking" | "live" | "rest";
@@ -305,6 +306,36 @@ export function useGeminiLiveOperator(translationSessionVersion = 0) {
     []
   );
 
+  const sentencePipelineRef = useRef<ReturnType<
+    typeof createSentenceCaptionPipeline
+  > | null>(null);
+  const useSentencePipelineRef = useRef(true);
+
+  useEffect(() => {
+    useSentencePipelineRef.current =
+      usesSermonContext || translationEngine !== "live";
+  }, [usesSermonContext, translationEngine]);
+
+  useEffect(() => {
+    sentencePipelineRef.current = createSentenceCaptionPipeline({
+      onPublish: (caption) => {
+        setLiveCaption(caption);
+        void saveCaptionState({
+          isLive: true,
+          caption,
+          updatedAt: Date.now(),
+        }).catch((error) => {
+          console.error("Failed to save caption state:", error);
+        });
+      },
+      translate: (chinese) => translateChineseToEnglish(chinese),
+    });
+
+    return () => {
+      sentencePipelineRef.current?.reset();
+    };
+  }, [translationSessionVersion]);
+
   const speechRecognitionRef = useRef<ReturnType<
     typeof createDesktopSpeechRecognition
   > | null>(null);
@@ -314,7 +345,11 @@ export function useGeminiLiveOperator(translationSessionVersion = 0) {
       onTranscript: (finalText, displayText) => {
         setMicTranscript(displayText);
         if (finalText) {
-          speechBuffer.add(finalText);
+          if (useSentencePipelineRef.current) {
+            sentencePipelineRef.current?.addFinalTranscript(finalText);
+          } else {
+            speechBuffer.add(finalText);
+          }
         }
       },
       onListeningChange: (listening) => {
