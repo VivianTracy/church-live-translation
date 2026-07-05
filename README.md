@@ -83,6 +83,8 @@ Live Audience Page
 
 For more detail, see [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
+New collaborators: see [`docs/COLLABORATOR_SETUP.md`](./docs/COLLABORATOR_SETUP.md) for setup and GitHub/Cursor workflow.
+
 ---
 
 ## Roadmap
