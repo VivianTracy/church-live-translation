@@ -344,13 +344,18 @@ export function useGeminiLiveOperator(translationSessionVersion = 0) {
     speechRecognitionRef.current = createDesktopSpeechRecognition({
       onTranscript: (finalText, displayText) => {
         setMicTranscript(displayText);
-        if (finalText) {
-          if (useSentencePipelineRef.current) {
-            sentencePipelineRef.current?.addFinalTranscript(finalText);
-          } else {
+        if (!useSentencePipelineRef.current) {
+          if (finalText) {
             speechBuffer.add(finalText);
           }
+          return;
         }
+
+        if (finalText) {
+          sentencePipelineRef.current?.addFinalTranscript(finalText);
+        }
+
+        sentencePipelineRef.current?.addInterimTranscript(displayText);
       },
       onListeningChange: (listening) => {
         setIsListening(listening);

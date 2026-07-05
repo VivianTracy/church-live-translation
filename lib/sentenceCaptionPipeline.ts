@@ -1,13 +1,16 @@
 import {
+  countChineseCharacters,
   joinSentences,
   splitChineseSentences,
   splitEnglishSentences,
 } from "@/lib/chineseSentences";
 
-export const SENTENCES_PER_BATCH = 3;
+export const SENTENCES_PER_BATCH = 2;
 export const TAIL_SENTENCE_COUNT = 2;
-export const REFINEMENT_WINDOW = 5;
-export const REFINEMENT_DEBOUNCE_MS = 700;
+export const REFINEMENT_WINDOW = 6;
+export const MIN_CHARS_PER_BATCH = 28;
+export const INTERIM_REFINE_DEBOUNCE_MS = 900;
+export const INTERIM_MIN_OPEN_CHARS = 12;
 
 type TranslationKind = "batch" | "refine";
 
@@ -15,7 +18,8 @@ type SentenceCaptionPipelineOptions = {
   sentencesPerBatch?: number;
   tailSentenceCount?: number;
   refinementWindow?: number;
-  refinementDebounceMs?: number;
+  minCharsPerBatch?: number;
+  interimDebounceMs?: number;
   onPublish: (caption: string) => void;
   translate: (chinese: string) => Promise<string>;
 };
@@ -24,18 +28,21 @@ export function createSentenceCaptionPipeline({
   sentencesPerBatch = SENTENCES_PER_BATCH,
   tailSentenceCount = TAIL_SENTENCE_COUNT,
   refinementWindow = REFINEMENT_WINDOW,
-  refinementDebounceMs = REFINEMENT_DEBOUNCE_MS,
+  minCharsPerBatch = MIN_CHARS_PER_BATCH,
+  interimDebounceMs = INTERIM_REFINE_DEBOUNCE_MS,
   onPublish,
   translate,
 }: SentenceCaptionPipelineOptions) {
   const chineseSentences: string[] = [];
   let committedChineseCount = 0;
+  let finalizedTranscript = "";
   let stableEnglishSentences: string[] = [];
   let tailEnglishSentences: string[] = [];
 
-  let refinementTimer: ReturnType<typeof setTimeout> | null = null;
+  let interimTimer: ReturnType<typeof setTimeout> | null = null;
   let translationQueue = Promise.resolve();
   let activeRequestId = 0;
+  let lastRefinedOpenText = "";
 
   const publishCaption = () => {
     const caption = joinSentences([
@@ -101,72 +108,105 @@ export function createSentenceCaptionPipeline({
     return translationQueue;
   };
 
-  const scheduleRefinement = () => {
-    if (refinementTimer) {
-      clearTimeout(refinementTimer);
+  const getPendingSegments = () =>
+    chineseSentences.slice(committedChineseCount);
+
+  const getPendingCharCount = () =>
+    countChineseCharacters(joinSentences(getPendingSegments()));
+
+  const commitBatch = (batch: string[]) => {
+    if (batch.length === 0) {
+      return;
     }
 
-    refinementTimer = setTimeout(() => {
-      refinementTimer = null;
+    committedChineseCount += batch.length;
+    lastRefinedOpenText = "";
+    void enqueueTranslation(joinSentences(batch), "batch");
+  };
 
-      const pendingCount = chineseSentences.length - committedChineseCount;
+  const maybeCommitBatch = () => {
+    while (true) {
+      const pending = getPendingSegments();
 
-      if (pendingCount <= 0) {
+      if (pending.length >= sentencesPerBatch) {
+        commitBatch(pending.slice(0, sentencesPerBatch));
+        continue;
+      }
+
+      const pendingChars = getPendingCharCount();
+
+      if (pending.length >= 1 && pendingChars >= minCharsPerBatch) {
+        commitBatch(pending);
+        continue;
+      }
+
+      break;
+    }
+  };
+
+  const scheduleInterimRefinement = (displayText: string) => {
+    if (interimTimer) {
+      clearTimeout(interimTimer);
+    }
+
+    interimTimer = setTimeout(() => {
+      interimTimer = null;
+
+      const openText = displayText.startsWith(finalizedTranscript)
+        ? displayText.slice(finalizedTranscript.length).trim()
+        : displayText.trim();
+
+      if (openText.length < INTERIM_MIN_OPEN_CHARS) {
         return;
       }
+
+      if (openText === lastRefinedOpenText) {
+        return;
+      }
+
+      if (openText.length < lastRefinedOpenText.length) {
+        lastRefinedOpenText = "";
+      }
+
+      const pendingCount = chineseSentences.length - committedChineseCount;
 
       if (pendingCount >= sentencesPerBatch) {
         return;
       }
 
-      const windowStart = Math.max(
-        0,
-        chineseSentences.length - refinementWindow
-      );
-      const chinese = joinSentences(chineseSentences.slice(windowStart));
-
-      if (!chinese) {
-        return;
-      }
-
-      void enqueueTranslation(chinese, "refine");
-    }, refinementDebounceMs);
-  };
-
-  const maybeCommitBatch = () => {
-    while (chineseSentences.length - committedChineseCount >= sentencesPerBatch) {
-      const batch = chineseSentences.slice(
-        committedChineseCount,
-        committedChineseCount + sentencesPerBatch
-      );
-      committedChineseCount += sentencesPerBatch;
-
-      void enqueueTranslation(joinSentences(batch), "batch");
-    }
+      lastRefinedOpenText = openText;
+      void enqueueTranslation(openText, "refine");
+    }, interimDebounceMs);
   };
 
   return {
     addFinalTranscript(text: string) {
-      const sentences = splitChineseSentences(text);
+      const cleanText = text.trim();
 
-      if (sentences.length === 0) {
+      if (!cleanText) {
         return;
       }
 
-      chineseSentences.push(...sentences);
+      finalizedTranscript += cleanText;
+      chineseSentences.push(...splitChineseSentences(cleanText));
       maybeCommitBatch();
-      scheduleRefinement();
+    },
+
+    addInterimTranscript(displayText: string) {
+      scheduleInterimRefinement(displayText);
     },
 
     reset() {
       chineseSentences.length = 0;
       committedChineseCount = 0;
+      finalizedTranscript = "";
       stableEnglishSentences = [];
       tailEnglishSentences = [];
+      lastRefinedOpenText = "";
 
-      if (refinementTimer) {
-        clearTimeout(refinementTimer);
-        refinementTimer = null;
+      if (interimTimer) {
+        clearTimeout(interimTimer);
+        interimTimer = null;
       }
 
       activeRequestId += 1;
