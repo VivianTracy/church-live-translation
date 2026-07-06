@@ -8,105 +8,21 @@ The system should reduce the burden on translation coworkers while fitting natur
 
 ---
 
-## Current Cloud Beta Architecture
+## System Overview
+
+One volunteer runs an **operator page**. The **congregation** reads English captions on **`/live`**. All operators publish to the same **Redis caption state**.
 
 ```text
-Pastor speaks Chinese
-        ↓
-Chrome Speech Recognition
-        ↓
-Operator Page
-        ↓
-translateChineseToEnglish()
-        ↓
-POST /api/translate
-        ↓
-Gemini + Church Translation Policy
-        ↓
-English caption
-        ↓
-POST /api/caption-state
-        ↓
-Redis shared caption state
-        ↓
-Live Page polls GET /api/caption-state
-        ↓
-Audience sees English caption
+Operator (mic)  →  STT  →  translate  →  Redis  →  /live (phones)
 ```
+
+Two operator implementations coexist. Only one should run per service.
 
 ---
 
-## Main Application Layers
+## Shared Hub: Caption State
 
-### 1. UI Layer
-
-```text
-app/operator/page.tsx
-app/live/page.tsx
-components/*
-```
-
-Responsible for rendering the operator console and audience display.
-
-The UI should not know whether captions are stored in Redis, Supabase, or another backend.
-
----
-
-### 2. Client Helper Layer
-
-```text
-lib/translation.ts
-lib/captionApi.ts
-```
-
-These files hide API calls from React pages.
-
-The UI calls simple functions:
-
-```ts
-translateChineseToEnglish(...)
-saveCaptionState(...)
-loadCaptionState()
-```
-
----
-
-### 3. API Layer
-
-```text
-app/api/translate/route.ts
-app/api/caption-state/route.ts
-```
-
-The browser never talks directly to Gemini or Redis.
-
-API routes protect credentials and centralize backend behavior.
-
----
-
-### 4. Service and Configuration Layer
-
-```text
-lib/translationPrompt.ts
-lib/service.ts
-lib/redis.ts
-types/caption.ts
-```
-
-Responsibilities:
-
-```text
-translationPrompt.ts  → church translation policy
-service.ts            → church and service metadata
-redis.ts              → Redis client
-caption.ts            → shared CaptionState type
-```
-
----
-
-## Caption State
-
-Current shared state shape:
+All paths read and write the same shape:
 
 ```ts
 export type CaptionState = {
@@ -116,155 +32,216 @@ export type CaptionState = {
 };
 ```
 
-This shape should remain stable unless there is a clear product reason to change it.
+| Route | Method | Role |
+|---|---|---|
+| `/api/caption-state` | `POST` | Operator publishes caption + timestamp |
+| `/api/caption-state` | `GET` | `/live` polls every second |
+
+Redis key: `caption-state`. The browser never accesses Redis or AI keys directly.
 
 ---
 
-## Current AV Assumptions
+## Operator Path A: Gemini (Production)
 
-Based on the archived X32 setup document, the church system appears to route Main L/R audio to the streaming computer through X-USB.
-
-Current known flow:
-
-```text
-Behringer X32
-        ↓
-Main L/R
-        ↓
-Output 15/16
-        ↓
-User Out 1/2
-        ↓
-X-USB
-        ↓
-Streaming Computer
-        ↓
-OBS
-```
-
-Church Caption should initially consume the existing audio feed rather than requiring mixer routing changes.
-
----
-
-## Target Church Integration Architecture
+**URL:** `/operator`  
+**Hook:** `lib/useGeminiLiveOperator.ts`
 
 ```text
-Pastor / Worship Leader / Moderator
+Pastor speaks Chinese
         ↓
-Behringer X32
-        ↓
-USB Audio Feed
-        ↓
-Streaming Computer
-        ↓
-Church Caption
-        ↓
-Translation Engine
-        ↓
-Redis Caption State
-        ↓
-Outputs
-```
-
-Possible outputs:
-
-```text
-/live       → phones or personal devices
-/overlay    → OBS Browser Source
-/display    → large screen display
-future      → transcript, AI voice, service archive
-```
-
----
-
-## OBS Integration Direction
-
-The church uses OBS.
-
-Future integration should prefer OBS Browser Source when possible.
-
-Target flow:
-
-```text
-Church Caption /overlay
-        ↓
-OBS Browser Source
-        ↓
-Existing OBS Scene
-        ↓
-Projector or livestream output
-```
-
-Important principle:
-
-Church Caption should not replace PowerPoint, OBS, or the existing AV workflow.
-
-It should become one additional source in the existing system.
-
----
-
-## Audio Strategy
-
-### Version 0.3
-
-Use the existing livestream audio feed.
-
-This requires no mixer changes.
-
-```text
-Main L/R → X-USB → Streaming Computer → Chrome / Church Caption
-```
-
-### Future Enhancement
-
-Support a dedicated translation audio mix when available.
-
-```text
-Pastor mic
-Moderator mic
-Worship leader mic
-Guest speaker mic
-        ↓
-Translation Mix / Bus
-        ↓
-USB channel
-        ↓
-Church Caption
-```
-
-This should remain optional.
-
-Church Caption should default to the existing livestream feed.
-
----
-
-## Translation Strategy
-
-Current implementation:
-
-```text
 Chrome Speech Recognition
         ↓
-Chinese text
+Chinese text (interim + final)
         ↓
-Gemini generateContent
+Sentence caption pipeline (batch / refine)
         ↓
-English caption
+Translation:
+  • Gemini Live API (WebSocket) when available, OR
+  • POST /api/translate (Gemini REST) as fallback
+        ↓
+Optional sermon manuscript (Redis service context)
+        ↓
+POST /api/caption-state
+        ↓
+Redis
 ```
 
-Current limitation:
+### Gemini-specific features
 
-Gemini request/response translation can hit rate limits during rapid speech segments.
+- **Sermon Context** — full Chinese manuscript stored in Redis improves translation accuracy and consistency (`/api/service-context`, `SermonContextCard` on `/operator`).
+- **Sentence pipeline** — `lib/sentenceCaptionPipeline.ts` batches ~2 sentences and refines interim text before translation.
+- **Live / REST fallback** — tries Gemini Live first; falls back to REST when Live is unavailable or when manuscript context requires REST.
 
-Future research should evaluate:
+### Related pages
 
-- speech buffering
-- duplicate detection
-- retry logic
-- Gemini Live API
-- Google Speech-to-Text
-- Chrome Translator API
-- audio-first translation
+| Page | Purpose |
+|---|---|
+| `/operator` | Main production console |
+| `/operator?test=1` | AV replay test (BlackHole / OBS) |
+| `/operator-rest` | Gemini REST only (simpler) |
+| `/operator-live` | Redirects to `/operator` |
+
+### API routes
+
+```text
+POST /api/translate          → Gemini + church translation policy + optional manuscript
+GET/POST /api/service-context → sermon manuscript in Redis
+GET /api/live/token          → Gemini Live session token
+```
+
+---
+
+## Operator Path B: OpenAI (Experimental)
+
+**URL:** `/operator-openai`  
+**Hook:** `lib/useOpenAIOperator.ts`
+
+```text
+Mic (echo cancellation OFF for BlackHole)
+        ↓
+5-second PCM chunks → WAV
+        ↓
+POST /api/openai/transcribe-audio
+        ↓
+gpt-4o-mini-transcribe (Chinese)
+        ↓
+POST /api/openai/translate
+        ↓
+gpt-4o-mini (Chinese → English)
+        ↓
+Append segments → POST /api/caption-state → Redis
+```
+
+### OpenAI design choices
+
+- **No sermon manuscript** — translation receives only spoken Chinese from each chunk plus a fixed system prompt (Bible names, church terms). See `lib/openaiSermonTranslationPrompt.ts`.
+- **REST chunk STT** — more reliable than Realtime Whisper manual commits for continuous sermon audio.
+- **Segment queue** — each transcribed chunk is translated and appended to the full English caption stored in Redis.
+- **Transcription monitor** — `WhisperStatusCard` shows PCM levels, API calls, and empty segments for debugging.
+
+### Related pages
+
+| Page | Purpose |
+|---|---|
+| `/operator-openai` | Experimental operator |
+| `/operator-openai?test=1` | AV replay test |
+
+### API routes
+
+```text
+POST /api/openai/transcribe-audio  → OpenAI audio/transcriptions (WAV chunks)
+POST /api/openai/translate         → GPT-4o mini chat completion
+POST /api/openai/transcription-session → legacy Realtime session (unused by current client)
+```
+
+**Requires:** `OPENAI_API_KEY`  
+**Setup:** [`docs/WHISPER_GPT_REALTIME.md`](./docs/WHISPER_GPT_REALTIME.md)
+
+---
+
+## Audience Display: `/live`
+
+**File:** `app/live/page.tsx`  
+**Component:** `components/RollingCaptionDisplay.tsx`  
+**Logic:** `lib/captionParagraph.ts`
+
+The audience does **not** see the full sermon transcript scrolling on screen.
+
+```text
+GET /api/caption-state (poll 1s)
+        ↓
+RollingCaptionDisplay
+        ↓
+Show ONE paragraph at a time
+        ↓
+New paragraph after ~2.5s pause (updatedAt gap)
+        ↓
+Auto font size (fits phone viewport)
+```
+
+Full caption text is still stored in Redis for the operator; the audience view shows only the current speaking paragraph.
+
+---
+
+## Application Layers
+
+### 1. UI
+
+```text
+app/operator/page.tsx
+app/operator-openai/page.tsx
+app/live/page.tsx
+components/*
+```
+
+Pages do not call Gemini, OpenAI, or Redis directly.
+
+### 2. Client helpers
+
+```text
+lib/translation.ts           → Gemini translate (production)
+lib/openaiTranslate.ts       → OpenAI translate (experimental)
+lib/openaiTranscribeAudio.ts → OpenAI STT chunks
+lib/captionApi.ts            → save/load caption state
+lib/serviceContextApi.ts     → sermon manuscript (Gemini path)
+```
+
+### 3. API routes (server-only keys)
+
+```text
+app/api/translate/route.ts
+app/api/caption-state/route.ts
+app/api/service-context/route.ts
+app/api/openai/transcribe-audio/route.ts
+app/api/openai/translate/route.ts
+```
+
+### 4. Policy and config
+
+```text
+lib/translationPrompt.ts           → Gemini church caption rules
+lib/openaiSermonTranslationPrompt.ts → OpenAI caption rules (no manuscript body)
+lib/service.ts                     → church name, service metadata
+lib/redis.ts                       → Redis client
+types/caption.ts                   → CaptionState type
+```
+
+---
+
+## AV Workflow (Sunday Target)
+
+```text
+Behringer X32 → Main L/R → X-USB → Streaming PC
+                                        ↓
+                                      OBS
+                                        ↓
+                              BlackHole (virtual mic)
+                                        ↓
+                              Chrome → Operator page
+                                        ↓
+                              Redis → /live (phones)
+```
+
+Church Caption does not replace OBS or the mixer. It consumes the same audio feed the streaming computer already has.
+
+**Local testing without live service:**
+
+```text
+OBS media → BlackHole → Chrome mic → /operator?test=1
+                                  or /operator-openai?test=1
+```
+
+See `lib/avReplayTest.ts` and `public/test-audio/` for the replay clip.
+
+---
+
+## Environment Variables
+
+| Variable | Used by |
+|---|---|
+| `GEMINI_API_KEY` | `/api/translate`, Live token |
+| `OPENAI_API_KEY` | OpenAI transcribe + translate routes |
+| Redis / KV vars | Caption state, service context |
 
 ---
 
@@ -272,64 +249,36 @@ Future research should evaluate:
 
 ### `main`
 
-Stable deployable branch.
+Deployable branch. Contains Gemini production operator, OpenAI experimental operator, and rolling `/live` display.
 
-Contains the current Cloud Beta implementation.
+### `preserve/gemini-manuscript-operator`
 
-Use for:
-
-- bug fixes
-- README updates
-- production-safe improvements
-- Vercel deployment
-
----
+Frozen snapshot of the pre-OpenAI architecture (Gemini + manuscript only). Use as reference or for Gemini-only development without OpenAI code paths.
 
 ### `research/audio-first`
 
-Experimental branch.
-
-Use for:
-
-- audio-first translation experiments
-- Gemini Live API research
-- Google Speech-to-Text research
-- Chrome Translator API experiments
-- OBS overlay experiments
-- translation engine redesign
-
-This branch may break.
-
-Do not rely on it for Sunday testing.
+Longer-term experiments (audio-first translation, OBS overlay, multi-speaker). May break; not for Sunday use.
 
 ---
 
 ## Architectural Principles
 
 - Keep `main` deployable.
-- Protect API keys on the server.
-- Do not call Gemini directly from React components.
+- Protect API keys on the server only.
+- Do not call Gemini or OpenAI directly from React components.
 - Keep Redis access inside API routes.
 - Keep UI independent from backend implementation.
-- Avoid changing church production AV configuration unless absolutely necessary.
-- Validate product decisions in the real church workflow.
+- Avoid changing church production AV unless necessary.
+- Validate in real worship services, not demos alone.
 
 ---
 
 ## Long-Term Vision
 
-Church Caption should become a translation engine that can produce multiple outputs:
-
 ```text
 Translation Engine
         ↓
-Captions
-AI voice
-Transcript
-Service archive
-Bible references
+Captions · AI voice · Transcript · Archive · Bible references
 ```
 
-The first output is live captions.
-
-The larger mission is bilingual worship accessibility.
+The first output is live captions. The larger mission is bilingual worship accessibility.
