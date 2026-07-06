@@ -1,6 +1,7 @@
 type MicrophoneCardProps = {
   isListening: boolean;
   micTranscript: string;
+  englishCaption?: string;
   isTranslating: boolean;
   micError: string;
   micNotice: string;
@@ -14,6 +15,7 @@ type MicrophoneCardProps = {
 export function MicrophoneCard({
   isListening,
   micTranscript,
+  englishCaption,
   isTranslating,
   micError,
   micNotice,
@@ -65,9 +67,15 @@ export function MicrophoneCard({
         </button>
       )}
 
-      <div className="rounded-2xl bg-slate-50 p-4 min-h-24 text-lg text-slate-700">
+      <div className="rounded-2xl bg-slate-50 p-4 min-h-24 text-lg text-slate-700 whitespace-pre-wrap">
         {micTranscript || "Chinese transcript will appear here."}
       </div>
+
+      {englishCaption !== undefined && (
+        <div className="rounded-2xl bg-emerald-50 p-4 min-h-24 text-lg text-slate-800 whitespace-pre-wrap">
+          {englishCaption || "English captions will appear here."}
+        </div>
+      )}
 
       <div className="rounded-2xl bg-stone-50 p-4 text-sm text-slate-600 space-y-1">
         <p>

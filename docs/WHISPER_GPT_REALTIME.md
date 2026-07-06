@@ -82,6 +82,12 @@ npm run dev
 http://localhost:3000/operator-openai
 ```
 
+For the 7-minute AV replay clip (OBS → BlackHole), use:
+
+```text
+http://localhost:3000/operator-openai?test=1
+```
+
 6. Open audience page in another tab:
 
 ```text
