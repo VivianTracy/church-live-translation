@@ -10,7 +10,7 @@ export const TAIL_SENTENCE_COUNT = 2;
 export const REFINEMENT_WINDOW = 6;
 export const MIN_CHARS_PER_BATCH = 28;
 export const INTERIM_REFINE_DEBOUNCE_MS = 900;
-export const INTERIM_MIN_OPEN_CHARS = 12;
+export const INTERIM_MIN_OPEN_CHARS = 4;
 
 type TranslationKind = "batch" | "refine";
 
@@ -21,6 +21,7 @@ type SentenceCaptionPipelineOptions = {
   minCharsPerBatch?: number;
   interimDebounceMs?: number;
   onPublish: (caption: string) => void;
+  onTranslationError?: (error: unknown) => void;
   translate: (chinese: string) => Promise<string>;
 };
 
@@ -31,6 +32,7 @@ export function createSentenceCaptionPipeline({
   minCharsPerBatch = MIN_CHARS_PER_BATCH,
   interimDebounceMs = INTERIM_REFINE_DEBOUNCE_MS,
   onPublish,
+  onTranslationError,
   translate,
 }: SentenceCaptionPipelineOptions) {
   const chineseSentences: string[] = [];
@@ -103,6 +105,7 @@ export function createSentenceCaptionPipeline({
       })
       .catch((error) => {
         console.error("Sentence caption translation failed:", error);
+        onTranslationError?.(error);
       });
 
     return translationQueue;
@@ -187,7 +190,9 @@ export function createSentenceCaptionPipeline({
         return;
       }
 
-      finalizedTranscript += cleanText;
+      finalizedTranscript = finalizedTranscript
+        ? `${finalizedTranscript} ${cleanText}`
+        : cleanText;
       chineseSentences.push(...splitChineseSentences(cleanText));
       maybeCommitBatch();
     },

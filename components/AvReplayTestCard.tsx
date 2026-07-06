@@ -1,12 +1,20 @@
 "use client";
 
 import {
-  AV_REPLAY_MAC_STEPS,
   AV_REPLAY_TEST,
-  AV_REPLAY_WINDOWS_STEPS,
+  AvReplayTestOptions,
+  getAvReplayMacSteps,
+  getAvReplayWindowsSteps,
 } from "@/lib/avReplayTest";
 
-export function AvReplayTestCard() {
+type AvReplayTestCardProps = AvReplayTestOptions;
+
+export function AvReplayTestCard({
+  operatorPath = "/operator",
+  transcriptionEngine = "Chrome speech recognition",
+}: AvReplayTestCardProps = {}) {
+  const macSteps = getAvReplayMacSteps({ operatorPath, transcriptionEngine });
+  const windowsSteps = getAvReplayWindowsSteps({ operatorPath });
   return (
     <section className="rounded-3xl border border-sky-200 bg-sky-50 p-8 text-sm text-sky-950 space-y-6">
       <div className="space-y-2 text-center">
@@ -19,8 +27,8 @@ export function AvReplayTestCard() {
         <p className="text-sky-900">
           Issue #{AV_REPLAY_TEST.issue}. Verify the clip, route it through a
           virtual audio device, then use the normal operator microphone flow.
-          Church Caption still uses Chrome speech recognition on the selected
-          input device.
+          Church Caption uses {transcriptionEngine} on the selected input
+          device.
         </p>
       </div>
 
@@ -57,7 +65,7 @@ export function AvReplayTestCard() {
         <div className="rounded-2xl bg-white/80 p-4 space-y-2">
           <p className="font-semibold">MacBook dev setup</p>
           <ol className="list-decimal list-inside space-y-2 text-sky-900">
-            {AV_REPLAY_MAC_STEPS.map((step) => (
+            {macSteps.map((step) => (
               <li key={step}>{step}</li>
             ))}
           </ol>
@@ -66,7 +74,7 @@ export function AvReplayTestCard() {
         <div className="rounded-2xl bg-white/80 p-4 space-y-2">
           <p className="font-semibold">Church Windows PC setup</p>
           <ol className="list-decimal list-inside space-y-2 text-sky-900">
-            {AV_REPLAY_WINDOWS_STEPS.map((step) => (
+            {windowsSteps.map((step) => (
               <li key={step}>{step}</li>
             ))}
           </ol>
