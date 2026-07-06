@@ -1,6 +1,7 @@
 "use client";
 
 import { loadCaptionState } from "@/lib/captionApi";
+import { RollingCaptionDisplay } from "@/components/RollingCaptionDisplay";
 import { CURRENT_SERVICE } from "@/lib/service";
 import { CaptionState } from "@/types/caption";
 import { useEffect, useState } from "react";
@@ -27,8 +28,6 @@ export default function LivePage() {
 
     return () => clearInterval(timer);
   }, []);
-
-  const hasCaption = captionState.caption.trim().length > 0;
 
   return (
     <main className="min-h-screen bg-stone-50 px-5 py-8 text-slate-900">
@@ -67,18 +66,15 @@ export default function LivePage() {
           </p>
         </section>
 
-        <section className="mt-8 flex flex-1 items-center rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
-          <p
-            className={`w-full text-center leading-relaxed ${
-              hasCaption
-                ? "text-4xl font-semibold text-slate-900"
-                : "text-2xl text-slate-400"
-            }`}
-          >
-            {hasCaption
-              ? captionState.caption
-              : "Today’s English captions will appear here."}
-          </p>
+        <section className="mt-8 flex min-h-[40vh] flex-1 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:min-h-[45vh] sm:p-8">
+          <RollingCaptionDisplay
+            caption={captionState.isLive ? captionState.caption : ""}
+            updatedAt={captionState.updatedAt}
+            placeholder="Today’s English captions will appear here."
+            minFontPx={22}
+            maxFontPx={56}
+            className="min-h-[32vh]"
+          />
         </section>
 
         <footer className="mt-8 text-center text-xs text-slate-400">

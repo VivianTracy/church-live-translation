@@ -13,6 +13,7 @@ export function useOpenAIOperator() {
   const [isListening, setIsListening] = useState(false);
   const [micTranscript, setMicTranscript] = useState("");
   const [englishCaption, setEnglishCaption] = useState("");
+  const [englishCaptionUpdatedAt, setEnglishCaptionUpdatedAt] = useState(0);
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationError, setTranslationError] = useState("");
   const [micError, setMicError] = useState("");
@@ -42,6 +43,7 @@ export function useOpenAIOperator() {
     translationQueueRef.current = Promise.resolve();
     setMicTranscript("");
     setEnglishCaption("");
+    setEnglishCaptionUpdatedAt(0);
     setSegmentCount(0);
     setTranscribedSegmentCount(0);
     setWhisperStatus(null);
@@ -63,6 +65,7 @@ export function useOpenAIOperator() {
           englishPartsRef.current.push(english);
           const fullCaption = englishPartsRef.current.join(" ");
           setEnglishCaption(fullCaption);
+          setEnglishCaptionUpdatedAt(Date.now());
           setLastTranslationMs(Date.now() - startedAt);
           setTranslationError("");
           setSegmentCount(englishPartsRef.current.length);
@@ -130,6 +133,7 @@ export function useOpenAIOperator() {
     isListening,
     micTranscript,
     englishCaption,
+    englishCaptionUpdatedAt,
     isTranslating,
     translationError,
     micError,

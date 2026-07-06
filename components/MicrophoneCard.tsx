@@ -1,7 +1,10 @@
+import { RollingCaptionDisplay } from "@/components/RollingCaptionDisplay";
+
 type MicrophoneCardProps = {
   isListening: boolean;
   micTranscript: string;
   englishCaption?: string;
+  englishCaptionUpdatedAt?: number;
   isTranslating: boolean;
   micError: string;
   micNotice: string;
@@ -16,6 +19,7 @@ export function MicrophoneCard({
   isListening,
   micTranscript,
   englishCaption,
+  englishCaptionUpdatedAt,
   isTranslating,
   micError,
   micNotice,
@@ -72,8 +76,15 @@ export function MicrophoneCard({
       </div>
 
       {englishCaption !== undefined && (
-        <div className="rounded-2xl bg-emerald-50 p-4 min-h-24 text-lg text-slate-800 whitespace-pre-wrap">
-          {englishCaption || "English captions will appear here."}
+        <div className="rounded-2xl bg-emerald-50 p-4 min-h-40">
+          <RollingCaptionDisplay
+            caption={englishCaption}
+            updatedAt={englishCaptionUpdatedAt}
+            placeholder="English captions will appear here."
+            minFontPx={16}
+            maxFontPx={28}
+            className="min-h-28"
+          />
         </div>
       )}
 

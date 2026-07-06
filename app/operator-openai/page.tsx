@@ -21,6 +21,7 @@ export default function OperatorOpenAIPage() {
     isListening,
     micTranscript,
     englishCaption,
+    englishCaptionUpdatedAt,
     isTranslating,
     translationError,
     micError,
@@ -134,6 +135,7 @@ export default function OperatorOpenAIPage() {
           isListening={isListening}
           micTranscript={micTranscript}
           englishCaption={englishCaption}
+          englishCaptionUpdatedAt={englishCaptionUpdatedAt}
           isTranslating={isTranslating}
           micError={micError}
           micNotice="Select BlackHole as the Chrome microphone for AV replay. Echo cancellation is disabled for virtual audio."
