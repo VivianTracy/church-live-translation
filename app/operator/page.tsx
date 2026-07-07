@@ -3,7 +3,6 @@
 import { AvReplayTestCard } from "@/components/AvReplayTestCard";
 import { SermonContextCard } from "@/components/SermonContextCard";
 import { AdvancedSettings } from "@/components/AdvancedSettings";
-import { AudienceCard } from "@/components/AudienceCard";
 import { BroadcastCard } from "@/components/BroadcastCard";
 import { Header } from "@/components/Header";
 import { MicrophoneCard } from "@/components/MicrophoneCard";
@@ -173,8 +172,6 @@ export default function OperatorPage() {
           onStopMicrophone={stopMicrophone}
           onRestartMicrophone={restartMicrophone}
         />
-
-        <AudienceCard />
 
         <AdvancedSettings
           showAdvanced={showAdvanced}

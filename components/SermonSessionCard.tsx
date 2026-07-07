@@ -13,7 +13,7 @@ function formatStatus(status: SermonSession["status"] | undefined): string {
     case "paused":
       return "Paused";
     case "ended":
-      return "Ended";
+      return "Saved";
     default:
       return "Not started";
   }
@@ -27,6 +27,9 @@ export function SermonSessionCard({
   if (mode !== "sermon") {
     return null;
   }
+
+  const canEndSession =
+    session?.status === "recording" || session?.status === "paused";
 
   return (
     <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 text-sm text-emerald-950 space-y-3">
@@ -48,13 +51,16 @@ export function SermonSessionCard({
             <p className="break-all">
               English: <span className="font-mono">{session.englishFile}</span>
             </p>
+            <p className="break-all">
+              Segments: <span className="font-mono">{session.segmentsFile}</span>
+            </p>
           </>
         ) : (
           <p>Start the microphone in Sermon mode to create transcript files.</p>
         )}
       </div>
 
-      {session && session.status !== "ended" ? (
+      {canEndSession ? (
         <button
           type="button"
           onClick={onEndSermon}
@@ -64,10 +70,18 @@ export function SermonSessionCard({
         </button>
       ) : null}
 
-      <p className="text-xs text-emerald-900">
-        Stop the microphone during a break to pause file writing. Start the
-        microphone again to append to the same files.
-      </p>
+      {session?.status === "ended" ? (
+        <p className="text-xs text-emerald-900">
+          Transcript files are saved on this computer. Start the microphone again
+          in Sermon mode to begin a new session.
+        </p>
+      ) : (
+        <p className="text-xs text-emerald-900">
+          Files save automatically as you record. Stop the microphone during a
+          break to pause writing, then start again to append. Click End sermon
+          session when the sermon is finished.
+        </p>
+      )}
     </section>
   );
 }

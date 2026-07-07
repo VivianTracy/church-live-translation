@@ -107,7 +107,7 @@ The app needs API keys. **Ask the project lead** for:
 - `GEMINI_API_KEY`
 - `KV_REST_API_URL`
 - `KV_REST_API_TOKEN`
-- `NEXT_PUBLIC_AUDIENCE_URL` (usually the Vercel URL, e.g. `https://church-caption.vercel.app`)
+- `OPENAI_API_KEY` (for `/operator-openai`)
 
 Then:
 
@@ -133,7 +133,7 @@ When you see something like `Ready on http://localhost:3000`:
 | Page | URL |
 |---|---|
 | Operator console | http://localhost:3000/operator |
-| Audience captions | http://localhost:3000/live |
+| OBS overlay | http://localhost:3000/overlay |
 
 Open those in **Chrome**. Keep the terminal running while you work. To stop the app: click the terminal and press **Ctrl+C** (Mac: **Control+C**).
 
@@ -229,7 +229,7 @@ The project lead reviews and merges. After merge, pull `main` again before your 
 Safe starting areas:
 
 - Text and labels in `components/`
-- Operator / live page copy in `app/operator/` and `app/live/`
+- Operator / overlay page copy in `app/operator/` and `app/overlay/`
 - Documentation in `README.md`
 
 Ask the project lead before changing:

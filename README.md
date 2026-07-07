@@ -14,19 +14,18 @@ The goal is not to replace church volunteers, but to reduce the burden on transl
 
 ### Version 0.2 – Cloud Beta
 
-Church Caption supports **two operator paths** that share one audience page:
+Church Caption supports **two operator paths** that publish captions to OBS overlay:
 
 | Path | URL | Best for |
 |---|---|---|
 | **Production (Gemini)** | `/operator` | Sunday service with optional sermon manuscript |
-| **Experimental (OpenAI)** | `/operator-openai` | Testing OpenAI STT + translation without manuscript |
+| **Experimental (OpenAI)** | `/operator-openai` | OpenAI STT + translation, sermon transcripts, OBS kit |
 
-Both paths publish to the same Redis caption state. The audience reads captions at **`/live`**.
+Both paths publish caption state for **`/overlay`** (OBS Browser Source). YouTube viewers see English captions on the stream.
 
 **Shared capabilities:**
 
-- Redis-backed shared caption state
-- Cross-device audience page with rolling paragraph captions
+- Caption state for OBS overlay (`/overlay`)
 - Church-specific translation policy and Bible-aware terminology
 - Operator console with microphone controls
 - AV replay test mode (`?test=1`) for local validation
@@ -59,15 +58,15 @@ Required environment variables (see [`docs/COLLABORATOR_SETUP.md`](./docs/COLLAB
 |---|---|
 | `GEMINI_API_KEY` | `/operator` |
 | `OPENAI_API_KEY` | `/operator-openai` |
-| Redis / KV vars | Caption state + sermon context |
+| Redis / KV vars | Caption state + sermon context (optional on streaming PC — see `CAPTION_STORAGE=local`) |
 
 **Pages:**
 
 | URL | Role |
 |---|---|
 | `/operator` | Production operator (Gemini) |
-| `/operator-openai` | Experimental operator (OpenAI) |
-| `/live` | Audience captions (phones) |
+| `/operator-openai` | Production operator (OpenAI) |
+| `/overlay` | OBS Browser Source (YouTube stream captions) |
 
 ---
 
@@ -115,16 +114,16 @@ Required environment variables (see [`docs/COLLABORATOR_SETUP.md`](./docs/COLLAB
                                │
                                ▼
                     ┌─────────────────────┐
-                    │   Redis             │
+                    │   Redis or local    │
                     └──────────┬──────────┘
                                │
                     GET /api/caption-state (poll)
                                │
                                ▼
                     ┌─────────────────────┐
-                    │   /live             │
-                    │   rolling paragraph │
-                    │   auto font size    │
+                    │   /overlay          │
+                    │   OBS Browser Source│
+                    │   YouTube stream    │
                     └─────────────────────┘
 ```
 

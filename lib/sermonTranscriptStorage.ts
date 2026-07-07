@@ -1,4 +1,8 @@
-import type { SermonSession, SermonSessionStatus } from "@/types/sermonSession";
+import type {
+  SermonSegment,
+  SermonSession,
+  SermonSessionStatus,
+} from "@/types/sermonSession";
 import fs from "fs/promises";
 import path from "path";
 
@@ -22,16 +26,37 @@ function formatSessionId(date: Date): string {
   return `${year}-${month}-${day}-${hours}${minutes}`;
 }
 
+function sessionFiles(sessionDir: string) {
+  return {
+    chineseFile: path.join(sessionDir, "chinese.txt"),
+    englishFile: path.join(sessionDir, "english.txt"),
+    segmentsFile: path.join(sessionDir, "segments.jsonl"),
+  };
+}
+
+function normalizeSession(session: SermonSession): SermonSession {
+  const sessionDir = path.dirname(session.chineseFile);
+
+  return {
+    ...session,
+    segmentsFile: session.segmentsFile || path.join(sessionDir, "segments.jsonl"),
+  };
+}
+
 async function writeActiveSession(session: SermonSession): Promise<void> {
   const root = getTranscriptRoot();
   await fs.mkdir(root, { recursive: true });
-  await fs.writeFile(activeSessionPath(), JSON.stringify(session, null, 2), "utf8");
+  await fs.writeFile(
+    activeSessionPath(),
+    JSON.stringify(normalizeSession(session), null, 2),
+    "utf8"
+  );
 }
 
 export async function getActiveSermonSession(): Promise<SermonSession | null> {
   try {
     const raw = await fs.readFile(activeSessionPath(), "utf8");
-    const session = JSON.parse(raw) as SermonSession;
+    const session = normalizeSession(JSON.parse(raw) as SermonSession);
 
     if (session.status === "ended") {
       return null;
@@ -58,17 +83,16 @@ export async function startSermonSession(): Promise<SermonSession> {
   const sessionDir = path.join(getTranscriptRoot(), id);
   await fs.mkdir(sessionDir, { recursive: true });
 
-  const chineseFile = path.join(sessionDir, "chinese.txt");
-  const englishFile = path.join(sessionDir, "english.txt");
-  await fs.writeFile(chineseFile, "", "utf8");
-  await fs.writeFile(englishFile, "", "utf8");
+  const files = sessionFiles(sessionDir);
+  await fs.writeFile(files.chineseFile, "", "utf8");
+  await fs.writeFile(files.englishFile, "", "utf8");
+  await fs.writeFile(files.segmentsFile, "", "utf8");
 
   const session: SermonSession = {
     id,
     startedAt: Date.now(),
     status: "recording",
-    chineseFile,
-    englishFile,
+    ...files,
   };
 
   await writeActiveSession(session);
@@ -137,5 +161,20 @@ export async function appendSermonSegment(
 
   if (en) {
     await fs.appendFile(session.englishFile, `${en} `, "utf8");
+  }
+
+  if (zh || en) {
+    const segment: SermonSegment = {
+      timestamp: Date.now(),
+      offsetMs: Math.max(0, Date.now() - session.startedAt),
+      chinese: zh,
+      english: en,
+    };
+
+    await fs.appendFile(
+      session.segmentsFile,
+      `${JSON.stringify(segment)}\n`,
+      "utf8"
+    );
   }
 }

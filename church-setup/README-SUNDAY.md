@@ -12,7 +12,6 @@ Use this on the **streaming computer** before and during the service.
 - [ ] In OBS, confirm Browser Source points to **http://localhost:3000/overlay** (1920×1080)
 - [ ] Adjust overlay font size and position on the operator page
 - [ ] Start a private YouTube test stream — confirm captions appear on stream
-- [ ] Share the `/live` link or QR code for phones (optional)
 
 ## During service
 
@@ -28,7 +27,7 @@ Use this on the **streaming computer** before and during the service.
 ## After service
 
 - [ ] Stop Live Caption
-- [ ] Sermon transcripts are in `transcripts/<session-id>/` (Sermon mode only)
+- [ ] Sermon transcripts are saved in `transcripts/<session-id>/` (Sermon mode only)
 - [ ] Stop `npm run dev` when done
 
 ## Troubleshooting
@@ -38,4 +37,4 @@ Use this on the **streaming computer** before and during the service.
 | No captions | Whisper monitor — PCM peak should be > 0 |
 | Overlay blank | Operator shows LIVE; OBS URL is `localhost:3000/overlay` |
 | Wrong audio | Microphone input matches OBS monitoring device |
-| Phones not updating | Same Redis keys in `.env.local` as Vercel deployment |
+| Overlay not updating | Operator shows LIVE; restart OBS Browser Source if needed |

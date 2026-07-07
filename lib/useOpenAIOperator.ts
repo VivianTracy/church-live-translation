@@ -49,6 +49,8 @@ export function useOpenAIOperator() {
   const micDeviceIdRef = useRef("");
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  const sermonSessionRef = useRef(sermonSession);
+  sermonSessionRef.current = sermonSession;
 
   const [micDeviceId, setMicDeviceIdState] = useState("");
 
@@ -85,6 +87,12 @@ export function useOpenAIOperator() {
     setWhisperStatus(null);
   };
 
+  const stopMicCapture = () => {
+    transcriptionRef.current?.stop();
+    transcriptionRef.current = null;
+    setIsListening(false);
+  };
+
   const clearBroadcast = async () => {
     liveBroadcastRef.current = false;
     resetCaptionState();
@@ -112,9 +120,16 @@ export function useOpenAIOperator() {
     }
 
     if (modeRef.current === "sermon" && nextMode === "others") {
+      stopMicCapture();
+
       try {
-        const ended = await endSermonSession();
-        setSermonSession(ended?.status === "ended" ? null : ended);
+        const session = sermonSessionRef.current;
+
+        if (session?.status === "recording" || session?.status === "paused") {
+          const ended = await endSermonSession();
+          setSermonSession(ended ?? session);
+        }
+
         await clearBroadcast();
       } catch (error) {
         console.error("Failed to end sermon session on mode change:", error);
@@ -262,11 +277,11 @@ export function useOpenAIOperator() {
   };
 
   const stopMicrophone = () => {
-    transcriptionRef.current?.stop();
-    transcriptionRef.current = null;
-    setIsListening(false);
+    stopMicCapture();
 
-    if (modeRef.current === "sermon" && sermonSession?.status === "recording") {
+    const session = sermonSessionRef.current;
+
+    if (modeRef.current === "sermon" && session?.status === "recording") {
       pauseSermonSession()
         .then(setSermonSession)
         .catch((error) => {
@@ -276,9 +291,17 @@ export function useOpenAIOperator() {
   };
 
   const endSermon = async () => {
+    stopMicCapture();
+
     try {
-      const ended = await endSermonSession();
-      setSermonSession(ended?.status === "ended" ? null : ended);
+      const current = sermonSessionRef.current;
+      let ended = current;
+
+      if (current?.status === "recording" || current?.status === "paused") {
+        ended = await endSermonSession();
+      }
+
+      setSermonSession(ended ?? current);
       await clearBroadcast();
     } catch (error) {
       console.error("Failed to end sermon session:", error);

@@ -13,7 +13,9 @@ gpt-realtime-2         ← Chinese → English captions (Realtime text)
         ↓
 Redis caption state
         ↓
-/live audience page
+/overlay (OBS Browser Source)
+        ↓
+YouTube stream
 ```
 
 This branch adds **`/operator-openai`** while keeping the existing Gemini + Chrome STT operator at **`/operator`**.
@@ -76,7 +78,7 @@ npm install
 npm run dev
 ```
 
-5. Open the experimental operator:
+5. Open the operator:
 
 ```text
 http://localhost:3000/operator-openai
@@ -88,13 +90,7 @@ For the 7-minute AV replay clip (OBS → BlackHole), use:
 http://localhost:3000/operator-openai?test=1
 ```
 
-6. Open audience page in another tab:
-
-```text
-http://localhost:3000/live
-```
-
-7. Save sermon manuscript context (optional), click **Start Microphone**, speak Chinese.
+6. Add `http://localhost:3000/overlay` as an OBS Browser Source and confirm captions on stream.
 
 ---
 

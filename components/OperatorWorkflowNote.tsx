@@ -1,6 +1,5 @@
 "use client";
 
-import { getAudienceLiveUrl } from "@/lib/audienceUrl";
 import { useEffect, useState } from "react";
 
 type HealthStatus = {
@@ -9,12 +8,10 @@ type HealthStatus = {
 };
 
 export function OperatorWorkflowNote() {
-  const [audienceLiveUrl, setAudienceLiveUrl] = useState("/live");
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [isLocalhost, setIsLocalhost] = useState(true);
 
   useEffect(() => {
-    setAudienceLiveUrl(getAudienceLiveUrl(window.location.origin));
     setIsLocalhost(
       window.location.hostname === "localhost" ||
         window.location.hostname === "127.0.0.1"
@@ -31,19 +28,9 @@ export function OperatorWorkflowNote() {
       <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 text-sm text-emerald-950 space-y-2">
         <p className="font-semibold">Sunday workflow</p>
         <p>
-          Run the operator on this church computer. Audience phones should open
-          the cloud link below, not localhost.
-        </p>
-        <p>
-          Audience link:{" "}
-          <a
-            href={audienceLiveUrl}
-            className="font-semibold underline break-all"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {audienceLiveUrl}
-          </a>
+          Run the operator on this church computer. Add{" "}
+          <span className="font-semibold">/overlay</span> as an OBS Browser Source
+          so YouTube viewers see English captions on the stream.
         </p>
       </section>
     );
@@ -59,16 +46,9 @@ export function OperatorWorkflowNote() {
         streaming computer instead of this cloud page.
       </p>
       <p>
-        Audience still watches{" "}
-        <a
-          href={audienceLiveUrl}
-          className="font-semibold underline break-all"
-          target="_blank"
-          rel="noreferrer"
-        >
-          {audienceLiveUrl}
-        </a>
-        . Captions sync through shared Redis.
+        Captions appear on YouTube through OBS using{" "}
+        <span className="font-semibold">localhost/overlay</span> on the streaming
+        computer.
       </p>
       {health && !health.geminiConfigured && (
         <p className="font-semibold text-red-700">

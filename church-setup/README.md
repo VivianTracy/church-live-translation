@@ -40,7 +40,7 @@ chmod +x install.sh
 
 ## OBS overlay
 
-See [`obs/browser-source.md`](./obs/browser-source.md).
+See [`obs/browser-source.md`](./obs/browser-source.md). Optional starter scene collection: [`obs/church-caption-scenes.json`](./obs/church-caption-scenes.json).
 
 ## Pages (local)
 
@@ -48,7 +48,6 @@ See [`obs/browser-source.md`](./obs/browser-source.md).
 |---|---|
 | `http://localhost:3000/operator-openai` | Operator console |
 | `http://localhost:3000/overlay` | OBS Browser Source |
-| `http://localhost:3000/live` | Audience phones (Vercel or local) |
 
 Run locally with:
 

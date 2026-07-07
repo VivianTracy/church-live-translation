@@ -10,10 +10,10 @@ The system should reduce the burden on translation coworkers while fitting natur
 
 ## System Overview
 
-One volunteer runs an **operator page**. The **congregation** reads English captions on **`/live`**. All operators publish to the same **Redis caption state**.
+One volunteer runs an **operator page**. English captions appear on the **YouTube stream** through OBS **`/overlay`**. Caption state is shared via Redis or local in-memory storage on the streaming PC.
 
 ```text
-Operator (mic)  →  STT  →  translate  →  Redis  →  /live (phones)
+Operator (mic)  →  STT  →  translate  →  caption state  →  /overlay (OBS → YouTube)
 ```
 
 Two operator implementations coexist. Only one should run per service.
@@ -35,7 +35,7 @@ export type CaptionState = {
 | Route | Method | Role |
 |---|---|---|
 | `/api/caption-state` | `POST` | Operator publishes caption + timestamp |
-| `/api/caption-state` | `GET` | `/live` polls every second |
+| `/api/caption-state` | `GET` | `/overlay` polls every 500ms |
 
 Redis key: `caption-state`. The browser never accesses Redis or AI keys directly.
 
@@ -139,27 +139,22 @@ POST /api/openai/transcription-session → legacy Realtime session (unused by cu
 
 ---
 
-## Audience Display: `/live`
+## OBS Overlay: `/overlay`
 
-**File:** `app/live/page.tsx`  
-**Component:** `components/RollingCaptionDisplay.tsx`  
-**Logic:** `lib/captionParagraph.ts`
-
-The audience does **not** see the full sermon transcript scrolling on screen.
+**File:** `app/overlay/page.tsx`  
+**Component:** `components/RollingCaptionDisplay.tsx`
 
 ```text
-GET /api/caption-state (poll 1s)
+GET /api/caption-state (poll ~500ms)
         ↓
 RollingCaptionDisplay
         ↓
-Show ONE paragraph at a time
+Transparent background for OBS Browser Source
         ↓
-New paragraph after ~2.5s pause (updatedAt gap)
-        ↓
-Auto font size (fits phone viewport)
+YouTube viewers see rolling English captions on stream
 ```
 
-Full caption text is still stored in Redis for the operator; the audience view shows only the current speaking paragraph.
+Overlay layout (font size, position, alignment) is controlled from `/operator-openai` via `/api/overlay-settings`.
 
 ---
 
@@ -170,7 +165,7 @@ Full caption text is still stored in Redis for the operator; the audience view s
 ```text
 app/operator/page.tsx
 app/operator-openai/page.tsx
-app/live/page.tsx
+app/overlay/page.tsx
 components/*
 ```
 
@@ -219,7 +214,7 @@ Behringer X32 → Main L/R → X-USB → Streaming PC
                                         ↓
                               Chrome → Operator page
                                         ↓
-                              Redis → /live (phones)
+                              caption state → /overlay → YouTube
 ```
 
 Church Caption does not replace OBS or the mixer. It consumes the same audio feed the streaming computer already has.
@@ -249,7 +244,7 @@ See `lib/avReplayTest.ts` and `public/test-audio/` for the replay clip.
 
 ### `main`
 
-Deployable branch. Contains Gemini production operator, OpenAI experimental operator, and rolling `/live` display.
+Deployable branch. Contains Gemini production operator, OpenAI operator, and OBS `/overlay`.
 
 ### `preserve/gemini-manuscript-operator`
 

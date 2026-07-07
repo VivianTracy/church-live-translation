@@ -8,6 +8,14 @@ export type SermonSession = {
   status: SermonSessionStatus;
   chineseFile: string;
   englishFile: string;
+  segmentsFile: string;
+};
+
+export type SermonSegment = {
+  timestamp: number;
+  offsetMs: number;
+  chinese: string;
+  english: string;
 };
 
 export type SermonSessionRequest =

@@ -37,4 +37,25 @@ Captions appear on YouTube when this Browser Source is visible in the **Program*
 
 ## Import scene collection (optional)
 
-A starter OBS scene JSON can be added here later. For now, add the Browser Source manually using the steps above.
+A starter OBS scene collection is included:
+
+`church-setup/obs/church-caption-scenes.json`
+
+### Mac / Linux
+
+1. Quit OBS.
+2. Copy the file into your OBS scenes folder:
+   - macOS: `~/Library/Application Support/obs-studio/basic/scenes/`
+   - Linux: `~/.config/obs-studio/basic/scenes/`
+3. Rename if needed (filename becomes the collection name in OBS).
+4. Launch OBS → **Scene Collection** → select **Church Caption**.
+
+Or use **Scene Collection → Import** in OBS and select the JSON file (check the checkbox next to the file in the import list).
+
+### Windows
+
+1. Quit OBS.
+2. Copy the file to `%APPDATA%\obs-studio\basic\scenes\`
+3. Launch OBS → **Scene Collection** → select **Church Caption**.
+
+The imported scene includes a **Sermon** scene with a Browser Source already pointed at `http://localhost:3000/overlay`. Add your camera and audio sources to the same scene as needed.

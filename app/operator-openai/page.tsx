@@ -1,10 +1,10 @@
 "use client";
 
 import { AvReplayTestCard } from "@/components/AvReplayTestCard";
-import { AudienceCard } from "@/components/AudienceCard";
 import { CaptionModeCard } from "@/components/CaptionModeCard";
 import { Header } from "@/components/Header";
 import { MicrophoneCard } from "@/components/MicrophoneCard";
+import { LocalStorageNotice } from "@/components/LocalStorageNotice";
 import { MicrophoneDeviceCard } from "@/components/MicrophoneDeviceCard";
 import { OperatorRelatedPagesCard } from "@/components/OperatorRelatedPagesCard";
 import { OverlaySettingsCard } from "@/components/OverlaySettingsCard";
@@ -170,9 +170,9 @@ export default function OperatorOpenAIPage() {
           onEndSermon={handleEndSermon}
         />
 
-        <OverlaySettingsCard />
+        <LocalStorageNotice />
 
-        <AudienceCard />
+        <OverlaySettingsCard />
 
         <WhisperStatusCard status={whisperStatus} />
       </div>

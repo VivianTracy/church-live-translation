@@ -11,7 +11,7 @@ Version 1 only supports:
 - Chinese sermon
 - English captions
 - One operator
-- Audience watches on mobile phones
+- English captions on the YouTube stream via OBS overlay
 
 ## Principles
 
