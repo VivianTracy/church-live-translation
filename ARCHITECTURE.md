@@ -10,13 +10,17 @@ The system should reduce the burden on translation coworkers while fitting natur
 
 ## System Overview
 
-One volunteer runs an **operator page**. English captions appear on the **YouTube stream** through OBS **`/overlay`**. Caption state is shared via Redis or local in-memory storage on the streaming PC.
+One volunteer runs the **operator page** on the streaming computer. English captions appear on the **YouTube stream** through OBS **`/overlay`**. Caption state is shared via Redis or local in-memory storage on the streaming PC.
 
 ```text
 Operator (mic)  →  STT  →  translate  →  caption state  →  /overlay (OBS → YouTube)
 ```
 
-Two operator implementations coexist. Only one should run per service.
+**Production path:** OpenAI (`/operator-openai`) — used for Sunday worship.
+
+**Backup path:** Gemini with sermon manuscript (`/operator`) — available if OpenAI is unavailable or when manuscript-guided translation is preferred.
+
+Only one operator path should run per service.
 
 ---
 
@@ -37,14 +41,78 @@ export type CaptionState = {
 | `/api/caption-state` | `POST` | Operator publishes caption + timestamp |
 | `/api/caption-state` | `GET` | `/overlay` polls every 500ms |
 
-Redis key: `caption-state`. The browser never accesses Redis or AI keys directly.
+Storage: Redis key `caption-state`, or in-memory when `CAPTION_STORAGE=local` (no Redis on streaming PC). The browser never accesses Redis or AI keys directly.
 
 ---
 
-## Operator Path A: Gemini (Production)
+## Operator Path A: OpenAI (Production)
+
+**URL:** `/operator-openai`  
+**Hook:** `lib/useOpenAIOperator.ts`
+
+```text
+Mic (echo cancellation OFF for BlackHole / VB-Cable)
+        ↓
+5-second PCM chunks → WAV
+        ↓
+POST /api/openai/transcribe-audio
+        ↓
+gpt-4o-mini-transcribe → Chinese text
+        ↓
+POST /api/openai/translate
+        ↓
+gpt-4o-mini → English caption (same Chinese chunk as input)
+        ↓
+Append to caption state + sermon transcript files (Sermon mode)
+        ↓
+POST /api/caption-state
+```
+
+### Production design choices
+
+- **Two-step pipeline** — transcribe output is passed directly to translation; no sermon manuscript on this path.
+- **REST chunk STT** — 5-second WAV chunks via `/v1/audio/transcriptions`; quiet chunks skipped below RMS threshold.
+- **Sermon session** — Sermon mode writes `chinese.txt`, `english.txt`, and `segments.jsonl` under `transcripts/<session-id>/`; files finalize when the operator ends the session.
+- **Caption modes** — **Sermon** (overlay + transcript files), **Others** (overlay only, no files).
+- **Transcription monitor** — `WhisperStatusCard` shows PCM levels, API calls, and empty segments for debugging.
+
+### Related pages
+
+| Page | Purpose |
+|---|---|
+| `/operator-openai` | Production operator console |
+| `/operator-openai?test=1` | AV replay test (BlackHole / OBS) |
+
+### API routes
+
+```text
+POST /api/openai/transcribe-audio  → gpt-4o-mini-transcribe (WAV chunks)
+POST /api/openai/translate         → gpt-4o-mini chat completion
+POST /api/sermon-session           → start / pause / resume / end transcript session
+GET/POST /api/overlay-settings     → font size, position, alignment for /overlay
+GET /api/storage-mode              → local vs Redis caption storage
+```
+
+**Requires:** `OPENAI_API_KEY`  
+**Setup:** [`church-setup/`](./church-setup/) and [`docs/WHISPER_GPT_REALTIME.md`](./docs/WHISPER_GPT_REALTIME.md)
+
+### Cost (OpenAI API, approximate)
+
+| Model | List price (Standard) |
+|---|---|
+| `gpt-4o-mini-transcribe` | $1.25 / 1M audio input tokens + $5.00 / 1M text output tokens |
+| `gpt-4o-mini` | $0.15 / 1M input tokens + $0.60 / 1M output tokens |
+
+~$0.15–0.25 per 45-minute sermon; ~$0.02–0.04 for a 5-minute test. Confirm on [platform.openai.com/usage](https://platform.openai.com/usage).
+
+---
+
+## Operator Path B: Gemini + Manuscript (Backup)
 
 **URL:** `/operator`  
 **Hook:** `lib/useGeminiLiveOperator.ts`
+
+Use this path when OpenAI is unavailable, or when uploading a Chinese sermon manuscript improves translation accuracy.
 
 ```text
 Pastor speaks Chinese
@@ -62,23 +130,21 @@ Translation:
 Optional sermon manuscript (Redis service context)
         ↓
 POST /api/caption-state
-        ↓
-Redis
 ```
 
-### Gemini-specific features
+### Backup-path features
 
-- **Sermon Context** — full Chinese manuscript stored in Redis improves translation accuracy and consistency (`/api/service-context`, `SermonContextCard` on `/operator`).
-- **Sentence pipeline** — `lib/sentenceCaptionPipeline.ts` batches ~2 sentences and refines interim text before translation.
-- **Live / REST fallback** — tries Gemini Live first; falls back to REST when Live is unavailable or when manuscript context requires REST.
+- **Sermon Context** — full Chinese manuscript in Redis improves translation (`/api/service-context`, `SermonContextCard` on `/operator`).
+- **Sentence pipeline** — `lib/sentenceCaptionPipeline.ts` batches ~2 sentences before translation.
+- **Live / REST fallback** — tries Gemini Live first; falls back to REST when Live is unavailable or manuscript context requires REST.
 
 ### Related pages
 
 | Page | Purpose |
 |---|---|
-| `/operator` | Main production console |
-| `/operator?test=1` | AV replay test (BlackHole / OBS) |
-| `/operator-rest` | Gemini REST only (simpler) |
+| `/operator` | Backup operator console |
+| `/operator?test=1` | AV replay test |
+| `/operator-rest` | Gemini REST only |
 | `/operator-live` | Redirects to `/operator` |
 
 ### API routes
@@ -89,53 +155,7 @@ GET/POST /api/service-context → sermon manuscript in Redis
 GET /api/live/token          → Gemini Live session token
 ```
 
----
-
-## Operator Path B: OpenAI (Experimental)
-
-**URL:** `/operator-openai`  
-**Hook:** `lib/useOpenAIOperator.ts`
-
-```text
-Mic (echo cancellation OFF for BlackHole)
-        ↓
-5-second PCM chunks → WAV
-        ↓
-POST /api/openai/transcribe-audio
-        ↓
-gpt-4o-mini-transcribe (Chinese)
-        ↓
-POST /api/openai/translate
-        ↓
-gpt-4o-mini (Chinese → English)
-        ↓
-Append segments → POST /api/caption-state → Redis
-```
-
-### OpenAI design choices
-
-- **No sermon manuscript** — translation receives only spoken Chinese from each chunk plus a fixed system prompt (Bible names, church terms). See `lib/openaiSermonTranslationPrompt.ts`.
-- **REST chunk STT** — more reliable than Realtime Whisper manual commits for continuous sermon audio.
-- **Segment queue** — each transcribed chunk is translated and appended to the full English caption stored in Redis.
-- **Transcription monitor** — `WhisperStatusCard` shows PCM levels, API calls, and empty segments for debugging.
-
-### Related pages
-
-| Page | Purpose |
-|---|---|
-| `/operator-openai` | Experimental operator |
-| `/operator-openai?test=1` | AV replay test |
-
-### API routes
-
-```text
-POST /api/openai/transcribe-audio  → OpenAI audio/transcriptions (WAV chunks)
-POST /api/openai/translate         → GPT-4o mini chat completion
-POST /api/openai/transcription-session → legacy Realtime session (unused by current client)
-```
-
-**Requires:** `OPENAI_API_KEY`  
-**Setup:** [`docs/WHISPER_GPT_REALTIME.md`](./docs/WHISPER_GPT_REALTIME.md)
+**Requires:** `GEMINI_API_KEY`, Chrome, Redis for manuscript context
 
 ---
 
@@ -146,6 +166,7 @@ POST /api/openai/transcription-session → legacy Realtime session (unused by cu
 
 ```text
 GET /api/caption-state (poll ~500ms)
+GET /api/overlay-settings
         ↓
 RollingCaptionDisplay
         ↓
@@ -156,6 +177,8 @@ YouTube viewers see rolling English captions on stream
 
 Overlay layout (font size, position, alignment) is controlled from `/operator-openai` via `/api/overlay-settings`.
 
+Import starter scene: [`church-setup/obs/church-caption-scenes.json`](./church-setup/obs/church-caption-scenes.json)
+
 ---
 
 ## Application Layers
@@ -163,8 +186,8 @@ Overlay layout (font size, position, alignment) is controlled from `/operator-op
 ### 1. UI
 
 ```text
-app/operator/page.tsx
-app/operator-openai/page.tsx
+app/operator-openai/page.tsx   ← production
+app/operator/page.tsx          ← backup
 app/overlay/page.tsx
 components/*
 ```
@@ -174,31 +197,36 @@ Pages do not call Gemini, OpenAI, or Redis directly.
 ### 2. Client helpers
 
 ```text
-lib/translation.ts           → Gemini translate (production)
-lib/openaiTranslate.ts       → OpenAI translate (experimental)
+lib/useOpenAIOperator.ts     → production operator hook
+lib/openaiTranslate.ts       → OpenAI translate
 lib/openaiTranscribeAudio.ts → OpenAI STT chunks
+lib/sermonSessionApi.ts      → transcript session lifecycle
 lib/captionApi.ts            → save/load caption state
-lib/serviceContextApi.ts     → sermon manuscript (Gemini path)
+lib/translation.ts           → Gemini translate (backup)
+lib/serviceContextApi.ts     → sermon manuscript (backup)
 ```
 
 ### 3. API routes (server-only keys)
 
 ```text
-app/api/translate/route.ts
-app/api/caption-state/route.ts
-app/api/service-context/route.ts
 app/api/openai/transcribe-audio/route.ts
 app/api/openai/translate/route.ts
+app/api/sermon-session/route.ts
+app/api/caption-state/route.ts
+app/api/overlay-settings/route.ts
+app/api/translate/route.ts           ← backup
+app/api/service-context/route.ts     ← backup
 ```
 
 ### 4. Policy and config
 
 ```text
-lib/translationPrompt.ts           → Gemini church caption rules
-lib/openaiSermonTranslationPrompt.ts → OpenAI caption rules (no manuscript body)
-lib/service.ts                     → church name, service metadata
-lib/redis.ts                       → Redis client
-types/caption.ts                   → CaptionState type
+lib/openaiSermonTranslationPrompt.ts → OpenAI caption rules
+lib/translationPrompt.ts             → Gemini caption rules (backup)
+lib/sermonTranscriptStorage.ts       → local transcript files
+lib/storageMode.ts                   → local vs Redis caption storage
+lib/service.ts                       → church name, service metadata
+types/caption.ts                     → CaptionState type
 ```
 
 ---
@@ -210,9 +238,9 @@ Behringer X32 → Main L/R → X-USB → Streaming PC
                                         ↓
                                       OBS
                                         ↓
-                              BlackHole (virtual mic)
+                              BlackHole / VB-Cable
                                         ↓
-                              Chrome → Operator page
+                              Chrome → /operator-openai
                                         ↓
                               caption state → /overlay → YouTube
 ```
@@ -222,8 +250,7 @@ Church Caption does not replace OBS or the mixer. It consumes the same audio fee
 **Local testing without live service:**
 
 ```text
-OBS media → BlackHole → Chrome mic → /operator?test=1
-                                  or /operator-openai?test=1
+OBS media → BlackHole → Chrome mic → /operator-openai?test=1
 ```
 
 See `lib/avReplayTest.ts` and `public/test-audio/` for the replay clip.
@@ -234,9 +261,11 @@ See `lib/avReplayTest.ts` and `public/test-audio/` for the replay clip.
 
 | Variable | Used by |
 |---|---|
-| `GEMINI_API_KEY` | `/api/translate`, Live token |
-| `OPENAI_API_KEY` | OpenAI transcribe + translate routes |
-| Redis / KV vars | Caption state, service context |
+| `OPENAI_API_KEY` | Production transcribe + translate |
+| `GEMINI_API_KEY` | Backup `/operator` translate + Live token |
+| Redis / KV vars | Caption state, overlay settings, manuscript (optional locally) |
+| `CAPTION_STORAGE=local` | Skip Redis on streaming PC (overlay only) |
+| `TRANSCRIPT_DIR` | Override default `./transcripts` folder |
 
 ---
 
@@ -244,15 +273,15 @@ See `lib/avReplayTest.ts` and `public/test-audio/` for the replay clip.
 
 ### `main`
 
-Deployable branch. Contains Gemini production operator, OpenAI operator, and OBS `/overlay`.
+Deployable branch. OpenAI production operator, OBS `/overlay`, sermon transcripts, and `church-setup/` bundle.
 
 ### `preserve/gemini-manuscript-operator`
 
-Frozen snapshot of the pre-OpenAI architecture (Gemini + manuscript only). Use as reference or for Gemini-only development without OpenAI code paths.
+Frozen snapshot of the Gemini + manuscript operator. Backup path reference.
 
 ### `research/audio-first`
 
-Longer-term experiments (audio-first translation, OBS overlay, multi-speaker). May break; not for Sunday use.
+Longer-term experiments. Not for Sunday use.
 
 ---
 
@@ -276,4 +305,4 @@ Translation Engine
 Captions · AI voice · Transcript · Archive · Bible references
 ```
 
-The first output is live captions. The larger mission is bilingual worship accessibility.
+The first output is live captions on the YouTube stream. The larger mission is bilingual worship accessibility.

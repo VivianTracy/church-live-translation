@@ -12,36 +12,29 @@ The goal is not to replace church volunteers, but to reduce the burden on transl
 
 ## Current Version
 
-### Version 0.2 – Cloud Beta
+### Version 0.3 – Church Streaming Kit
 
-Church Caption supports **two operator paths** that publish captions to OBS overlay:
+Church Caption runs on the **streaming computer** with OBS. The operator captures Chinese sermon audio; English captions appear on the YouTube stream through an OBS Browser Source.
 
-| Path | URL | Best for |
-|---|---|---|
-| **Production (Gemini)** | `/operator` | Sunday service with optional sermon manuscript |
-| **Experimental (OpenAI)** | `/operator-openai` | OpenAI STT + translation, sermon transcripts, OBS kit |
+**Production operator:** [`/operator-openai`](http://localhost:3000/operator-openai)
 
-Both paths publish caption state for **`/overlay`** (OBS Browser Source). YouTube viewers see English captions on the stream.
+| Capability | Details |
+|---|---|
+| Speech-to-text | `gpt-4o-mini-transcribe` (5-second REST audio chunks) |
+| Translation | `gpt-4o-mini` (Chinese text → English captions) |
+| OBS overlay | `/overlay` — Browser Source at 1920×1080 |
+| Sermon transcripts | Auto-saved to `transcripts/<session-id>/` in Sermon mode |
+| Caption modes | **Sermon** (captions + files), **Others** (prayer/announcements) |
+| Local Sunday runtime | `npm run dev` on the streaming PC; see [`church-setup/`](./church-setup/) |
 
-**Shared capabilities:**
+**Pages:**
 
-- Caption state for OBS overlay (`/overlay`)
-- Church-specific translation policy and Bible-aware terminology
-- Operator console with microphone controls
-- AV replay test mode (`?test=1`) for local validation
+| URL | Role |
+|---|---|
+| `/operator-openai` | Production operator console |
+| `/overlay` | OBS Browser Source (YouTube stream captions) |
 
-**Gemini path (`/operator`):**
-
-- Chrome speech recognition
-- Gemini Live or REST translation
-- Optional sermon manuscript context (Redis)
-- Sentence caption pipeline
-
-**OpenAI path (`/operator-openai`):**
-
-- REST chunk transcription (`gpt-4o-mini-transcribe`)
-- GPT-4o mini translation from spoken Chinese only (no manuscript)
-- Transcription monitor for debugging
+**Setup bundle:** [`church-setup/README-SUNDAY.md`](./church-setup/README-SUNDAY.md)
 
 ---
 
@@ -56,17 +49,30 @@ Required environment variables (see [`docs/COLLABORATOR_SETUP.md`](./docs/COLLAB
 
 | Variable | Required for |
 |---|---|
-| `GEMINI_API_KEY` | `/operator` |
-| `OPENAI_API_KEY` | `/operator-openai` |
-| Redis / KV vars | Caption state + sermon context (optional on streaming PC — see `CAPTION_STORAGE=local`) |
+| `OPENAI_API_KEY` | `/operator-openai` (transcription + translation) |
+| Redis / KV vars | Caption state (optional on streaming PC — set `CAPTION_STORAGE=local`) |
 
-**Pages:**
+Open **http://localhost:3000/operator-openai**, add **http://localhost:3000/overlay** as an OBS Browser Source, and start captions.
 
-| URL | Role |
+---
+
+## Cost Estimate (OpenAI API)
+
+Production uses **pay-as-you-go** OpenAI API billing (not ChatGPT Plus). Check [platform.openai.com/usage](https://platform.openai.com/usage) after a test run.
+
+| Model | Role | List price (Standard API) |
+|---|---|---|
+| `gpt-4o-mini-transcribe` | Chinese speech → text | $1.25 / 1M audio input tokens + $5.00 / 1M text output tokens |
+| `gpt-4o-mini` | Chinese text → English captions | $0.15 / 1M input tokens + $0.60 / 1M output tokens |
+
+**Rough estimates for one service** (mic live during preaching; quiet pauses reduce cost):
+
+| Duration | Estimated API cost |
 |---|---|
-| `/operator` | Production operator (Gemini) |
-| `/operator-openai` | Production operator (OpenAI) |
-| `/overlay` | OBS Browser Source (YouTube stream captions) |
+| 5-minute test | ~$0.02–0.04 |
+| 45-minute sermon | ~$0.15–0.25 |
+
+Transcription is billed on audio processed; translation is billed per caption chunk (each ~5 seconds of speech triggers one transcribe + one translate call). Run a short rehearsal before Sunday and confirm on the usage dashboard.
 
 ---
 
@@ -85,54 +91,37 @@ Required environment variables (see [`docs/COLLABORATOR_SETUP.md`](./docs/COLLAB
 ## Technology Stack
 
 - Next.js, React, TypeScript, Tailwind CSS
-- **Google Gemini** — production translation (`/operator`)
-- **OpenAI** — experimental STT + translation (`/operator-openai`)
-- **Upstash Redis / Vercel KV** — shared caption state and sermon context
-- **Chrome** — speech recognition (Gemini path)
-- **Vercel** — deployment
+- **OpenAI** — production STT + translation (`/operator-openai`)
+- **Upstash Redis / Vercel KV** — caption state (optional locally via `CAPTION_STORAGE=local`)
+- **OBS** — Browser Source overlay for YouTube stream
 
 ---
 
 ## Architecture Overview
 
 ```text
-                    ┌─────────────────────┐
-                    │   /operator         │
-                    │   Chrome STT        │
-                    │   Gemini translate  │
-                    │   (+ manuscript)    │
-                    └──────────┬──────────┘
-                               │
-                    ┌──────────┴──────────┐
-                    │  /operator-openai   │
-                    │  OpenAI STT chunks    │
-                    │  GPT-4o mini        │
-                    │  (spoken text only)   │
-                    └──────────┬──────────┘
-                               │
+BlackHole / VB-Cable → Chrome (/operator-openai)
+                              ↓
+                    gpt-4o-mini-transcribe (Chinese)
+                              ↓
+                    gpt-4o-mini (English captions)
+                              ↓
                     POST /api/caption-state
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │   Redis or local    │
-                    └──────────┬──────────┘
-                               │
+                              ↓
+                    Redis or local storage
+                              ↓
                     GET /api/caption-state (poll)
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │   /overlay          │
-                    │   OBS Browser Source│
-                    │   YouTube stream    │
-                    └─────────────────────┘
+                              ↓
+                    /overlay → OBS → YouTube
 ```
 
 For full detail, see [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
 **Additional docs:**
 
+- [`church-setup/`](./church-setup/) — Sunday install and OBS setup
 - [`docs/COLLABORATOR_SETUP.md`](./docs/COLLABORATOR_SETUP.md) — clone, env, dev workflow
-- [`docs/WHISPER_GPT_REALTIME.md`](./docs/WHISPER_GPT_REALTIME.md) — OpenAI operator setup and billing
+- [`docs/WHISPER_GPT_REALTIME.md`](./docs/WHISPER_GPT_REALTIME.md) — OpenAI billing and API notes
 
 ---
 
@@ -140,20 +129,8 @@ For full detail, see [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
 | Branch | Purpose |
 |---|---|
-| `main` | Deployable app: Gemini production + OpenAI experimental |
-| `preserve/gemini-manuscript-operator` | Snapshot of Gemini-only architecture before OpenAI merge (reference) |
-| `research/audio-first` | Longer-term audio-first experiments |
-
----
-
-## Roadmap
-
-### Version 0.3 – First Church Workflow Integration
-
-- Validate on the church streaming computer (X32 USB feed)
-- OBS / BlackHole AV replay testing
-- OBS browser-source overlay output
-- Sunday worship validation
+| `main` | Deployable app: OpenAI production operator + OBS overlay |
+| `preserve/gemini-manuscript-operator` | Snapshot of Gemini + manuscript operator (reference) |
 
 ---
 
