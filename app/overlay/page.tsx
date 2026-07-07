@@ -28,7 +28,11 @@ export default function OverlayPage() {
         const saved = await loadCaptionState();
 
         if (saved) {
-          setCaptionState(saved);
+          setCaptionState({
+            isLive: saved.isLive,
+            caption: saved.isLive ? saved.caption : "",
+            updatedAt: saved.updatedAt,
+          });
         }
       } catch (error) {
         console.error("Failed to load overlay caption state:", error);
@@ -58,7 +62,9 @@ export default function OverlayPage() {
             minFontPx={28}
             maxFontPx={52}
             lightText
-            className="min-h-[4.5rem]"
+            layout="rollingLines"
+            maxLines={3}
+            className="w-full"
           />
         ) : null}
       </div>

@@ -7,6 +7,8 @@ type ParagraphState = {
   baseIndex: number;
 };
 
+export type { ParagraphState };
+
 export function getParagraphAfterPause(
   caption: string,
   updatedAt: number,

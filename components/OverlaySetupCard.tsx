@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 type OverlaySetupCardProps = {
   overlayPath?: string;
 };
@@ -5,10 +9,11 @@ type OverlaySetupCardProps = {
 export function OverlaySetupCard({
   overlayPath = "/overlay",
 }: OverlaySetupCardProps) {
-  const overlayUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}${overlayPath}`
-      : overlayPath;
+  const [overlayUrl, setOverlayUrl] = useState(overlayPath);
+
+  useEffect(() => {
+    setOverlayUrl(`${window.location.origin}${overlayPath}`);
+  }, [overlayPath]);
 
   return (
     <section className="rounded-3xl border border-indigo-200 bg-indigo-50 p-6 text-sm text-indigo-950 space-y-3">

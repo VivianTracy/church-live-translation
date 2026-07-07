@@ -44,6 +44,7 @@ export function useOpenAIOperator() {
   const englishPartsRef = useRef<string[]>([]);
   const chinesePartsRef = useRef<string[]>([]);
   const translationQueueRef = useRef(Promise.resolve());
+  const liveBroadcastRef = useRef(false);
   const modeRef = useRef(mode);
   modeRef.current = mode;
 
@@ -74,25 +75,55 @@ export function useOpenAIOperator() {
     setWhisperStatus(null);
   };
 
-  const setMode = useCallback(
-    async (nextMode: CaptionMode) => {
-      if (nextMode === modeRef.current) {
-        return;
-      }
+  const clearBroadcast = async () => {
+    liveBroadcastRef.current = false;
+    resetCaptionState();
 
-      if (modeRef.current === "sermon" && nextMode === "others") {
-        try {
-          const ended = await endSermonSession();
-          setSermonSession(ended?.status === "ended" ? null : ended);
-        } catch (error) {
-          console.error("Failed to end sermon session on mode change:", error);
+    await saveCaptionState({
+      isLive: false,
+      caption: "",
+      updatedAt: Date.now(),
+    });
+  };
+
+  const startBroadcast = async () => {
+    liveBroadcastRef.current = true;
+
+    await saveCaptionState({
+      isLive: true,
+      caption: "",
+      updatedAt: Date.now(),
+    });
+  };
+
+  const setMode = useCallback(async (nextMode: CaptionMode) => {
+    if (nextMode === modeRef.current) {
+      return;
+    }
+
+    if (modeRef.current === "sermon" && nextMode === "others") {
+      try {
+        const ended = await endSermonSession();
+        setSermonSession(ended?.status === "ended" ? null : ended);
+        await clearBroadcast();
+      } catch (error) {
+        console.error("Failed to end sermon session on mode change:", error);
+      }
+    }
+
+    if (nextMode === "sermon" && modeRef.current === "others") {
+      try {
+        const session = await loadSermonSession();
+        if (!session || session.status === "ended") {
+          await clearBroadcast();
         }
+      } catch (error) {
+        console.error("Failed to prepare sermon mode:", error);
       }
+    }
 
-      setModeState(nextMode);
-    },
-    []
-  );
+    setModeState(nextMode);
+  }, []);
 
   const handleTranscribedSegment = (chinese: string) => {
     chinesePartsRef.current.push(chinese);
@@ -116,11 +147,13 @@ export function useOpenAIOperator() {
           setTranslationError("");
           setSegmentCount(englishPartsRef.current.length);
 
-          await saveCaptionState({
-            isLive: true,
-            caption: fullCaption,
-            updatedAt: Date.now(),
-          });
+          if (liveBroadcastRef.current) {
+            await saveCaptionState({
+              isLive: true,
+              caption: fullCaption,
+              updatedAt: Date.now(),
+            });
+          }
 
           if (modeRef.current === "sermon") {
             await appendSermonSegment(chinese, english);
@@ -235,18 +268,11 @@ export function useOpenAIOperator() {
     try {
       const ended = await endSermonSession();
       setSermonSession(ended?.status === "ended" ? null : ended);
+      await clearBroadcast();
     } catch (error) {
       console.error("Failed to end sermon session:", error);
       throw error;
     }
-  };
-
-  const clearBroadcast = async () => {
-    await saveCaptionState({
-      isLive: false,
-      caption: "",
-      updatedAt: Date.now(),
-    });
   };
 
   return {
@@ -269,6 +295,7 @@ export function useOpenAIOperator() {
     startMicrophone,
     stopMicrophone,
     endSermon,
+    startBroadcast,
     clearBroadcast,
   };
 }

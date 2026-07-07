@@ -9,7 +9,6 @@ import { OverlaySetupCard } from "@/components/OverlaySetupCard";
 import { SermonSessionCard } from "@/components/SermonSessionCard";
 import { StatusCard } from "@/components/StatusCard";
 import { WhisperStatusCard } from "@/components/WhisperStatusCard";
-import { saveCaptionState } from "@/lib/captionApi";
 import { useOpenAIOperator } from "@/lib/useOpenAIOperator";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -38,6 +37,7 @@ export default function OperatorOpenAIPage() {
     startMicrophone,
     stopMicrophone,
     endSermon,
+    startBroadcast,
     clearBroadcast,
   } = useOpenAIOperator();
 
@@ -46,11 +46,7 @@ export default function OperatorOpenAIPage() {
     setIsLive(nextIsLive);
 
     if (nextIsLive) {
-      await saveCaptionState({
-        isLive: true,
-        caption: englishCaption || "Live captions have started.",
-        updatedAt: Date.now(),
-      });
+      await startBroadcast();
       return;
     }
 
@@ -61,17 +57,23 @@ export default function OperatorOpenAIPage() {
   const handleStartMicrophone = async () => {
     if (await startMicrophone()) {
       setIsLive(true);
+      await startBroadcast();
     }
   };
 
-  const handleEndSermon = () => {
-    void endSermon().catch((error) => {
+  const handleEndSermon = async () => {
+    try {
+      await endSermon();
+      setIsLive(false);
+    } catch (error) {
       console.error(error);
-    });
+    }
   };
 
   const handleModeChange = (nextMode: "sermon" | "others") => {
-    void setMode(nextMode);
+    void setMode(nextMode).then(() => {
+      setIsLive(false);
+    });
   };
 
   useEffect(() => {
