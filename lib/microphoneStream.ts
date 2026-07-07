@@ -14,9 +14,16 @@ export type MicrophoneStreamInfo = {
   readyState: MediaStreamTrackState;
 };
 
-export async function getCaptionMicrophoneStream(): Promise<MicrophoneStreamInfo> {
+export async function getCaptionMicrophoneStream(
+  deviceId?: string
+): Promise<MicrophoneStreamInfo> {
+  const audio: MediaTrackConstraints = {
+    ...CAPTION_MIC_CONSTRAINTS,
+    ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+  };
+
   const stream = await navigator.mediaDevices.getUserMedia({
-    audio: CAPTION_MIC_CONSTRAINTS,
+    audio,
   });
 
   const track = stream.getAudioTracks()[0];

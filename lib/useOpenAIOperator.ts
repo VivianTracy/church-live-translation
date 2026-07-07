@@ -15,6 +15,7 @@ import {
   resumeSermonSession,
   startSermonSession,
 } from "@/lib/sermonSessionApi";
+import { loadStoredMicDeviceId, saveStoredMicDeviceId } from "@/lib/microphoneDeviceStorage";
 import type { CaptionMode, SermonSession } from "@/types/sermonSession";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -45,8 +46,17 @@ export function useOpenAIOperator() {
   const chinesePartsRef = useRef<string[]>([]);
   const translationQueueRef = useRef(Promise.resolve());
   const liveBroadcastRef = useRef(false);
+  const micDeviceIdRef = useRef("");
   const modeRef = useRef(mode);
   modeRef.current = mode;
+
+  const [micDeviceId, setMicDeviceIdState] = useState("");
+
+  useEffect(() => {
+    const storedDeviceId = loadStoredMicDeviceId();
+    micDeviceIdRef.current = storedDeviceId;
+    setMicDeviceIdState(storedDeviceId);
+  }, []);
 
   useEffect(() => {
     loadSermonSession()
@@ -191,6 +201,7 @@ export function useOpenAIOperator() {
         initialSegments: options.preserveCaptions
           ? [...chinesePartsRef.current]
           : undefined,
+        deviceId: micDeviceIdRef.current || undefined,
         onDisplay: setMicTranscript,
         onSegment: handleTranscribedSegment,
         onListeningChange: setIsListening,
@@ -275,10 +286,18 @@ export function useOpenAIOperator() {
     }
   };
 
+  const setMicDeviceId = useCallback((deviceId: string) => {
+    micDeviceIdRef.current = deviceId;
+    setMicDeviceIdState(deviceId);
+    saveStoredMicDeviceId(deviceId);
+  }, []);
+
   return {
     mode,
     setMode,
     sermonSession,
+    micDeviceId,
+    setMicDeviceId,
     translationStatusLabel:
       "OpenAI gpt-4o-mini-transcribe (REST chunks) + GPT-4o mini",
     isListening,

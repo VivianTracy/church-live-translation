@@ -5,12 +5,13 @@ import { AudienceCard } from "@/components/AudienceCard";
 import { CaptionModeCard } from "@/components/CaptionModeCard";
 import { Header } from "@/components/Header";
 import { MicrophoneCard } from "@/components/MicrophoneCard";
-import { OverlaySetupCard } from "@/components/OverlaySetupCard";
+import { MicrophoneDeviceCard } from "@/components/MicrophoneDeviceCard";
+import { OperatorRelatedPagesCard } from "@/components/OperatorRelatedPagesCard";
+import { OverlaySettingsCard } from "@/components/OverlaySettingsCard";
 import { SermonSessionCard } from "@/components/SermonSessionCard";
 import { StatusCard } from "@/components/StatusCard";
 import { WhisperStatusCard } from "@/components/WhisperStatusCard";
 import { useOpenAIOperator } from "@/lib/useOpenAIOperator";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export default function OperatorOpenAIPage() {
@@ -22,7 +23,6 @@ export default function OperatorOpenAIPage() {
     mode,
     setMode,
     sermonSession,
-    translationStatusLabel,
     isListening,
     micTranscript,
     englishCaption,
@@ -31,14 +31,14 @@ export default function OperatorOpenAIPage() {
     translationError,
     micError,
     lastTranslationMs,
-    segmentCount,
-    transcribedSegmentCount,
     whisperStatus,
     startMicrophone,
     stopMicrophone,
     endSermon,
     startBroadcast,
     clearBroadcast,
+    micDeviceId,
+    setMicDeviceId,
   } = useOpenAIOperator();
 
   const handleToggleLive = async () => {
@@ -99,47 +99,25 @@ export default function OperatorOpenAIPage() {
       <div className="mx-auto max-w-3xl space-y-8">
         <Header />
 
-        <section className="rounded-3xl border border-sky-200 bg-sky-50 p-6 text-sm text-sky-950 space-y-2">
-          <p className="font-semibold">OpenAI operator</p>
-          <p>
-            Records 5-second audio chunks, transcribes with{" "}
-            <span className="font-semibold">gpt-4o-mini-transcribe</span>, then
-            translates with <span className="font-semibold">gpt-4o-mini</span>.
-            Requires <code>OPENAI_API_KEY</code> in <code>.env.local</code>.
+        <section className="rounded-3xl border border-sky-200 bg-sky-50 p-6 text-sm text-sky-950 space-y-3">
+          <p className="text-sm font-bold tracking-widest text-sky-800">
+            OPERATOR CONSOLE
           </p>
-          <p>
-            Production operator:{" "}
-            <Link href="/operator" className="font-semibold underline">
-              /operator
-            </Link>
+          <p className="text-base font-semibold">
+            Run live English captions from this page.
           </p>
-          <p>
-            OBS overlay:{" "}
-            <Link href="/overlay" className="font-semibold underline">
-              /overlay
-            </Link>
-          </p>
-          <p>
-            AV replay test:{" "}
-            <Link href="/operator-openai?test=1" className="font-semibold underline">
-              /operator-openai?test=1
-            </Link>
+          <ol className="list-decimal space-y-1 pl-5 text-sky-900">
+            <li>Choose a caption mode.</li>
+            <li>Select your microphone (BlackHole for OBS audio).</li>
+            <li>Press Start Live Caption, then Start Microphone.</li>
+          </ol>
+          <p className="text-xs text-sky-800">
+            When captions are not needed, press Stop Live Caption and close this
+            tab.
           </p>
         </section>
 
-        <CaptionModeCard
-          mode={mode}
-          disabled={isListening}
-          onModeChange={handleModeChange}
-        />
-
-        <SermonSessionCard
-          mode={mode}
-          session={sermonSession}
-          onEndSermon={handleEndSermon}
-        />
-
-        <OverlaySetupCard />
+        <OperatorRelatedPagesCard />
 
         {showAvReplayTest ? (
           <AvReplayTestCard
@@ -148,27 +126,17 @@ export default function OperatorOpenAIPage() {
           />
         ) : null}
 
-        <section className="rounded-3xl border border-violet-200 bg-violet-50 p-6 text-sm text-violet-950 space-y-2">
-          <p className="font-semibold">OpenAI stack</p>
-          <p>
-            Status:{" "}
-            <span className="font-semibold">{translationStatusLabel}</span>
-          </p>
-          <p>
-            Segments transcribed:{" "}
-            <span className="font-semibold">{transcribedSegmentCount}</span>
-            {" · "}
-            Segments translated:{" "}
-            <span className="font-semibold">{segmentCount}</span>
-          </p>
-          {translationError && (
-            <pre className="whitespace-pre-wrap rounded-2xl bg-white/70 p-3 text-xs font-semibold text-red-700">
-              {translationError}
-            </pre>
-          )}
-        </section>
+        <CaptionModeCard
+          mode={mode}
+          disabled={isListening}
+          onModeChange={handleModeChange}
+        />
 
-        <WhisperStatusCard status={whisperStatus} />
+        <MicrophoneDeviceCard
+          selectedDeviceId={micDeviceId}
+          disabled={isListening}
+          onDeviceChange={setMicDeviceId}
+        />
 
         <StatusCard
           isLive={isLive}
@@ -184,7 +152,7 @@ export default function OperatorOpenAIPage() {
           englishCaptionUpdatedAt={englishCaptionUpdatedAt}
           isTranslating={isTranslating}
           micError={micError}
-          micNotice="Select BlackHole as the Chrome microphone for AV replay. Echo cancellation is disabled for virtual audio."
+          micNotice="Use BlackHole (Mac) or VB-Cable (Windows) when audio comes from OBS."
           translationError={translationError}
           lastTranslationMs={lastTranslationMs}
           onStartMicrophone={() => {
@@ -196,7 +164,17 @@ export default function OperatorOpenAIPage() {
           }}
         />
 
+        <SermonSessionCard
+          mode={mode}
+          session={sermonSession}
+          onEndSermon={handleEndSermon}
+        />
+
+        <OverlaySettingsCard />
+
         <AudienceCard />
+
+        <WhisperStatusCard status={whisperStatus} />
       </div>
     </main>
   );

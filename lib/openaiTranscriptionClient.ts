@@ -20,6 +20,7 @@ type TranscriptionCallbacks = {
   onError: (message: string) => void;
   onMonitorUpdate?: (snapshot: WhisperMonitorSnapshot) => void;
   initialSegments?: string[];
+  deviceId?: string;
 };
 
 type TranscriptionSession = {
@@ -53,7 +54,7 @@ export async function connectOpenAITranscription(
     `Starting REST chunk transcription (${OPENAI_TRANSCRIPTION_CHUNK_MS}ms chunks)`
   );
 
-  const mic = await getCaptionMicrophoneStream();
+  const mic = await getCaptionMicrophoneStream(callbacks.deviceId);
   monitor.setMicState({
     micLabel: mic.label,
     micReadyState: mic.readyState,

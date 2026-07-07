@@ -24,6 +24,7 @@ type RollingCaptionDisplayProps = {
   /** Single growing paragraph (operator). Multi-line scroll-up (overlay). */
   layout?: "paragraph" | "rollingLines";
   maxLines?: number;
+  lineAlign?: "left" | "center" | "right";
 };
 
 type ParagraphState = {
@@ -31,6 +32,37 @@ type ParagraphState = {
   updatedAt: number;
   baseIndex: number;
 };
+
+const LINE_GAP_PX = 8;
+
+function measureRollingViewport(
+  lineElements: HTMLElement[],
+  maxLines: number
+): { viewportHeight: number; trackOffsetY: number; totalHeight: number } {
+  if (lineElements.length === 0) {
+    return { viewportHeight: 0, trackOffsetY: 0, totalHeight: 0 };
+  }
+
+  const totalHeight = lineElements.reduce((sum, line, index) => {
+    const gap = index > 0 ? LINE_GAP_PX : 0;
+    return sum + line.offsetHeight + gap;
+  }, 0);
+
+  let viewportHeight = 0;
+  let linesInWindow = 0;
+
+  for (let index = lineElements.length - 1; index >= 0 && linesInWindow < maxLines; index--) {
+    const gap = linesInWindow > 0 ? LINE_GAP_PX : 0;
+    viewportHeight += lineElements[index].offsetHeight + gap;
+    linesInWindow += 1;
+  }
+
+  return {
+    viewportHeight,
+    trackOffsetY: Math.max(0, totalHeight - viewportHeight),
+    totalHeight,
+  };
+}
 
 export function RollingCaptionDisplay({
   caption,
@@ -42,6 +74,7 @@ export function RollingCaptionDisplay({
   lightText = false,
   layout = "paragraph",
   maxLines = 3,
+  lineAlign = "center",
 }: RollingCaptionDisplayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLParagraphElement>(null);
@@ -55,9 +88,16 @@ export function RollingCaptionDisplay({
   const [finalizedLines, setFinalizedLines] = useState<string[]>([]);
   const [currentLine, setCurrentLine] = useState("");
   const [fontSize, setFontSize] = useState(maxFontPx);
-  const [linesOffsetY, setLinesOffsetY] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [trackOffsetY, setTrackOffsetY] = useState(0);
 
   const textClassName = lightText ? "text-white" : "text-slate-900";
+  const lineAlignClass =
+    lineAlign === "left"
+      ? "text-left"
+      : lineAlign === "right"
+        ? "text-right"
+        : "text-center";
 
   useEffect(() => {
     const effectiveUpdatedAt =
@@ -69,7 +109,8 @@ export function RollingCaptionDisplay({
       setParagraph("");
       setFinalizedLines([]);
       setCurrentLine("");
-      setLinesOffsetY(0);
+      setViewportHeight(0);
+      setTrackOffsetY(0);
       return;
     }
 
@@ -95,22 +136,6 @@ export function RollingCaptionDisplay({
     paragraphStateRef.current = result.state;
     setParagraph(result.paragraph);
   }, [caption, updatedAt, layout, maxLines]);
-
-  useLayoutEffect(() => {
-    if (layout !== "rollingLines") {
-      return;
-    }
-
-    const viewport = containerRef.current;
-    const inner = linesInnerRef.current;
-
-    if (!viewport || !inner) {
-      return;
-    }
-
-    const overflow = inner.scrollHeight - viewport.clientHeight;
-    setLinesOffsetY(overflow > 0 ? -overflow : 0);
-  }, [layout, finalizedLines, currentLine, fontSize, maxLines]);
 
   useLayoutEffect(() => {
     if (layout === "rollingLines") {
@@ -165,47 +190,51 @@ export function RollingCaptionDisplay({
       return;
     }
 
-    const fitLines = () => {
-      const lineElements = inner.querySelectorAll("[data-caption-line]");
+    const fitAndMeasure = () => {
+      const lineElements = [
+        ...inner.querySelectorAll("[data-caption-line]"),
+      ] as HTMLElement[];
+
       let size = maxFontPx;
 
-      for (const element of lineElements) {
-        const line = element as HTMLElement;
+      for (const line of lineElements) {
         line.style.fontSize = `${size}px`;
       }
 
       while (size > minFontPx) {
-        const overflow = inner.scrollHeight - container.clientHeight;
-        const widest = [...lineElements].some(
-          (element) =>
-            (element as HTMLElement).scrollWidth > container.clientWidth
+        const widest = lineElements.some(
+          (line) => line.scrollWidth > container.clientWidth
         );
 
-        if (overflow <= 0 && !widest) {
+        if (!widest) {
           break;
         }
 
         size -= 1;
 
-        for (const element of lineElements) {
-          const line = element as HTMLElement;
+        for (const line of lineElements) {
           line.style.fontSize = `${size}px`;
         }
       }
 
       setFontSize(size);
+
+      const measured = measureRollingViewport(lineElements, maxLines);
+      setViewportHeight(measured.viewportHeight);
+      setTrackOffsetY(measured.trackOffsetY);
     };
 
-    fitLines();
+    fitAndMeasure();
 
-    const observer = new ResizeObserver(fitLines);
+    const observer = new ResizeObserver(fitAndMeasure);
     observer.observe(container);
+    observer.observe(inner);
 
     return () => observer.disconnect();
   }, [layout, finalizedLines, currentLine, minFontPx, maxFontPx, maxLines]);
 
   if (layout === "rollingLines") {
-    const visibleLines = [...finalizedLines, currentLine].filter(Boolean);
+    const displayLines = [...finalizedLines, currentLine].filter(Boolean);
     const lineStyle: CSSProperties = {
       fontSize: `${fontSize}px`,
     };
@@ -213,27 +242,44 @@ export function RollingCaptionDisplay({
     return (
       <div
         ref={containerRef}
-        className={`relative overflow-hidden ${className}`}
-        style={{ maxHeight: `${maxLines * 1.45}em` }}
+        className={`rolling-caption-viewport relative w-full overflow-hidden ${className}`}
+        style={{
+          height: viewportHeight > 0 ? `${viewportHeight}px` : undefined,
+        }}
         aria-live="polite"
         aria-atomic="false"
       >
         <div
           ref={linesInnerRef}
-          className="rolling-caption-lines-track flex flex-col gap-1"
-          style={{ transform: `translateY(${linesOffsetY}px)` }}
+          className="rolling-caption-lines-track flex w-full flex-col"
+          style={{
+            gap: `${LINE_GAP_PX}px`,
+            transform: `translateY(-${trackOffsetY}px)`,
+          }}
         >
-          {visibleLines.length > 0 ? (
-            visibleLines.map((line, index) => (
-              <p
-                key={`${index}-${line.slice(0, 24)}`}
-                data-caption-line
-                style={lineStyle}
-                className={`w-full text-center font-semibold leading-snug ${textClassName}`}
-              >
-                {line}
-              </p>
-            ))
+          {displayLines.length > 0 ? (
+            <>
+              {finalizedLines.map((line, index) => (
+                <p
+                  key={`final-${index}-${line.slice(0, 32)}`}
+                  data-caption-line
+                  style={lineStyle}
+                  className={`rolling-caption-line w-full font-semibold leading-snug ${lineAlignClass} ${textClassName}`}
+                >
+                  {line}
+                </p>
+              ))}
+              {currentLine ? (
+                <p
+                  key="current-line"
+                  data-caption-line
+                  style={lineStyle}
+                  className={`rolling-caption-line w-full font-semibold leading-snug ${lineAlignClass} ${textClassName}`}
+                >
+                  {currentLine}
+                </p>
+              ) : null}
+            </>
           ) : (
             <p
               data-caption-line
