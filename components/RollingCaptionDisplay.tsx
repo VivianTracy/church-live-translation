@@ -19,6 +19,7 @@ type RollingCaptionDisplayProps = {
   minFontPx?: number;
   maxFontPx?: number;
   className?: string;
+  lightText?: boolean;
 };
 
 type ParagraphState = {
@@ -34,6 +35,7 @@ export function RollingCaptionDisplay({
   minFontPx = 20,
   maxFontPx = 48,
   className = "",
+  lightText = false,
 }: RollingCaptionDisplayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLParagraphElement>(null);
@@ -115,7 +117,9 @@ export function RollingCaptionDisplay({
           key={paragraphKey}
           ref={textRef}
           style={textStyle}
-          className="rolling-caption-text w-full text-center font-semibold leading-snug text-slate-900 transition-[font-size] duration-200"
+          className={`rolling-caption-text w-full text-center font-semibold leading-snug transition-[font-size] duration-200 ${
+            lightText ? "text-white" : "text-slate-900"
+          }`}
         >
           {paragraph}
         </p>

@@ -7,9 +7,22 @@ import {
   OpenAITranslationError,
   translateChineseToEnglishOpenAI,
 } from "@/lib/openaiTranslate";
-import { useEffect, useRef, useState } from "react";
+import {
+  appendSermonSegment,
+  endSermonSession,
+  loadSermonSession,
+  pauseSermonSession,
+  resumeSermonSession,
+  startSermonSession,
+} from "@/lib/sermonSessionApi";
+import type { CaptionMode, SermonSession } from "@/types/sermonSession";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useOpenAIOperator() {
+  const [mode, setModeState] = useState<CaptionMode>("others");
+  const [sermonSession, setSermonSession] = useState<SermonSession | null>(
+    null
+  );
   const [isListening, setIsListening] = useState(false);
   const [micTranscript, setMicTranscript] = useState("");
   const [englishCaption, setEnglishCaption] = useState("");
@@ -29,7 +42,18 @@ export function useOpenAIOperator() {
     ReturnType<typeof connectOpenAITranscription>
   > | null>(null);
   const englishPartsRef = useRef<string[]>([]);
+  const chinesePartsRef = useRef<string[]>([]);
   const translationQueueRef = useRef(Promise.resolve());
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+
+  useEffect(() => {
+    loadSermonSession()
+      .then(setSermonSession)
+      .catch((error) => {
+        console.error("Failed to load sermon session:", error);
+      });
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -38,8 +62,9 @@ export function useOpenAIOperator() {
     };
   }, []);
 
-  const resetSession = () => {
+  const resetCaptionState = () => {
     englishPartsRef.current = [];
+    chinesePartsRef.current = [];
     translationQueueRef.current = Promise.resolve();
     setMicTranscript("");
     setEnglishCaption("");
@@ -49,7 +74,28 @@ export function useOpenAIOperator() {
     setWhisperStatus(null);
   };
 
+  const setMode = useCallback(
+    async (nextMode: CaptionMode) => {
+      if (nextMode === modeRef.current) {
+        return;
+      }
+
+      if (modeRef.current === "sermon" && nextMode === "others") {
+        try {
+          const ended = await endSermonSession();
+          setSermonSession(ended?.status === "ended" ? null : ended);
+        } catch (error) {
+          console.error("Failed to end sermon session on mode change:", error);
+        }
+      }
+
+      setModeState(nextMode);
+    },
+    []
+  );
+
   const handleTranscribedSegment = (chinese: string) => {
+    chinesePartsRef.current.push(chinese);
     setTranscribedSegmentCount((count) => count + 1);
     translateSegment(chinese);
   };
@@ -75,6 +121,10 @@ export function useOpenAIOperator() {
             caption: fullCaption,
             updatedAt: Date.now(),
           });
+
+          if (modeRef.current === "sermon") {
+            await appendSermonSegment(chinese, english);
+          }
         } catch (error) {
           const message =
             error instanceof OpenAITranslationError
@@ -93,15 +143,21 @@ export function useOpenAIOperator() {
       });
   };
 
-  const startMicrophone = async () => {
+  const connectMicrophone = async (options: { preserveCaptions: boolean }) => {
     setMicError("");
     setTranslationError("");
-    resetSession();
+
+    if (!options.preserveCaptions) {
+      resetCaptionState();
+    }
 
     try {
       transcriptionRef.current?.stop();
 
       transcriptionRef.current = await connectOpenAITranscription({
+        initialSegments: options.preserveCaptions
+          ? [...chinesePartsRef.current]
+          : undefined,
         onDisplay: setMicTranscript,
         onSegment: handleTranscribedSegment,
         onListeningChange: setIsListening,
@@ -121,13 +177,82 @@ export function useOpenAIOperator() {
     }
   };
 
+  const startMicrophone = async () => {
+    const currentMode = modeRef.current;
+    let session =
+      currentMode === "sermon" ? await loadSermonSession() : sermonSession;
+
+    if (currentMode === "sermon") {
+      setSermonSession(session);
+    }
+
+    const pausedSermon =
+      currentMode === "sermon" && session?.status === "paused";
+    const activeSermon =
+      currentMode === "sermon" &&
+      session !== null &&
+      session.status !== "ended";
+
+    try {
+      if (currentMode === "sermon") {
+        if (pausedSermon) {
+          session = await resumeSermonSession();
+          setSermonSession(session);
+          return connectMicrophone({ preserveCaptions: true });
+        }
+
+        if (!activeSermon) {
+          session = await startSermonSession();
+          setSermonSession(session);
+          return connectMicrophone({ preserveCaptions: false });
+        }
+
+        return connectMicrophone({ preserveCaptions: true });
+      }
+
+      return connectMicrophone({ preserveCaptions: false });
+    } catch (error) {
+      setMicError(error instanceof Error ? error.message : String(error));
+      return false;
+    }
+  };
+
   const stopMicrophone = () => {
     transcriptionRef.current?.stop();
     transcriptionRef.current = null;
     setIsListening(false);
+
+    if (modeRef.current === "sermon" && sermonSession?.status === "recording") {
+      pauseSermonSession()
+        .then(setSermonSession)
+        .catch((error) => {
+          console.error("Failed to pause sermon session:", error);
+        });
+    }
+  };
+
+  const endSermon = async () => {
+    try {
+      const ended = await endSermonSession();
+      setSermonSession(ended?.status === "ended" ? null : ended);
+    } catch (error) {
+      console.error("Failed to end sermon session:", error);
+      throw error;
+    }
+  };
+
+  const clearBroadcast = async () => {
+    await saveCaptionState({
+      isLive: false,
+      caption: "",
+      updatedAt: Date.now(),
+    });
   };
 
   return {
+    mode,
+    setMode,
+    sermonSession,
     translationStatusLabel:
       "OpenAI gpt-4o-mini-transcribe (REST chunks) + GPT-4o mini",
     isListening,
@@ -143,5 +268,7 @@ export function useOpenAIOperator() {
     whisperStatus,
     startMicrophone,
     stopMicrophone,
+    endSermon,
+    clearBroadcast,
   };
 }

@@ -19,6 +19,7 @@ type TranscriptionCallbacks = {
   onListeningChange: (isListening: boolean) => void;
   onError: (message: string) => void;
   onMonitorUpdate?: (snapshot: WhisperMonitorSnapshot) => void;
+  initialSegments?: string[];
 };
 
 type TranscriptionSession = {
@@ -61,14 +62,18 @@ export async function connectOpenAITranscription(
     `Microphone: ${mic.label} · ${mic.channelCount}ch · track=${mic.readyState}`
   );
 
-  const completedSegments: string[] = [];
+  const completedSegments: string[] = [...(callbacks.initialSegments ?? [])];
   let transcriptionQueue = Promise.resolve();
   let stopped = false;
   let recorder: Awaited<ReturnType<typeof startPcmChunkRecorder>> | null = null;
 
-  const updateDisplay = () => {
+  function updateDisplayFromSegments() {
     callbacks.onDisplay(joinParts(completedSegments));
-  };
+  }
+
+  if (completedSegments.length > 0) {
+    updateDisplayFromSegments();
+  }
 
   const enqueueChunk = (wavBase64: string, detail: string) => {
     transcriptionQueue = transcriptionQueue
@@ -94,7 +99,7 @@ export async function connectOpenAITranscription(
 
           completedSegments.push(transcript);
           monitor.segmentFinished(transcript);
-          updateDisplay();
+          updateDisplayFromSegments();
           callbacks.onSegment(transcript);
         } catch (error) {
           const message =

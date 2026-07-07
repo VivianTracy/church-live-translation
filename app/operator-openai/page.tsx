@@ -2,8 +2,11 @@
 
 import { AvReplayTestCard } from "@/components/AvReplayTestCard";
 import { AudienceCard } from "@/components/AudienceCard";
+import { CaptionModeCard } from "@/components/CaptionModeCard";
 import { Header } from "@/components/Header";
 import { MicrophoneCard } from "@/components/MicrophoneCard";
+import { OverlaySetupCard } from "@/components/OverlaySetupCard";
+import { SermonSessionCard } from "@/components/SermonSessionCard";
 import { StatusCard } from "@/components/StatusCard";
 import { WhisperStatusCard } from "@/components/WhisperStatusCard";
 import { saveCaptionState } from "@/lib/captionApi";
@@ -17,6 +20,9 @@ export default function OperatorOpenAIPage() {
   const [showAvReplayTest, setShowAvReplayTest] = useState(false);
 
   const {
+    mode,
+    setMode,
+    sermonSession,
     translationStatusLabel,
     isListening,
     micTranscript,
@@ -31,23 +37,41 @@ export default function OperatorOpenAIPage() {
     whisperStatus,
     startMicrophone,
     stopMicrophone,
+    endSermon,
+    clearBroadcast,
   } = useOpenAIOperator();
 
   const handleToggleLive = async () => {
     const nextIsLive = !isLive;
     setIsLive(nextIsLive);
 
-    await saveCaptionState({
-      isLive: nextIsLive,
-      caption: nextIsLive ? englishCaption || "Live captions have started." : "",
-      updatedAt: Date.now(),
-    });
+    if (nextIsLive) {
+      await saveCaptionState({
+        isLive: true,
+        caption: englishCaption || "Live captions have started.",
+        updatedAt: Date.now(),
+      });
+      return;
+    }
+
+    stopMicrophone();
+    await clearBroadcast();
   };
 
   const handleStartMicrophone = async () => {
     if (await startMicrophone()) {
       setIsLive(true);
     }
+  };
+
+  const handleEndSermon = () => {
+    void endSermon().catch((error) => {
+      console.error(error);
+    });
+  };
+
+  const handleModeChange = (nextMode: "sermon" | "others") => {
+    void setMode(nextMode);
   };
 
   useEffect(() => {
@@ -74,7 +98,7 @@ export default function OperatorOpenAIPage() {
         <Header />
 
         <section className="rounded-3xl border border-sky-200 bg-sky-50 p-6 text-sm text-sky-950 space-y-2">
-          <p className="font-semibold">Experimental OpenAI operator</p>
+          <p className="font-semibold">OpenAI operator</p>
           <p>
             Records 5-second audio chunks, transcribes with{" "}
             <span className="font-semibold">gpt-4o-mini-transcribe</span>, then
@@ -88,12 +112,32 @@ export default function OperatorOpenAIPage() {
             </Link>
           </p>
           <p>
+            OBS overlay:{" "}
+            <Link href="/overlay" className="font-semibold underline">
+              /overlay
+            </Link>
+          </p>
+          <p>
             AV replay test:{" "}
             <Link href="/operator-openai?test=1" className="font-semibold underline">
               /operator-openai?test=1
             </Link>
           </p>
         </section>
+
+        <CaptionModeCard
+          mode={mode}
+          disabled={isListening}
+          onModeChange={handleModeChange}
+        />
+
+        <SermonSessionCard
+          mode={mode}
+          session={sermonSession}
+          onEndSermon={handleEndSermon}
+        />
+
+        <OverlaySetupCard />
 
         {showAvReplayTest ? (
           <AvReplayTestCard
