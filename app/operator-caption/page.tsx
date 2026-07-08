@@ -112,7 +112,7 @@ export default function OperatorCaptionPage() {
             <li>Press Start Live Caption, then Start Microphone.</li>
           </ol>
           <p className="text-xs text-sky-800">
-            For earpiece audio or both outputs, use{" "}
+            For earpiece audio translation, use{" "}
             <span className="font-mono">/operator-live</span>.
           </p>
         </section>
