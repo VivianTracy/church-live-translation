@@ -1,7 +1,5 @@
 import { AudioLevelMeter } from "@/components/AudioLevelMeter";
 
-import { RollingCaptionDisplay } from "@/components/RollingCaptionDisplay";
-
 type AudioMonitorCardProps = {
   isListening: boolean;
   isTranslating: boolean;
@@ -12,17 +10,9 @@ type AudioMonitorCardProps = {
   latencyMs: number | null;
   inputTranscript?: string;
   outputTranscript?: string;
-  micTranscript?: string;
-  englishCaption?: string;
-  englishCaptionUpdatedAt?: number;
-  showAudioOutput?: boolean;
-  showCaptions?: boolean;
   translationStatusLabel?: string;
   micError: string;
   translationError: string;
-  captionError?: string;
-  inputStatusLabel?: string;
-  translationStatusText?: string;
   onStartListening: () => void;
   onStopListening: () => void;
   onRestartListening: () => void;
@@ -38,17 +28,9 @@ export function AudioMonitorCard({
   latencyMs,
   inputTranscript,
   outputTranscript,
-  micTranscript,
-  englishCaption,
-  englishCaptionUpdatedAt,
-  showAudioOutput = true,
-  showCaptions = false,
   translationStatusLabel,
   micError,
   translationError,
-  captionError,
-  inputStatusLabel = "Receiving Chinese audio",
-  translationStatusText = "Sending output",
   onStartListening,
   onStopListening,
   onRestartListening,
@@ -103,38 +85,16 @@ export function AudioMonitorCard({
           active={isListening}
           accent="sky"
         />
-        {showAudioOutput ? (
-          <AudioLevelMeter
-            label="English output (translation channel)"
-            level={outputLevel}
-            peak={outputPeak}
-            active={isListening && isTranslating}
-            accent="emerald"
-          />
-        ) : null}
+        <AudioLevelMeter
+          label="English output (translation channel)"
+          level={outputLevel}
+          peak={outputPeak}
+          active={isListening && isTranslating}
+          accent="emerald"
+        />
       </div>
 
-      {showCaptions && micTranscript !== undefined && (
-        <div className="rounded-2xl bg-slate-50 p-4 min-h-20 text-sm text-slate-700 whitespace-pre-wrap">
-          {micTranscript || "Chinese transcript will appear here."}
-        </div>
-      )}
-
-      {showCaptions && englishCaption !== undefined && (
-        <div className="rounded-2xl bg-emerald-50 p-4 min-h-32">
-          <RollingCaptionDisplay
-            caption={englishCaption}
-            updatedAt={englishCaptionUpdatedAt}
-            placeholder="English captions for OBS overlay will appear here."
-            minFontPx={16}
-            maxFontPx={28}
-            className="min-h-24"
-          />
-        </div>
-      )}
-
-      {(inputTranscript !== undefined || outputTranscript !== undefined) &&
-      showAudioOutput ? (
+      {(inputTranscript !== undefined || outputTranscript !== undefined) && (
         <div className="grid gap-3">
           {inputTranscript !== undefined && (
             <div className="rounded-2xl bg-slate-50 p-4 min-h-20 text-sm text-slate-700 whitespace-pre-wrap">
@@ -147,7 +107,7 @@ export function AudioMonitorCard({
             </div>
           )}
         </div>
-      ) : null}
+      )}
 
       <div className="rounded-2xl bg-violet-50 p-4 text-sm text-violet-950 space-y-1">
         {translationStatusLabel ? (
@@ -158,13 +118,13 @@ export function AudioMonitorCard({
         <p>
           Input status:{" "}
           <span className="font-semibold">
-            {isListening ? inputStatusLabel : "Not receiving"}
+            {isListening ? "Receiving Chinese audio" : "Not receiving"}
           </span>
         </p>
         <p>
-          Output status:{" "}
+          Translation status:{" "}
           <span className="font-semibold">
-            {isTranslating ? translationStatusText : "Ready"}
+            {isTranslating ? "Sending English audio" : "Ready"}
           </span>
         </p>
         {latencyMs !== null && (
@@ -185,15 +145,9 @@ export function AudioMonitorCard({
 
       {translationError && (
         <p className="rounded-2xl bg-red-50 p-3 text-xs font-semibold text-red-700">
-          Audio translation: {translationError}
+          Translation: {translationError}
         </p>
       )}
-
-      {showCaptions && captionError ? (
-        <p className="rounded-2xl bg-red-50 p-3 text-xs font-semibold text-red-700">
-          Captions: {captionError}
-        </p>
-      ) : null}
     </section>
   );
 }

@@ -26,6 +26,7 @@ type ConnectOptions = {
   onFirstOutputAudio?: () => void;
   onInputTranscriptDelta?: (delta: string) => void;
   onOutputTranscriptDelta?: (delta: string) => void;
+  onTranslatedStream?: (stream: MediaStream) => void;
   onError: (message: string) => void;
 };
 
@@ -164,6 +165,8 @@ export async function connectOpenAIAudioTranslation(
       options.onTranslatingChange(true);
       options.onFirstOutputAudio?.();
     }
+
+    options.onTranslatedStream?.(outputStream);
   };
 
   for (const track of mic.stream.getAudioTracks()) {

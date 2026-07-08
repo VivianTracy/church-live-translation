@@ -3,13 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-type AudioOperatorRelatedPagesCardProps = {
-  showCaptionPages?: boolean;
-};
-
-export function AudioOperatorRelatedPagesCard({
-  showCaptionPages = true,
-}: AudioOperatorRelatedPagesCardProps) {
+export function AudioOperatorRelatedPagesCard() {
   const [baseUrl, setBaseUrl] = useState("http://localhost:3000");
 
   useEffect(() => {
@@ -23,29 +17,12 @@ export function AudioOperatorRelatedPagesCard({
           OTHER PAGES
         </p>
         <p className="text-sm text-slate-600">
-          Use this page for earpiece audio, YouTube captions, or both. The
-          caption-only operator remains at{" "}
-          <span className="font-mono text-xs">/operator-caption</span>.
+          Use this page for earpiece translation. Captions for YouTube stay on
+          the caption operator.
         </p>
       </div>
 
       <div className="space-y-4">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
-          <Link
-            href="/operator-live"
-            className="font-semibold text-indigo-700 underline break-all"
-          >
-            /operator-live
-          </Link>
-          <p className="text-sm font-semibold text-slate-800">
-            Live output operator (this page)
-          </p>
-          <p className="text-sm text-slate-600">
-            Choose Audio, Captions, or Both. You are already on this page during
-            the service.
-          </p>
-        </div>
-
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
           <Link
             href="/operator-caption"
@@ -54,52 +31,49 @@ export function AudioOperatorRelatedPagesCard({
             /operator-caption
           </Link>
           <p className="text-sm font-semibold text-slate-800">
-            Caption operator (YouTube + transcripts)
+            Caption operator (YouTube)
           </p>
           <p className="text-sm text-slate-600">
-            Caption-only console with Sermon mode transcript files. Use this when
-            you only need YouTube captions.
+            Run English captions on the YouTube stream via OBS. This is separate
+            from earpiece audio on the translation channel.
           </p>
         </div>
 
-        {showCaptionPages ? (
-          <>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
-              <Link
-                href="/caption-settings"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-semibold text-indigo-700 underline break-all"
-              >
-                /caption-settings
-              </Link>
-              <p className="text-sm font-semibold text-slate-800">
-                Caption appearance
-              </p>
-              <p className="text-sm text-slate-600">
-                Font size, position, and alignment for the OBS overlay. Set up
-                before the service starts.
-              </p>
-            </div>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+          <Link
+            href="/listen"
+            className="font-semibold text-indigo-700 underline break-all"
+          >
+            /listen
+          </Link>
+          <p className="text-sm font-semibold text-slate-800">
+            Phone translation page
+          </p>
+          <p className="text-sm text-slate-600">
+            Congregation members scan the QR code on the operator page to hear
+            live English translation on their phone.
+          </p>
+          <p className="break-all font-mono text-xs text-slate-500">
+            {baseUrl}/listen
+          </p>
+        </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
-              <Link
-                href="/overlay"
-                className="font-semibold text-indigo-700 underline break-all"
-              >
-                /overlay
-              </Link>
-              <p className="text-sm font-semibold text-slate-800">OBS overlay</p>
-              <p className="text-sm text-slate-600">
-                Browser Source for YouTube stream captions. Earpiece listeners do
-                not use this page.
-              </p>
-              <p className="break-all font-mono text-xs text-slate-500">
-                {baseUrl}/overlay
-              </p>
-            </div>
-          </>
-        ) : null}
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+          <Link
+            href="/overlay"
+            className="font-semibold text-indigo-700 underline break-all"
+          >
+            /overlay
+          </Link>
+          <p className="text-sm font-semibold text-slate-800">OBS overlay</p>
+          <p className="text-sm text-slate-600">
+            Browser Source for YouTube stream captions. Earpiece listeners do not
+            use this page.
+          </p>
+          <p className="break-all font-mono text-xs text-slate-500">
+            {baseUrl}/overlay
+          </p>
+        </div>
       </div>
     </section>
   );

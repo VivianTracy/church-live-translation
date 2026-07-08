@@ -1,15 +1,9 @@
 "use client";
 
-import { saveCaptionState } from "@/lib/captionApi";
 import {
   connectOpenAIAudioTranslation,
   type AudioTranslationConnection,
 } from "@/lib/openaiAudioTranslationClient";
-import { connectOpenAITranscription } from "@/lib/openaiTranscriptionClient";
-import {
-  OpenAITranslationError,
-  translateChineseToEnglishOpenAI,
-} from "@/lib/openaiTranslate";
 import {
   loadStoredAudioOutputDeviceId,
   saveStoredAudioOutputDeviceId,
@@ -18,13 +12,7 @@ import {
   loadStoredMicDeviceId,
   saveStoredMicDeviceId,
 } from "@/lib/microphoneDeviceStorage";
-import {
-  loadStoredOutputMode,
-  outputModeIncludesAudio,
-  outputModeIncludesCaptions,
-  saveStoredOutputMode,
-  type OutputMode,
-} from "@/lib/outputModeStorage";
+import { startTranslationAudioBroadcast } from "@/lib/translationAudioBroadcast";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type AudioLevels = {
@@ -41,59 +29,73 @@ const INITIAL_LEVELS: AudioLevels = {
   outputPeak: 0,
 };
 
-export function useAudioTranslationOperator() {
-  const [outputMode, setOutputModeState] = useState<OutputMode>("both");
+export function useAudioTranslationOperator(audienceLive = false) {
   const [isListening, setIsListening] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
-  const [isCaptionTranslating, setIsCaptionTranslating] = useState(false);
   const [micDeviceId, setMicDeviceIdState] = useState("");
   const [outputDeviceId, setOutputDeviceIdState] = useState("");
   const [outputDeviceLabel, setOutputDeviceLabel] = useState("");
   const [micError, setMicError] = useState("");
   const [translationError, setTranslationError] = useState("");
-  const [captionError, setCaptionError] = useState("");
+  const [audienceBroadcastError, setAudienceBroadcastError] = useState("");
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [inputTranscript, setInputTranscript] = useState("");
   const [outputTranscript, setOutputTranscript] = useState("");
-  const [micTranscript, setMicTranscript] = useState("");
-  const [englishCaption, setEnglishCaption] = useState("");
-  const [englishCaptionUpdatedAt, setEnglishCaptionUpdatedAt] = useState(0);
   const [levels, setLevels] = useState<AudioLevels>(INITIAL_LEVELS);
 
-  const audioConnectionRef = useRef<AudioTranslationConnection | null>(null);
-  const transcriptionRef = useRef<Awaited<
-    ReturnType<typeof connectOpenAITranscription>
-  > | null>(null);
+  const connectionRef = useRef<AudioTranslationConnection | null>(null);
   const micDeviceIdRef = useRef("");
   const outputDeviceIdRef = useRef("");
-  const outputModeRef = useRef<OutputMode>("both");
   const sessionStartedAtRef = useRef<number | null>(null);
-  const liveBroadcastRef = useRef(false);
-  const englishPartsRef = useRef<string[]>([]);
-  const captionTranslationQueueRef = useRef(Promise.resolve());
+  const audienceLiveRef = useRef(audienceLive);
+  const outputStreamRef = useRef<MediaStream | null>(null);
+  const broadcastStopRef = useRef<(() => void) | null>(null);
 
-  outputModeRef.current = outputMode;
+  audienceLiveRef.current = audienceLive;
+
+  const stopAudienceBroadcast = useCallback(() => {
+    broadcastStopRef.current?.();
+    broadcastStopRef.current = null;
+  }, []);
+
+  const startAudienceBroadcast = useCallback(
+    (stream: MediaStream) => {
+      stopAudienceBroadcast();
+      broadcastStopRef.current = startTranslationAudioBroadcast(
+        stream,
+        setAudienceBroadcastError
+      );
+    },
+    [stopAudienceBroadcast]
+  );
 
   useEffect(() => {
     const storedMicId = loadStoredMicDeviceId();
     const storedOutputId = loadStoredAudioOutputDeviceId();
-    const storedOutputMode = loadStoredOutputMode();
     micDeviceIdRef.current = storedMicId;
     outputDeviceIdRef.current = storedOutputId;
-    outputModeRef.current = storedOutputMode;
     setMicDeviceIdState(storedMicId);
     setOutputDeviceIdState(storedOutputId);
-    setOutputModeState(storedOutputMode);
   }, []);
 
   useEffect(() => {
     return () => {
-      audioConnectionRef.current?.stop();
-      audioConnectionRef.current = null;
-      transcriptionRef.current?.stop();
-      transcriptionRef.current = null;
+      stopAudienceBroadcast();
+      connectionRef.current?.stop();
+      connectionRef.current = null;
     };
-  }, []);
+  }, [stopAudienceBroadcast]);
+
+  useEffect(() => {
+    if (!audienceLive) {
+      stopAudienceBroadcast();
+      return;
+    }
+
+    if (outputStreamRef.current && isListening) {
+      startAudienceBroadcast(outputStreamRef.current);
+    }
+  }, [audienceLive, isListening, startAudienceBroadcast, stopAudienceBroadcast]);
 
   useEffect(() => {
     if (!outputDeviceId || !navigator.mediaDevices?.enumerateDevices) {
@@ -118,207 +120,99 @@ export function useAudioTranslationOperator() {
   }, [outputDeviceId]);
 
   useEffect(() => {
-    if (!isListening || !audioConnectionRef.current || !outputDeviceId) {
+    if (!isListening || !connectionRef.current || !outputDeviceId) {
       return;
     }
 
-    void audioConnectionRef.current.setOutputDeviceId(outputDeviceId);
+    void connectionRef.current.setOutputDeviceId(outputDeviceId);
   }, [isListening, outputDeviceId]);
 
   const resetSessionState = useCallback(() => {
     setLevels(INITIAL_LEVELS);
     setInputTranscript("");
     setOutputTranscript("");
-    setMicTranscript("");
-    setEnglishCaption("");
-    setEnglishCaptionUpdatedAt(0);
     setLatencyMs(null);
-    englishPartsRef.current = [];
-    captionTranslationQueueRef.current = Promise.resolve();
     sessionStartedAtRef.current = null;
-  }, []);
-
-  const startBroadcast = useCallback(async () => {
-    liveBroadcastRef.current = true;
-
-    await saveCaptionState({
-      isLive: true,
-      caption: englishPartsRef.current.join(" "),
-      updatedAt: Date.now(),
-    });
-  }, []);
-
-  const clearBroadcast = useCallback(async () => {
-    liveBroadcastRef.current = false;
-    resetSessionState();
-
-    await saveCaptionState({
-      isLive: false,
-      caption: "",
-      updatedAt: Date.now(),
-    });
-  }, [resetSessionState]);
-
-  const translateCaptionSegment = useCallback((chinese: string) => {
-    captionTranslationQueueRef.current = captionTranslationQueueRef.current
-      .then(async () => {
-        setIsCaptionTranslating(true);
-
-        try {
-          const english = await translateChineseToEnglishOpenAI(chinese);
-          englishPartsRef.current.push(english);
-          const fullCaption = englishPartsRef.current.join(" ");
-          setEnglishCaption(fullCaption);
-          setEnglishCaptionUpdatedAt(Date.now());
-          setCaptionError("");
-
-          if (liveBroadcastRef.current) {
-            await saveCaptionState({
-              isLive: true,
-              caption: fullCaption,
-              updatedAt: Date.now(),
-            });
-          }
-        } catch (error) {
-          const message =
-            error instanceof OpenAITranslationError
-              ? error.message
-              : error instanceof Error
-                ? error.message
-                : String(error);
-          setCaptionError(message);
-          throw error;
-        } finally {
-          setIsCaptionTranslating(false);
-        }
-      })
-      .catch((error) => {
-        console.error("Caption translation failed:", error);
-      });
-  }, []);
-
-  const stopAudioConnection = useCallback(() => {
-    audioConnectionRef.current?.stop();
-    audioConnectionRef.current = null;
-  }, []);
-
-  const stopCaptionConnection = useCallback(() => {
-    transcriptionRef.current?.stop();
-    transcriptionRef.current = null;
-  }, []);
+    outputStreamRef.current = null;
+    stopAudienceBroadcast();
+  }, [stopAudienceBroadcast]);
 
   const stopListening = useCallback(() => {
-    stopAudioConnection();
-    stopCaptionConnection();
+    stopAudienceBroadcast();
+    connectionRef.current?.stop();
+    connectionRef.current = null;
     setIsListening(false);
     setIsTranslating(false);
-    setIsCaptionTranslating(false);
     resetSessionState();
-  }, [resetSessionState, stopAudioConnection, stopCaptionConnection]);
-
-  const startCaptionConnection = useCallback(async () => {
-    transcriptionRef.current = await connectOpenAITranscription({
-      deviceId: micDeviceIdRef.current || undefined,
-      onDisplay: setMicTranscript,
-      onSegment: translateCaptionSegment,
-      onListeningChange: () => undefined,
-      onError: (message) => {
-        setCaptionError(message);
-      },
-      onMonitorUpdate: (snapshot) => {
-        if (!outputModeIncludesAudio(outputModeRef.current)) {
-          setLevels((current) => ({
-            ...current,
-            inputLevel: snapshot.lastChunkRms ?? current.inputLevel,
-            inputPeak: snapshot.lastChunkPeak ?? current.inputPeak,
-          }));
-        }
-      },
-    });
-  }, [translateCaptionSegment]);
-
-  const startAudioConnection = useCallback(async () => {
-    const startedAt = Date.now();
-    sessionStartedAtRef.current = startedAt;
-
-    audioConnectionRef.current = await connectOpenAIAudioTranslation({
-      deviceId: micDeviceIdRef.current || undefined,
-      outputDeviceId: outputDeviceIdRef.current || undefined,
-      onListeningChange: () => undefined,
-      onTranslatingChange: setIsTranslating,
-      onInputLevels: (inputLevel, inputPeak) => {
-        setLevels((current) => ({
-          ...current,
-          inputLevel,
-          inputPeak,
-        }));
-      },
-      onOutputLevels: (outputLevel, outputPeak) => {
-        setLevels((current) => ({
-          ...current,
-          outputLevel,
-          outputPeak,
-        }));
-      },
-      onFirstOutputAudio: () => {
-        if (sessionStartedAtRef.current !== null) {
-          setLatencyMs(Date.now() - sessionStartedAtRef.current);
-        }
-      },
-      onInputTranscriptDelta: (delta) => {
-        setInputTranscript((current) => current + delta);
-      },
-      onOutputTranscriptDelta: (delta) => {
-        setOutputTranscript((current) => current + delta);
-      },
-      onError: (message) => {
-        setTranslationError(message);
-      },
-    });
-  }, []);
+  }, [resetSessionState, stopAudienceBroadcast]);
 
   const startListening = useCallback(async () => {
-    if (audioConnectionRef.current || transcriptionRef.current) {
+    if (connectionRef.current) {
       return true;
     }
 
-    const mode = outputModeRef.current;
-    const includesAudio = outputModeIncludesAudio(mode);
-    const includesCaptions = outputModeIncludesCaptions(mode);
-
     setMicError("");
     setTranslationError("");
-    setCaptionError("");
+    setAudienceBroadcastError("");
     resetSessionState();
 
     try {
-      if (includesCaptions) {
-        await startCaptionConnection();
-      }
+      const startedAt = Date.now();
+      sessionStartedAtRef.current = startedAt;
 
-      if (includesAudio) {
-        await startAudioConnection();
-      }
+      connectionRef.current = await connectOpenAIAudioTranslation({
+        deviceId: micDeviceIdRef.current || undefined,
+        outputDeviceId: outputDeviceIdRef.current || undefined,
+        onListeningChange: setIsListening,
+        onTranslatingChange: setIsTranslating,
+        onInputLevels: (inputLevel, inputPeak) => {
+          setLevels((current) => ({
+            ...current,
+            inputLevel,
+            inputPeak,
+          }));
+        },
+        onOutputLevels: (outputLevel, outputPeak) => {
+          setLevels((current) => ({
+            ...current,
+            outputLevel,
+            outputPeak,
+          }));
+        },
+        onFirstOutputAudio: () => {
+          if (sessionStartedAtRef.current !== null) {
+            setLatencyMs(Date.now() - sessionStartedAtRef.current);
+          }
+        },
+        onInputTranscriptDelta: (delta) => {
+          setInputTranscript((current) => current + delta);
+        },
+        onOutputTranscriptDelta: (delta) => {
+          setOutputTranscript((current) => current + delta);
+        },
+        onTranslatedStream: (stream) => {
+          outputStreamRef.current = stream;
 
-      setIsListening(true);
+          if (audienceLiveRef.current) {
+            startAudienceBroadcast(stream);
+          }
+        },
+        onError: (message) => {
+          setTranslationError(message);
+        },
+      });
+
       return true;
     } catch (error) {
-      stopAudioConnection();
-      stopCaptionConnection();
       const message = error instanceof Error ? error.message : String(error);
       setMicError(message);
       setIsListening(false);
       setIsTranslating(false);
+      connectionRef.current = null;
       resetSessionState();
       return false;
     }
-  }, [
-    resetSessionState,
-    startAudioConnection,
-    startCaptionConnection,
-    stopAudioConnection,
-    stopCaptionConnection,
-  ]);
+  }, [resetSessionState, startAudienceBroadcast]);
 
   const restartListening = useCallback(async () => {
     stopListening();
@@ -337,27 +231,10 @@ export function useAudioTranslationOperator() {
     saveStoredAudioOutputDeviceId(deviceId);
   }, []);
 
-  const setOutputMode = useCallback((mode: OutputMode) => {
-    outputModeRef.current = mode;
-    setOutputModeState(mode);
-    saveStoredOutputMode(mode);
-  }, []);
-
-  const translationStatusLabel =
-    outputMode === "captions"
-      ? "OpenAI gpt-4o-mini-transcribe + GPT-4o mini captions"
-      : outputMode === "audio"
-        ? "OpenAI gpt-realtime-translate (Chinese → English audio)"
-        : "Captions + gpt-realtime-translate audio";
-
   return {
-    outputMode,
-    setOutputMode,
-    translationStatusLabel,
+    translationStatusLabel: "OpenAI gpt-realtime-translate (Chinese → English audio)",
     isListening,
-    isTranslating: isTranslating || isCaptionTranslating,
-    isAudioTranslating: isTranslating,
-    isCaptionTranslating,
+    isTranslating,
     micDeviceId,
     setMicDeviceId,
     outputDeviceId,
@@ -365,13 +242,10 @@ export function useAudioTranslationOperator() {
     outputDeviceLabel,
     micError,
     translationError,
-    captionError,
+    audienceBroadcastError,
     latencyMs,
     inputTranscript,
     outputTranscript,
-    micTranscript,
-    englishCaption,
-    englishCaptionUpdatedAt,
     inputLevel: levels.inputLevel,
     inputPeak: levels.inputPeak,
     outputLevel: levels.outputLevel,
@@ -379,7 +253,5 @@ export function useAudioTranslationOperator() {
     startListening,
     stopListening,
     restartListening,
-    startBroadcast,
-    clearBroadcast,
   };
 }
