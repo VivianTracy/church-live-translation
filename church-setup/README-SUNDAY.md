@@ -7,7 +7,7 @@ Use this on the **streaming computer** before and during the service.
 - [ ] Open Terminal (Mac) or PowerShell (Windows)
 - [ ] `cd` to the church-caption folder
 - [ ] Run `npm run dev` (or `npm run start` if already built)
-- [ ] Open **http://localhost:3000/operator-openai** in Chrome
+- [ ] Open **http://localhost:3000/operator-caption** in Chrome
 - [ ] In **Microphone input**, select **BlackHole** (Mac) or **VB-Cable Output** (Windows)
 - [ ] In OBS, confirm Browser Source points to **http://localhost:3000/overlay** (1920×1080)
 - [ ] Adjust overlay font size and position on the operator page

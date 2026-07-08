@@ -129,8 +129,8 @@ export default function OperatorPage() {
           )}
           <p className="text-xs text-violet-800">
             Experimental OpenAI operator:{" "}
-            <a href="/operator-openai" className="font-semibold underline">
-              /operator-openai
+            <a href="/operator-caption" className="font-semibold underline">
+              /operator-caption
             </a>
           </p>
           <p className="text-xs text-violet-800">

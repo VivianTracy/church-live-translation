@@ -17,7 +17,7 @@
 
 ## Font and alignment
 
-On **http://localhost:3000/operator-openai**:
+On **http://localhost:3000/caption-settings**:
 
 - **Font size:** Small / Medium / Large
 - **Caption box position:** Bottom / Lower third / Top
@@ -32,7 +32,7 @@ Captions appear on YouTube when this Browser Source is visible in the **Program*
 ## Local test without YouTube
 
 1. Run Church Caption (`npm run dev`).
-2. Open `/operator-openai`, start captions with test audio.
+2. Open `/operator-caption`, start captions with test audio.
 3. Watch the overlay preview on the operator page or open `/overlay` in a second browser window.
 
 ## Import scene collection (optional)

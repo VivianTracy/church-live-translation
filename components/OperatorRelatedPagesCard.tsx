@@ -25,6 +25,21 @@ export function OperatorRelatedPagesCard() {
       <div className="space-y-4">
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
           <Link
+            href="/caption-settings"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-indigo-700 underline break-all"
+          >
+            /caption-settings
+          </Link>
+          <p className="text-sm font-semibold text-slate-800">Caption appearance</p>
+          <p className="text-sm text-slate-600">
+            Font size, position, and alignment for the OBS overlay.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+          <Link
             href="/overlay"
             className="font-semibold text-indigo-700 underline break-all"
           >
@@ -43,10 +58,26 @@ export function OperatorRelatedPagesCard() {
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
           <Link
-            href="/operator-openai?test=1"
+            href="/operator-live"
             className="font-semibold text-indigo-700 underline break-all"
           >
-            /operator-openai?test=1
+            /operator-live
+          </Link>
+          <p className="text-sm font-semibold text-slate-800">
+            Live output operator
+          </p>
+          <p className="text-sm text-slate-600">
+            Run earpiece audio translation, YouTube captions, or both from one
+            console during worship.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+          <Link
+            href="/operator-caption?test=1"
+            className="font-semibold text-indigo-700 underline break-all"
+          >
+            /operator-caption?test=1
           </Link>
           <p className="text-sm font-semibold text-slate-800">AV replay test</p>
           <p className="text-sm text-slate-600">

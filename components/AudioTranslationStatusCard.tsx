@@ -2,6 +2,9 @@ type AudioTranslationStatusCardProps = {
   isLive: boolean;
   isListening: boolean;
   seconds: number;
+  statusHint: string;
+  startLabel: string;
+  stopLabel: string;
   onToggleLive: () => void;
 };
 
@@ -19,6 +22,9 @@ export function AudioTranslationStatusCard({
   isLive,
   isListening,
   seconds,
+  statusHint,
+  startLabel,
+  stopLabel,
   onToggleLive,
 }: AudioTranslationStatusCardProps) {
   return (
@@ -30,10 +36,10 @@ export function AudioTranslationStatusCard({
         <p className="text-2xl text-slate-600">
           {isLive
             ? isListening
-              ? "Translation channel active · Audio flowing"
-              : "Translation channel active"
+              ? `${statusHint} · Input running`
+              : statusHint
             : isListening
-              ? "Audio input running"
+              ? "Input running"
               : "Ready to start"}
         </p>
         <p className="text-4xl font-mono font-semibold text-slate-800">
@@ -49,7 +55,7 @@ export function AudioTranslationStatusCard({
             : "bg-violet-600 hover:bg-violet-700"
         }`}
       >
-        {isLive ? "🔴 Stop Live Translation" : "🟢 Start Live Translation"}
+        {isLive ? stopLabel : startLabel}
       </button>
     </section>
   );

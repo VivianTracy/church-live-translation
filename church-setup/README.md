@@ -46,7 +46,8 @@ See [`obs/browser-source.md`](./obs/browser-source.md). Optional starter scene c
 
 | URL | Role |
 |---|---|
-| `http://localhost:3000/operator-openai` | Operator console |
+| `http://localhost:3000/operator-caption` | Caption operator (YouTube) |
+| `http://localhost:3000/operator-live` | Live output operator (audio / captions / both) |
 | `http://localhost:3000/overlay` | OBS Browser Source |
 
 Run locally with:
