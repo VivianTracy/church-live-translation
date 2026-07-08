@@ -1,5 +1,7 @@
+import { getTranslationRelayOrigin } from "@/lib/translationRelayUrl";
+
 export function getTranslationListenUrl(origin?: string): string {
-  const configured = process.env.NEXT_PUBLIC_AUDIENCE_URL?.replace(/\/$/, "");
+  const configured = getTranslationRelayOrigin();
 
   if (configured) {
     return `${configured}/listen`;

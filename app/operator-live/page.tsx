@@ -11,16 +11,24 @@ import { TranslationChannelCard } from "@/components/TranslationChannelCard";
 import { useAudioTranslationOperator } from "@/lib/useAudioTranslationOperator";
 import {
   clearTranslationListenState,
+  loadTranslationRelayStatus,
   saveTranslationListenState,
 } from "@/lib/translationListenApi";
-import { useEffect, useState } from "react";
+import {
+  getTranslationRelayOrigin,
+  isLocalDevHostname,
+  isUsingRemoteTranslationRelay,
+} from "@/lib/translationRelayUrl";
+import { useCallback, useEffect, useState } from "react";
 
 export default function OperatorLivePage() {
   const [isLive, setIsLive] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [relayError, setRelayError] = useState("");
   const [relayReady, setRelayReady] = useState<boolean | null>(null);
-  const [showLocalOperatorWarning, setShowLocalOperatorWarning] = useState(false);
+  const [showMissingRelayConfig, setShowMissingRelayConfig] = useState(false);
+  const [relayOrigin, setRelayOrigin] = useState<string | undefined>(undefined);
+  const [usingRemoteRelay, setUsingRemoteRelay] = useState(false);
 
   const {
     isListening,
@@ -48,36 +56,54 @@ export default function OperatorLivePage() {
   } = useAudioTranslationOperator(isLive);
 
   useEffect(() => {
-    setShowLocalOperatorWarning(
-      window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1"
+    setRelayOrigin(getTranslationRelayOrigin());
+    setUsingRemoteRelay(isUsingRemoteTranslationRelay());
+    setShowMissingRelayConfig(
+      isLocalDevHostname(window.location.hostname) && !getTranslationRelayOrigin()
     );
 
-    void fetch("/api/translation-listen-state", { cache: "no-store" })
-      .then(async (response) => {
-        const body = (await response.json()) as { relayConfigured?: boolean; error?: string };
-
-        if (!response.ok) {
-          setRelayReady(false);
-          setRelayError(body.error ?? "Phone relay is unavailable.");
-          return;
-        }
-
-        setRelayReady(body.relayConfigured !== false);
+    void loadTranslationRelayStatus()
+      .then((status) => {
+        setRelayReady(status.relayConfigured);
+        setRelayError("");
       })
-      .catch(() => {
-        setRelayReady(false);
-        setRelayError("Could not check phone relay status.");
+      .catch((error) => {
+        setRelayReady(null);
+        setRelayError(
+          error instanceof Error
+            ? `Phone relay status unavailable: ${error.message}`
+            : "Phone relay status unavailable. Local audio still works."
+        );
       });
   }, []);
 
-  const markAudienceLive = async () => {
-    await saveTranslationListenState({
+  const markAudienceLive = useCallback(() => {
+    void saveTranslationListenState({
       isLive: true,
       updatedAt: Date.now(),
-    });
-    setRelayError("");
-  };
+    })
+      .then(() => {
+        setRelayError("");
+      })
+      .catch((error) => {
+        setRelayError(
+          error instanceof Error
+            ? `Phone relay: ${error.message}`
+            : "Phone relay: Failed to save translation listen state."
+        );
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!isLive) {
+      return;
+    }
+
+    markAudienceLive();
+    const timer = setInterval(markAudienceLive, 5000);
+
+    return () => clearInterval(timer);
+  }, [isLive, markAudienceLive]);
 
   const handleToggleLive = () => {
     const nextIsLive = !isLive;
@@ -87,32 +113,25 @@ export default function OperatorLivePage() {
       stopListening();
       setSeconds(0);
       void clearTranslationListenState().catch((error) => {
-        setRelayError(error instanceof Error ? error.message : String(error));
+        setRelayError(
+          error instanceof Error
+            ? `Phone relay: ${error.message}`
+            : "Phone relay: Failed to clear translation listen state."
+        );
       });
       return;
     }
 
     setIsLive(true);
-    void markAudienceLive().catch((error) => {
-      setIsLive(false);
-      setRelayError(error instanceof Error ? error.message : String(error));
-    });
+    markAudienceLive();
   };
 
   const handleStartListening = async () => {
     setIsLive(true);
-
-    try {
-      await markAudienceLive();
-    } catch (error) {
-      setIsLive(false);
-      setRelayError(error instanceof Error ? error.message : String(error));
-      return;
-    }
+    markAudienceLive();
 
     if (!(await startListening())) {
-      setIsLive(false);
-      void clearTranslationListenState().catch(() => undefined);
+      setRelayError((current) => current || "Could not start audio input.");
     }
   };
 
@@ -146,30 +165,38 @@ export default function OperatorLivePage() {
             <li>Press Start Live Translation, then Start Audio Input.</li>
           </ol>
           <p className="text-xs text-violet-800">
-            For phone listeners, run this page on your deployed Vercel URL, not
-            localhost.
+            Run this page on the church computer. Local audio devices work from
+            localhost; phone listeners use the deployed relay URL.
           </p>
         </section>
 
-        {showLocalOperatorWarning ? (
+        {showMissingRelayConfig ? (
           <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
-            You are on localhost. Phones opening the Vercel audience page cannot
-            receive audio from this operator session. Use{" "}
-            <span className="font-mono">https://church-caption.vercel.app/operator-live</span>{" "}
-            during the service.
+            Add{" "}
+            <span className="font-mono">NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app</span>{" "}
+            to <span className="font-mono">.env.local</span>, restart{" "}
+            <span className="font-mono">npm run dev</span>, then phones can
+            receive audio while this operator runs locally.
+          </p>
+        ) : null}
+
+        {usingRemoteRelay && relayOrigin ? (
+          <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200">
+            Local operator connected to phone relay at{" "}
+            <span className="font-mono">{relayOrigin}</span>.
           </p>
         ) : null}
 
         {relayReady === false ? (
           <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
-            Phone relay is not configured. Add Redis/KV env vars on Vercel, then
-            reload this page from the deployed site.
+            Phone relay is not configured on the deployed site. Local translation
+            still works; add Redis/KV env vars on Vercel for phone listeners.
           </p>
         ) : null}
 
         {relayError ? (
-          <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
-            Phone relay: {relayError}
+          <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
+            {relayError}
           </p>
         ) : null}
 
@@ -190,9 +217,10 @@ export default function OperatorLivePage() {
 
         {isLive && isListening && isTranslating && chunksUploaded === 0 ? (
           <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
-            Translation audio is playing locally, but no chunks have reached phones
-            yet. Wait a few seconds; if this stays at 0, reload from the deployed
-            operator URL.
+            Translation audio is playing locally, but no chunks have reached the
+            phone relay yet. Wait a few seconds; if this stays at 0, check{" "}
+            <span className="font-mono">NEXT_PUBLIC_AUDIENCE_URL</span> and the
+            relay status message above.
           </p>
         ) : null}
 

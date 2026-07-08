@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 type AudienceUrlResponse = {
   listenUrl: string;
-  source: "env" | "request-host" | "local-dev" | "localhost";
+  source: "env" | "request-host" | "local-dev" | "local-dev-relay" | "localhost";
 };
 
 export function TranslationAudienceCard() {
@@ -67,6 +67,7 @@ export function TranslationAudienceCard() {
 
   const showDeployWarning = urlReachable === false;
   const showLocalDevNote = urlSource === "local-dev";
+  const showLocalRelayNote = urlSource === "local-dev-relay";
 
   return (
     <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 text-center space-y-5">
@@ -102,6 +103,13 @@ export function TranslationAudienceCard() {
         </p>
       ) : null}
 
+      {showLocalRelayNote ? (
+        <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200">
+          Local operator mode: this QR points to the deployed relay. Phones can
+          use mobile data while this computer handles local audio.
+        </p>
+      ) : null}
+
       {showLocalDevNote ? (
         <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
           Local dev link shown. Phones on mobile data need the deployed URL —
@@ -112,7 +120,7 @@ export function TranslationAudienceCard() {
         </p>
       ) : null}
 
-      {!showLocalDevNote && !showDeployWarning ? (
+      {!showLocalDevNote && !showLocalRelayNote && !showDeployWarning ? (
         <p className="text-sm text-slate-500">
           Phones can use mobile data. They do not need the same Wi‑Fi as this
           computer.

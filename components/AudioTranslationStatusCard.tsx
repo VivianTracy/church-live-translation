@@ -42,6 +42,7 @@ export function AudioTranslationStatusCard({
       </div>
 
       <button
+        type="button"
         onClick={onToggleLive}
         className={`w-full rounded-2xl px-8 py-7 text-3xl font-bold text-white shadow-sm transition ${
           isLive

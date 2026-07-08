@@ -1,4 +1,5 @@
 import type { TranslationListenState } from "@/types/translationListen";
+import { getTranslationRelayApiUrl } from "@/lib/translationRelayUrl";
 
 async function readApiError(response: Response, fallback: string): Promise<string> {
   try {
@@ -17,7 +18,7 @@ async function readApiError(response: Response, fallback: string): Promise<strin
 export async function saveTranslationListenState(
   state: TranslationListenState
 ): Promise<void> {
-  const response = await fetch("/api/translation-listen-state", {
+  const response = await fetch(getTranslationRelayApiUrl("/api/translation-listen-state"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -48,4 +49,28 @@ export async function loadTranslationListenState(): Promise<TranslationListenSta
 
 export async function clearTranslationListenState(): Promise<void> {
   await saveTranslationListenState({ isLive: false, updatedAt: Date.now() });
+}
+
+export async function loadTranslationRelayStatus(): Promise<{
+  relayConfigured: boolean;
+  isLive: boolean;
+  updatedAt: number;
+}> {
+  const response = await fetch(getTranslationRelayApiUrl("/api/translation-listen-state"), {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to load translation relay status."));
+  }
+
+  const data = (await response.json()) as TranslationListenState & {
+    relayConfigured?: boolean;
+  };
+
+  return {
+    relayConfigured: data.relayConfigured !== false,
+    isLive: data.isLive,
+    updatedAt: data.updatedAt,
+  };
 }

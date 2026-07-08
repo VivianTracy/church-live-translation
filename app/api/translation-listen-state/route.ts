@@ -3,32 +3,41 @@ import {
   isTranslationRelayConfigured,
   setTranslationListenLive,
 } from "@/lib/translationAudioStore";
-import { NextRequest, NextResponse } from "next/server";
+import {
+  translationRelayJsonResponse,
+  translationRelayOptionsResponse,
+} from "@/lib/translationRelayCors";
+import { NextRequest } from "next/server";
 
-function errorResponse(error: unknown, fallback: string) {
+function errorResponse(request: NextRequest, error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
 
-  return NextResponse.json({ error: message }, { status: 500 });
+  return translationRelayJsonResponse(request, { error: message }, { status: 500 });
 }
 
-export async function GET() {
+export async function OPTIONS(request: NextRequest) {
+  return translationRelayOptionsResponse(request);
+}
+
+export async function GET(request: NextRequest) {
   try {
-    return NextResponse.json({
+    return translationRelayJsonResponse(request, {
       ...(await getTranslationListenState()),
       relayConfigured: isTranslationRelayConfigured(),
     });
   } catch (error) {
-    return errorResponse(error, "Failed to load translation listen state.");
+    return errorResponse(request, error, "Failed to load translation listen state.");
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     if (!isTranslationRelayConfigured()) {
-      return NextResponse.json(
+      return translationRelayJsonResponse(
+        request,
         {
           error:
-            "Phone listeners require Redis. Set KV_REST_API_URL and KV_REST_API_TOKEN on Vercel.",
+            "Phone listeners require Redis. Set KV_REST_API_URL and KV_REST_API_TOKEN on your deployed site.",
         },
         { status: 503 }
       );
@@ -37,13 +46,17 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as { isLive?: boolean };
 
     if (typeof body.isLive !== "boolean") {
-      return NextResponse.json({ error: "isLive is required." }, { status: 400 });
+      return translationRelayJsonResponse(
+        request,
+        { error: "isLive is required." },
+        { status: 400 }
+      );
     }
 
     await setTranslationListenLive(body.isLive);
 
-    return NextResponse.json({ success: true });
+    return translationRelayJsonResponse(request, { success: true });
   } catch (error) {
-    return errorResponse(error, "Failed to save translation listen state.");
+    return errorResponse(request, error, "Failed to save translation listen state.");
   }
 }

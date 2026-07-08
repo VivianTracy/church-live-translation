@@ -26,3 +26,10 @@ export const EMPTY_TRANSLATION_AUDIO_META: TranslationAudioMeta = {
   latestSeq: 0,
   mimeType: "audio/webm;codecs=opus",
 };
+
+export function isTranslationSessionLive(
+  listenState: TranslationListenState,
+  meta: TranslationAudioMeta
+): boolean {
+  return listenState.isLive || meta.isLive || meta.latestSeq > 0;
+}

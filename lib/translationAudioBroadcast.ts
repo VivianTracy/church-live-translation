@@ -1,3 +1,5 @@
+import { getTranslationRelayApiUrl } from "@/lib/translationRelayUrl";
+
 export const TRANSLATION_BROADCAST_MIME_TYPE = "audio/wav";
 
 async function readUploadError(response: Response): Promise<string> {
@@ -19,7 +21,7 @@ export function uploadTranslationWavChunk(
   onError: (message: string) => void,
   onUploaded?: () => void
 ): void {
-  void fetch("/api/translation-audio", {
+  void fetch(getTranslationRelayApiUrl("/api/translation-audio"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

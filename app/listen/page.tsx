@@ -7,6 +7,7 @@ import {
   unlockMobileAudioPlayback,
 } from "@/lib/translationAudioPlayback";
 import { loadTranslationListenState } from "@/lib/translationListenApi";
+import { isTranslationSessionLive } from "@/types/translationListen";
 import { EMPTY_TRANSLATION_LISTEN_STATE } from "@/types/translationListen";
 import { useEffect, useRef, useState } from "react";
 
@@ -26,21 +27,15 @@ export default function ListenPage() {
     const loadState = async () => {
       try {
         const listenState = await loadTranslationListenState();
-        setState(listenState);
+        const payload = await fetchTranslationAudioAfter(0);
+        const isLive = isTranslationSessionLive(listenState, payload.meta);
+
+        setState({
+          isLive,
+          updatedAt: Math.max(listenState.updatedAt, payload.meta.updatedAt),
+        });
+        setLatestServerSeq(payload.meta.latestSeq);
         setStateError("");
-
-        if (!listenState.isLive) {
-          const payload = await fetchTranslationAudioAfter(0);
-
-          if (payload.meta.isLive) {
-            setState({
-              isLive: true,
-              updatedAt: payload.meta.updatedAt,
-            });
-          }
-
-          setLatestServerSeq(payload.meta.latestSeq);
-        }
       } catch (error) {
         setStateError(
           error instanceof Error ? error.message : "Could not reach translation service."
@@ -69,7 +64,7 @@ export default function ListenPage() {
           return;
         }
 
-        if (payload.meta.isLive) {
+        if (payload.meta.isLive || payload.meta.latestSeq > 0) {
           setState({
             isLive: true,
             updatedAt: payload.meta.updatedAt,
