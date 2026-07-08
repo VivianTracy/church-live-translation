@@ -107,7 +107,7 @@ The app needs API keys. **Ask the project lead** for:
 - `GEMINI_API_KEY`
 - `KV_REST_API_URL`
 - `KV_REST_API_TOKEN`
-- `OPENAI_API_KEY` (for `/operator-openai`)
+- `OPENAI_API_KEY` (for `/operator-caption`)
 
 Then:
 

@@ -7,6 +7,12 @@ export const OPENAI_TRANSCRIPTION_MODEL = "gpt-realtime-whisper";
 /** Chinese → English caption translation (Chat Completions). */
 export const OPENAI_CHAT_TRANSLATION_MODEL = "gpt-4o-mini";
 
+/** Live speech-to-speech translation for earpiece channel. */
+export const OPENAI_AUDIO_TRANSLATION_MODEL = "gpt-realtime-translate";
+
+/** Target language for sermon audio translation. */
+export const OPENAI_AUDIO_TRANSLATION_LANGUAGE = "en";
+
 /** Optional Realtime text session model (experimental). */
 export const OPENAI_TRANSLATION_MODEL = "gpt-realtime-2";
 
@@ -15,6 +21,12 @@ export const OPENAI_REALTIME_CALLS_URL =
 
 export const OPENAI_REALTIME_WEBSOCKET_URL =
   "wss://api.openai.com/v1/realtime";
+
+export const OPENAI_TRANSLATION_CLIENT_SECRETS_URL =
+  "https://api.openai.com/v1/realtime/translations/client_secrets";
+
+export const OPENAI_TRANSLATION_CALLS_URL =
+  "https://api.openai.com/v1/realtime/translations/calls";
 
 export const OPENAI_TRANSCRIPTION_WEBSOCKET_URL =
   "wss://api.openai.com/v1/realtime?intent=transcription";

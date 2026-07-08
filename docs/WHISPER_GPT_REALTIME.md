@@ -18,7 +18,7 @@ Redis caption state
 YouTube stream
 ```
 
-This branch adds **`/operator-openai`** while keeping the existing Gemini + Chrome STT operator at **`/operator`**.
+This branch adds **`/operator-caption`** while keeping the existing Gemini + Chrome STT operator at **`/operator`**.
 
 ---
 
@@ -81,13 +81,13 @@ npm run dev
 5. Open the operator:
 
 ```text
-http://localhost:3000/operator-openai
+http://localhost:3000/operator-caption
 ```
 
 For the 7-minute AV replay clip (OBS → BlackHole), use:
 
 ```text
-http://localhost:3000/operator-openai?test=1
+http://localhost:3000/operator-caption?test=1
 ```
 
 6. Add `http://localhost:3000/overlay` as an OBS Browser Source and confirm captions on stream.
@@ -118,7 +118,7 @@ Chrome speech recognition is free but:
 
 | File | Purpose |
 |---|---|
-| `app/operator-openai/page.tsx` | Experimental operator UI |
+| `app/operator-caption/page.tsx` | Experimental operator UI |
 | `app/api/openai/transcription-session/route.ts` | Mint transcription client secret |
 | `app/api/openai/translation-session/route.ts` | Mint translation client secret |
 | `lib/openaiTranscriptionClient.ts` | Browser WebRTC → Whisper |
@@ -135,7 +135,7 @@ For a **45-minute Chinese sermon**:
 - Transcription: ~45 min × Whisper Realtime per-minute rate
 - Translation: depends on caption batch count and text length (Realtime text tokens)
 
-Use the usage dashboard after a test run before Sunday. Start with a short 5-minute mic test on `/operator-openai`.
+Use the usage dashboard after a test run before Sunday. Start with a short 5-minute mic test on `/operator-caption`.
 
 ---
 

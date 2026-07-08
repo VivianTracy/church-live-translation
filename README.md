@@ -16,7 +16,7 @@ The goal is not to replace church volunteers, but to reduce the burden on transl
 
 Church Caption runs on the **streaming computer** with OBS. The operator captures Chinese sermon audio; English captions appear on the YouTube stream through an OBS Browser Source.
 
-**Production operator:** [`/operator-openai`](http://localhost:3000/operator-openai)
+**Production operator:** [`/operator-caption`](http://localhost:3000/operator-caption)
 
 | Capability | Details |
 |---|---|
@@ -31,7 +31,9 @@ Church Caption runs on the **streaming computer** with OBS. The operator capture
 
 | URL | Role |
 |---|---|
-| `/operator-openai` | Production operator console |
+| `/operator-caption` | Caption operator (YouTube stream + sermon transcripts) |
+| `/operator-live` | Live output operator (earpiece audio, captions, or both) |
+| `/caption-settings` | OBS overlay font, position, and alignment |
 | `/overlay` | OBS Browser Source (YouTube stream captions) |
 
 **Setup bundle:** [`church-setup/README-SUNDAY.md`](./church-setup/README-SUNDAY.md)
@@ -49,10 +51,10 @@ Required environment variables (see [`docs/COLLABORATOR_SETUP.md`](./docs/COLLAB
 
 | Variable | Required for |
 |---|---|
-| `OPENAI_API_KEY` | `/operator-openai` (transcription + translation) |
+| `OPENAI_API_KEY` | `/operator-caption` and `/operator-live` (transcription + translation) |
 | Redis / KV vars | Caption state (optional on streaming PC — set `CAPTION_STORAGE=local`) |
 
-Open **http://localhost:3000/operator-openai**, add **http://localhost:3000/overlay** as an OBS Browser Source, and start captions.
+Open **http://localhost:3000/operator-caption**, add **http://localhost:3000/overlay** as an OBS Browser Source, and start captions.
 
 ---
 
@@ -91,7 +93,7 @@ Transcription is billed on audio processed; translation is billed per caption ch
 ## Technology Stack
 
 - Next.js, React, TypeScript, Tailwind CSS
-- **OpenAI** — production STT + translation (`/operator-openai`)
+- **OpenAI** — production STT + translation (`/operator-caption`)
 - **Upstash Redis / Vercel KV** — caption state (optional locally via `CAPTION_STORAGE=local`)
 - **OBS** — Browser Source overlay for YouTube stream
 
@@ -100,7 +102,7 @@ Transcription is billed on audio processed; translation is billed per caption ch
 ## Architecture Overview
 
 ```text
-BlackHole / VB-Cable → Chrome (/operator-openai)
+BlackHole / VB-Cable → Chrome (/operator-caption)
                               ↓
                     gpt-4o-mini-transcribe (Chinese)
                               ↓

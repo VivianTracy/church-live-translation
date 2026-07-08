@@ -16,7 +16,7 @@ One volunteer runs the **operator page** on the streaming computer. English capt
 Operator (mic)  →  STT  →  translate  →  caption state  →  /overlay (OBS → YouTube)
 ```
 
-**Production path:** OpenAI (`/operator-openai`) — used for Sunday worship.
+**Production path:** OpenAI (`/operator-caption`) — used for Sunday worship.
 
 **Backup path:** Gemini with sermon manuscript (`/operator`) — available if OpenAI is unavailable or when manuscript-guided translation is preferred.
 
@@ -47,7 +47,7 @@ Storage: Redis key `caption-state`, or in-memory when `CAPTION_STORAGE=local` (n
 
 ## Operator Path A: OpenAI (Production)
 
-**URL:** `/operator-openai`  
+**URL:** `/operator-caption`  
 **Hook:** `lib/useOpenAIOperator.ts`
 
 ```text
@@ -80,8 +80,9 @@ POST /api/caption-state
 
 | Page | Purpose |
 |---|---|
-| `/operator-openai` | Production operator console |
-| `/operator-openai?test=1` | AV replay test (BlackHole / OBS) |
+| `/operator-caption` | Caption operator (YouTube + sermon transcripts) |
+| `/operator-caption?test=1` | AV replay test (BlackHole / OBS) |
+| `/operator-live` | Live output operator (earpiece audio, captions, or both) |
 
 ### API routes
 
@@ -175,7 +176,7 @@ Transparent background for OBS Browser Source
 YouTube viewers see rolling English captions on stream
 ```
 
-Overlay layout (font size, position, alignment) is controlled from `/operator-openai` via `/api/overlay-settings`.
+Overlay layout (font size, position, alignment) is controlled from `/caption-settings` via `/api/overlay-settings`.
 
 Import starter scene: [`church-setup/obs/church-caption-scenes.json`](./church-setup/obs/church-caption-scenes.json)
 
@@ -186,7 +187,8 @@ Import starter scene: [`church-setup/obs/church-caption-scenes.json`](./church-s
 ### 1. UI
 
 ```text
-app/operator-openai/page.tsx   ← production
+app/operator-caption/page.tsx   ← caption operator (YouTube + transcripts)
+app/operator-live/page.tsx      ← live output (audio, captions, or both)
 app/operator/page.tsx          ← backup
 app/overlay/page.tsx
 components/*
@@ -240,7 +242,7 @@ Behringer X32 → Main L/R → X-USB → Streaming PC
                                         ↓
                               BlackHole / VB-Cable
                                         ↓
-                              Chrome → /operator-openai
+                              Chrome → /operator-caption
                                         ↓
                               caption state → /overlay → YouTube
 ```
@@ -250,7 +252,7 @@ Church Caption does not replace OBS or the mixer. It consumes the same audio fee
 **Local testing without live service:**
 
 ```text
-OBS media → BlackHole → Chrome mic → /operator-openai?test=1
+OBS media → BlackHole → Chrome mic → /operator-caption?test=1
 ```
 
 See `lib/avReplayTest.ts` and `public/test-audio/` for the replay clip.
