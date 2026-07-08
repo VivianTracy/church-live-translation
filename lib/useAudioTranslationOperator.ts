@@ -44,6 +44,7 @@ export function useAudioTranslationOperator(audienceLive = false) {
   const [levels, setLevels] = useState<AudioLevels>(INITIAL_LEVELS);
 
   const connectionRef = useRef<AudioTranslationConnection | null>(null);
+  const startingRef = useRef(false);
   const micDeviceIdRef = useRef("");
   const outputDeviceIdRef = useRef("");
   const sessionStartedAtRef = useRef<number | null>(null);
@@ -141,16 +142,18 @@ export function useAudioTranslationOperator(audienceLive = false) {
     stopAudienceBroadcast();
     connectionRef.current?.stop();
     connectionRef.current = null;
+    startingRef.current = false;
     setIsListening(false);
     setIsTranslating(false);
     resetSessionState();
   }, [resetSessionState, stopAudienceBroadcast]);
 
   const startListening = useCallback(async () => {
-    if (connectionRef.current) {
-      return true;
+    if (connectionRef.current || startingRef.current) {
+      return Boolean(connectionRef.current);
     }
 
+    startingRef.current = true;
     setMicError("");
     setTranslationError("");
     setAudienceBroadcastError("");
@@ -202,6 +205,7 @@ export function useAudioTranslationOperator(audienceLive = false) {
         },
       });
 
+      startingRef.current = false;
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -209,6 +213,7 @@ export function useAudioTranslationOperator(audienceLive = false) {
       setIsListening(false);
       setIsTranslating(false);
       connectionRef.current = null;
+      startingRef.current = false;
       resetSessionState();
       return false;
     }

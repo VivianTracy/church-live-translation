@@ -57,6 +57,24 @@ async function applyAudioOutputDevice(
   await audio.setSinkId(deviceId);
 }
 
+function stopPlaybackElement(audio: HTMLAudioElement): void {
+  audio.pause();
+  audio.currentTime = 0;
+  audio.srcObject = null;
+  audio.removeAttribute("src");
+  audio.load();
+}
+
+function stopPeerConnectionTracks(peerConnection: RTCPeerConnection): void {
+  for (const receiver of peerConnection.getReceivers()) {
+    receiver.track.stop();
+  }
+
+  for (const sender of peerConnection.getSenders()) {
+    sender.track?.stop();
+  }
+}
+
 export async function connectOpenAIAudioTranslation(
   options: ConnectOptions
 ): Promise<AudioTranslationConnection> {
@@ -106,6 +124,8 @@ export async function connectOpenAIAudioTranslation(
   let hasReceivedOutput = false;
   let stopped = false;
   let attachGeneration = 0;
+  let activeOutputTrackId: string | null = null;
+  let broadcastStarted = false;
 
   const teardownOutputMonitor = () => {
     stopOutputMonitor?.();
@@ -124,6 +144,11 @@ export async function connectOpenAIAudioTranslation(
 
     try {
       await applyAudioOutputDevice(translatedAudio, outputDeviceId);
+
+      if (generation !== attachGeneration || stopped) {
+        return;
+      }
+
       await translatedAudio.play();
     } catch (error) {
       if (generation === attachGeneration && !stopped) {
@@ -133,6 +158,10 @@ export async function connectOpenAIAudioTranslation(
             : "Failed to play translated audio."
         );
       }
+      return;
+    }
+
+    if (generation !== attachGeneration || stopped) {
       return;
     }
 
@@ -152,6 +181,7 @@ export async function connectOpenAIAudioTranslation(
 
     if (generation !== attachGeneration || stopped) {
       void outputMonitorContext.close();
+      outputMonitorContext = null;
       return;
     }
 
@@ -166,7 +196,10 @@ export async function connectOpenAIAudioTranslation(
       options.onFirstOutputAudio?.();
     }
 
-    options.onTranslatedStream?.(outputStream);
+    if (!broadcastStarted) {
+      broadcastStarted = true;
+      options.onTranslatedStream?.(outputStream);
+    }
   };
 
   for (const track of mic.stream.getAudioTracks()) {
@@ -178,6 +211,12 @@ export async function connectOpenAIAudioTranslation(
       return;
     }
 
+    if (activeOutputTrackId === event.track.id) {
+      return;
+    }
+
+    activeOutputTrackId = event.track.id;
+
     const outputStream =
       event.streams[0] ?? new MediaStream([event.track]);
 
@@ -185,6 +224,10 @@ export async function connectOpenAIAudioTranslation(
   };
 
   events.onmessage = ({ data }) => {
+    if (stopped) {
+      return;
+    }
+
     const event = JSON.parse(data as string) as RealtimeTranslationEvent;
 
     if (event.type === "session.output_transcript.delta") {
@@ -256,10 +299,12 @@ export async function connectOpenAIAudioTranslation(
 
     stopped = true;
     attachGeneration += 1;
+    activeOutputTrackId = null;
+    broadcastStarted = false;
     stopInputMonitor();
     teardownOutputMonitor();
-    translatedAudio.pause();
-    translatedAudio.srcObject = null;
+    stopPlaybackElement(translatedAudio);
+    stopPeerConnectionTracks(peerConnection);
     peerConnection.close();
     mic.stream.getTracks().forEach((track) => track.stop());
     void inputContext.close();

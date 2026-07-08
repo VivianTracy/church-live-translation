@@ -9,12 +9,18 @@ import { MicrophoneDeviceCard } from "@/components/MicrophoneDeviceCard";
 import { TranslationAudienceCard } from "@/components/TranslationAudienceCard";
 import { TranslationChannelCard } from "@/components/TranslationChannelCard";
 import { useAudioTranslationOperator } from "@/lib/useAudioTranslationOperator";
-import { clearTranslationListenState, saveTranslationListenState } from "@/lib/translationListenApi";
+import {
+  clearTranslationListenState,
+  saveTranslationListenState,
+} from "@/lib/translationListenApi";
 import { useEffect, useState } from "react";
 
 export default function OperatorLivePage() {
   const [isLive, setIsLive] = useState(false);
   const [seconds, setSeconds] = useState(0);
+  const [relayError, setRelayError] = useState("");
+  const [relayReady, setRelayReady] = useState<boolean | null>(null);
+  const [showLocalOperatorWarning, setShowLocalOperatorWarning] = useState(false);
 
   const {
     isListening,
@@ -40,32 +46,67 @@ export default function OperatorLivePage() {
     restartListening,
   } = useAudioTranslationOperator(isLive);
 
+  useEffect(() => {
+    setShowLocalOperatorWarning(
+      window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1"
+    );
+
+    void fetch("/api/translation-listen-state", { cache: "no-store" })
+      .then(async (response) => {
+        const body = (await response.json()) as { relayConfigured?: boolean; error?: string };
+
+        if (!response.ok) {
+          setRelayReady(false);
+          setRelayError(body.error ?? "Phone relay is unavailable.");
+          return;
+        }
+
+        setRelayReady(body.relayConfigured !== false);
+      })
+      .catch(() => {
+        setRelayReady(false);
+        setRelayError("Could not check phone relay status.");
+      });
+  }, []);
+
+  const markAudienceLive = async () => {
+    await saveTranslationListenState({
+      isLive: true,
+      updatedAt: Date.now(),
+    });
+    setRelayError("");
+  };
+
   const handleToggleLive = () => {
     const nextIsLive = !isLive;
-    setIsLive(nextIsLive);
 
     if (!nextIsLive) {
+      setIsLive(false);
       stopListening();
       setSeconds(0);
-      void clearTranslationListenState();
+      void clearTranslationListenState().catch((error) => {
+        setRelayError(error instanceof Error ? error.message : String(error));
+      });
       return;
     }
 
-    void saveTranslationListenState({
-      isLive: true,
-      updatedAt: Date.now(),
+    setIsLive(true);
+    void markAudienceLive().catch((error) => {
+      setIsLive(false);
+      setRelayError(error instanceof Error ? error.message : String(error));
     });
   };
 
   const handleStartListening = async () => {
-    if (await startListening()) {
-      setIsLive(true);
-
-      void saveTranslationListenState({
-        isLive: true,
-        updatedAt: Date.now(),
-      });
+    if (!(await startListening())) {
+      return;
     }
+
+    setIsLive(true);
+    void markAudienceLive().catch((error) => {
+      setRelayError(error instanceof Error ? error.message : String(error));
+    });
   };
 
   useEffect(() => {
@@ -98,10 +139,32 @@ export default function OperatorLivePage() {
             <li>Press Start Live Translation, then Start Audio Input.</li>
           </ol>
           <p className="text-xs text-violet-800">
-            Phone listeners use the QR code below. Deploy this app with Redis so
-            phones can connect from anywhere.
+            For phone listeners, run this page on your deployed Vercel URL, not
+            localhost.
           </p>
         </section>
+
+        {showLocalOperatorWarning ? (
+          <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
+            You are on localhost. Phones opening the Vercel audience page cannot
+            receive audio from this operator session. Use{" "}
+            <span className="font-mono">https://church-caption.vercel.app/operator-live</span>{" "}
+            during the service.
+          </p>
+        ) : null}
+
+        {relayReady === false ? (
+          <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
+            Phone relay is not configured. Add Redis/KV env vars on Vercel, then
+            reload this page from the deployed site.
+          </p>
+        ) : null}
+
+        {relayError ? (
+          <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
+            Phone relay: {relayError}
+          </p>
+        ) : null}
 
         <TranslationAudienceCard />
 

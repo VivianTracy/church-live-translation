@@ -1,5 +1,19 @@
 import type { TranslationListenState } from "@/types/translationListen";
 
+async function readApiError(response: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: string };
+
+    if (body.error) {
+      return body.error;
+    }
+  } catch {
+    // Ignore JSON parse failures and fall back below.
+  }
+
+  return fallback;
+}
+
 export async function saveTranslationListenState(
   state: TranslationListenState
 ): Promise<void> {
@@ -12,18 +26,24 @@ export async function saveTranslationListenState(
   });
 
   if (!response.ok) {
-    throw new Error("Failed to save translation listen state.");
+    throw new Error(await readApiError(response, "Failed to save translation listen state."));
   }
 }
 
 export async function loadTranslationListenState(): Promise<TranslationListenState> {
-  const response = await fetch("/api/translation-listen-state");
+  const response = await fetch("/api/translation-listen-state", {
+    cache: "no-store",
+  });
 
   if (!response.ok) {
-    throw new Error("Failed to load translation listen state.");
+    throw new Error(await readApiError(response, "Failed to load translation listen state."));
   }
 
-  return response.json();
+  const data = (await response.json()) as TranslationListenState;
+  return {
+    isLive: data.isLive,
+    updatedAt: data.updatedAt,
+  };
 }
 
 export async function clearTranslationListenState(): Promise<void> {

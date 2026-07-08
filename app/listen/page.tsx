@@ -13,15 +13,31 @@ export default function ListenPage() {
   const [state, setState] = useState(EMPTY_TRANSLATION_LISTEN_STATE);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackError, setPlaybackError] = useState("");
+  const [stateError, setStateError] = useState("");
   const lastSeqRef = useRef(0);
   const playerRef = useRef<TranslationAudioChunkPlayer | null>(null);
 
   useEffect(() => {
     const loadState = async () => {
       try {
-        setState(await loadTranslationListenState());
+        const listenState = await loadTranslationListenState();
+        setState(listenState);
+        setStateError("");
+
+        if (!listenState.isLive) {
+          const payload = await fetchTranslationAudioAfter(0);
+
+          if (payload.meta.isLive) {
+            setState({
+              isLive: true,
+              updatedAt: payload.meta.updatedAt,
+            });
+          }
+        }
       } catch (error) {
-        console.error("Failed to load translation listen state:", error);
+        setStateError(
+          error instanceof Error ? error.message : "Could not reach translation service."
+        );
       }
     };
 
@@ -46,6 +62,13 @@ export default function ListenPage() {
           return;
         }
 
+        if (payload.meta.isLive) {
+          setState({
+            isLive: true,
+            updatedAt: payload.meta.updatedAt,
+          });
+        }
+
         for (const chunk of payload.chunks) {
           playerRef.current?.enqueue(chunk);
           lastSeqRef.current = chunk.seq;
@@ -62,7 +85,7 @@ export default function ListenPage() {
     };
 
     void pollAudio();
-    const timer = setInterval(pollAudio, 350);
+    const timer = setInterval(pollAudio, 500);
 
     return () => {
       cancelled = true;
@@ -78,7 +101,7 @@ export default function ListenPage() {
     }
   }, [state.isLive, isPlaying]);
 
-  const handleStartListening = async () => {
+  const handleStartListening = () => {
     setPlaybackError("");
     lastSeqRef.current = 0;
     playerRef.current?.reset();
@@ -101,15 +124,13 @@ export default function ListenPage() {
           <p className="mt-3 text-zinc-300">
             {state.isLive
               ? "Use headphones and tap the button below."
-              : "Waiting for the service to begin…"}
+              : "Waiting for the operator to start live translation…"}
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => {
-            void handleStartListening();
-          }}
+          onClick={handleStartListening}
           disabled={!state.isLive || isPlaying}
           className={`rounded-2xl px-8 py-6 text-2xl font-bold ${
             !state.isLive || isPlaying
@@ -119,6 +140,12 @@ export default function ListenPage() {
         >
           {isPlaying ? "Listening…" : "Tap to Listen"}
         </button>
+
+        {stateError ? (
+          <p className="rounded-2xl bg-red-950 px-4 py-3 text-sm text-red-200">
+            {stateError}
+          </p>
+        ) : null}
 
         {playbackError ? (
           <p className="rounded-2xl bg-red-950 px-4 py-3 text-sm text-red-200">

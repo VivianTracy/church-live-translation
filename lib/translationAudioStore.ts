@@ -8,43 +8,27 @@ import { redis } from "@/lib/redis";
 import { isLocalCaptionStorage } from "@/lib/storageMode";
 
 const META_KEY = "translation-audio-meta";
-const CHUNK_KEY_PREFIX = "translation-audio-chunk:";
-const MAX_STORED_CHUNKS = 80;
-const CHUNK_TTL_SECONDS = 300;
+const CHUNKS_KEY = "translation-audio-chunks";
+const SEQ_KEY = "translation-audio-seq";
+const MAX_STORED_CHUNKS = 48;
 
 let localMeta: TranslationAudioMeta = { ...EMPTY_TRANSLATION_AUDIO_META };
-let localChunks = new Map<number, TranslationAudioChunk>();
+let localChunks: TranslationAudioChunk[] = [];
 
-function chunkKey(seq: number): string {
-  return `${CHUNK_KEY_PREFIX}${seq}`;
+function parseChunk(raw: unknown): TranslationAudioChunk | null {
+  if (!raw || typeof raw !== "string") {
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw) as TranslationAudioChunk;
+  } catch {
+    return null;
+  }
 }
 
-async function deleteOldChunks(latestSeq: number): Promise<void> {
-  const oldestToKeep = latestSeq - MAX_STORED_CHUNKS;
-
-  if (isLocalCaptionStorage()) {
-    for (const seq of localChunks.keys()) {
-      if (seq < oldestToKeep) {
-        localChunks.delete(seq);
-      }
-    }
-
-    return;
-  }
-
-  if (oldestToKeep <= 0) {
-    return;
-  }
-
-  const deletions = [];
-
-  for (let seq = oldestToKeep - 10; seq < oldestToKeep; seq += 1) {
-    if (seq > 0) {
-      deletions.push(redis.del(chunkKey(seq)));
-    }
-  }
-
-  await Promise.all(deletions);
+export function isTranslationRelayConfigured(): boolean {
+  return !isLocalCaptionStorage();
 }
 
 export async function getTranslationAudioMeta(): Promise<TranslationAudioMeta> {
@@ -58,73 +42,101 @@ export async function getTranslationAudioMeta(): Promise<TranslationAudioMeta> {
 }
 
 export async function setTranslationListenLive(isLive: boolean): Promise<void> {
-  const updatedAt = Date.now();
-  const meta = await getTranslationAudioMeta();
-  const nextMeta: TranslationAudioMeta = {
-    ...meta,
-    isLive,
-    updatedAt,
-  };
-
   if (isLocalCaptionStorage()) {
-    localMeta = nextMeta;
+    const updatedAt = Date.now();
 
     if (!isLive) {
-      localChunks.clear();
+      localChunks = [];
       localMeta = {
         ...EMPTY_TRANSLATION_AUDIO_META,
         updatedAt,
       };
+      return;
     }
 
+    localMeta = {
+      ...localMeta,
+      isLive: true,
+      updatedAt,
+    };
     return;
   }
+
+  const updatedAt = Date.now();
 
   if (!isLive) {
-    await clearTranslationAudio();
-    await redis.set(META_KEY, {
-      ...EMPTY_TRANSLATION_AUDIO_META,
-      updatedAt,
-    });
+    await redis
+      .pipeline()
+      .del(CHUNKS_KEY)
+      .del(SEQ_KEY)
+      .set(META_KEY, {
+        ...EMPTY_TRANSLATION_AUDIO_META,
+        updatedAt,
+      })
+      .exec();
     return;
   }
 
-  await redis.set(META_KEY, nextMeta);
+  const meta = await getTranslationAudioMeta();
+
+  await redis.set(META_KEY, {
+    ...meta,
+    isLive: true,
+    updatedAt,
+  });
 }
 
 export async function appendTranslationAudioChunk(
   mimeType: string,
   data: string
 ): Promise<TranslationAudioChunk> {
-  const meta = await getTranslationAudioMeta();
-  const seq = meta.latestSeq + 1;
+  const createdAt = Date.now();
+
+  if (isLocalCaptionStorage()) {
+    const seq = localMeta.latestSeq + 1;
+    const chunk: TranslationAudioChunk = {
+      seq,
+      mimeType,
+      data,
+      createdAt,
+    };
+
+    localChunks.push(chunk);
+
+    if (localChunks.length > MAX_STORED_CHUNKS) {
+      localChunks = localChunks.slice(-MAX_STORED_CHUNKS);
+    }
+
+    localMeta = {
+      ...localMeta,
+      isLive: true,
+      latestSeq: seq,
+      mimeType,
+      updatedAt: createdAt,
+    };
+
+    return chunk;
+  }
+
+  const seq = await redis.incr(SEQ_KEY);
   const chunk: TranslationAudioChunk = {
     seq,
     mimeType,
     data,
-    createdAt: Date.now(),
+    createdAt,
   };
 
-  const nextMeta: TranslationAudioMeta = {
-    ...meta,
-    isLive: true,
-    latestSeq: seq,
-    mimeType,
-    updatedAt: chunk.createdAt,
-  };
-
-  if (isLocalCaptionStorage()) {
-    localMeta = nextMeta;
-    localChunks.set(seq, chunk);
-    await deleteOldChunks(seq);
-    return chunk;
-  }
-
-  await Promise.all([
-    redis.set(META_KEY, nextMeta),
-    redis.set(chunkKey(seq), chunk, { ex: CHUNK_TTL_SECONDS }),
-  ]);
-  await deleteOldChunks(seq);
+  await redis
+    .pipeline()
+    .rpush(CHUNKS_KEY, JSON.stringify(chunk))
+    .ltrim(CHUNKS_KEY, -MAX_STORED_CHUNKS, -1)
+    .set(META_KEY, {
+      isLive: true,
+      latestSeq: seq,
+      mimeType,
+      updatedAt: createdAt,
+    })
+    .exec();
 
   return chunk;
 }
@@ -138,46 +150,20 @@ export async function getTranslationAudioChunksAfter(
     return { meta, chunks: [] };
   }
 
-  const chunks: TranslationAudioChunk[] = [];
-
   if (isLocalCaptionStorage()) {
-    for (let seq = afterSeq + 1; seq <= meta.latestSeq; seq += 1) {
-      const chunk = localChunks.get(seq);
-
-      if (chunk) {
-        chunks.push(chunk);
-      }
-    }
-
-    return { meta, chunks };
+    return {
+      meta,
+      chunks: localChunks.filter((chunk) => chunk.seq > afterSeq),
+    };
   }
 
-  for (let seq = afterSeq + 1; seq <= meta.latestSeq; seq += 1) {
-    const chunk = await redis.get<TranslationAudioChunk>(chunkKey(seq));
-
-    if (chunk) {
-      chunks.push(chunk);
-    }
-  }
+  const rawChunks = await redis.lrange<string>(CHUNKS_KEY, 0, -1);
+  const chunks = rawChunks
+    .map(parseChunk)
+    .filter((chunk): chunk is TranslationAudioChunk => chunk !== null)
+    .filter((chunk) => chunk.seq > afterSeq);
 
   return { meta, chunks };
-}
-
-export async function clearTranslationAudio(): Promise<void> {
-  if (isLocalCaptionStorage()) {
-    localChunks.clear();
-    localMeta = { ...EMPTY_TRANSLATION_AUDIO_META };
-    return;
-  }
-
-  const meta = await getTranslationAudioMeta();
-  const deletions = [];
-
-  for (let seq = Math.max(1, meta.latestSeq - MAX_STORED_CHUNKS); seq <= meta.latestSeq; seq += 1) {
-    deletions.push(redis.del(chunkKey(seq)));
-  }
-
-  await Promise.all(deletions);
 }
 
 export async function getTranslationListenState(): Promise<TranslationListenState> {

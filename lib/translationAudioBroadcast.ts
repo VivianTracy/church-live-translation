@@ -5,6 +5,9 @@ const MIME_TYPES = [
   "audio/ogg;codecs=opus",
 ];
 
+const MAX_CHUNK_BASE64_LENGTH = 120_000;
+const UPLOAD_INTERVAL_MS = 800;
+
 export function getTranslationRecordingMimeType(): string {
   if (typeof MediaRecorder === "undefined") {
     return "";
@@ -40,6 +43,20 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
+async function readUploadError(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: string };
+
+    if (body.error) {
+      return body.error;
+    }
+  } catch {
+    // Ignore JSON parse failures.
+  }
+
+  return "Failed to upload translation audio.";
+}
+
 export function startTranslationAudioBroadcast(
   stream: MediaStream,
   onError: (message: string) => void
@@ -53,10 +70,22 @@ export function startTranslationAudioBroadcast(
 
   let stopped = false;
   let uploadQueue = Promise.resolve();
+  let lastErrorAt = 0;
+
+  const reportError = (message: string) => {
+    const now = Date.now();
+
+    if (now - lastErrorAt < 10_000) {
+      return;
+    }
+
+    lastErrorAt = now;
+    onError(message);
+  };
 
   const recorder = new MediaRecorder(stream, {
     mimeType,
-    audioBitsPerSecond: 64000,
+    audioBitsPerSecond: 24000,
   });
 
   recorder.addEventListener("dataavailable", (event) => {
@@ -68,6 +97,10 @@ export function startTranslationAudioBroadcast(
       .then(async () => {
         const data = await blobToBase64(event.data);
 
+        if (data.length > MAX_CHUNK_BASE64_LENGTH) {
+          return;
+        }
+
         const response = await fetch("/api/translation-audio", {
           method: "POST",
           headers: {
@@ -77,15 +110,15 @@ export function startTranslationAudioBroadcast(
         });
 
         if (!response.ok) {
-          throw new Error("Failed to upload translation audio.");
+          throw new Error(await readUploadError(response));
         }
       })
       .catch((error) => {
-        onError(error instanceof Error ? error.message : String(error));
+        reportError(error instanceof Error ? error.message : String(error));
       });
   });
 
-  recorder.start(400);
+  recorder.start(UPLOAD_INTERVAL_MS);
 
   return () => {
     stopped = true;

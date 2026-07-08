@@ -66,8 +66,14 @@ export class TranslationAudioChunkPlayer {
     this.stopped = true;
     this.queue = [];
     this.playing = false;
-    this.activeAudio?.pause();
-    this.activeAudio = null;
+
+    if (this.activeAudio) {
+      this.activeAudio.pause();
+      this.activeAudio.currentTime = 0;
+      this.activeAudio.src = "";
+      this.activeAudio.load();
+      this.activeAudio = null;
+    }
   }
 
   reset(): void {
@@ -77,10 +83,24 @@ export class TranslationAudioChunkPlayer {
 }
 
 export async function fetchTranslationAudioAfter(afterSeq: number) {
-  const response = await fetch(`/api/translation-audio?after=${afterSeq}`);
+  const response = await fetch(`/api/translation-audio?after=${afterSeq}`, {
+    cache: "no-store",
+  });
 
   if (!response.ok) {
-    throw new Error("Failed to load translation audio.");
+    let message = "Failed to load translation audio.";
+
+    try {
+      const body = (await response.json()) as { error?: string };
+
+      if (body.error) {
+        message = body.error;
+      }
+    } catch {
+      // Ignore JSON parse failures.
+    }
+
+    throw new Error(message);
   }
 
   return response.json() as Promise<{
