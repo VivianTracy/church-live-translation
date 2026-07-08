@@ -1,7 +1,4 @@
-import { startPcmChunkRecorder } from "@/lib/pcmAudioCapture";
-
 export const TRANSLATION_BROADCAST_MIME_TYPE = "audio/wav";
-const CHUNK_MS = 600;
 
 async function readUploadError(response: Response): Promise<string> {
   try {
@@ -17,71 +14,53 @@ async function readUploadError(response: Response): Promise<string> {
   return "Failed to upload translation audio.";
 }
 
-export function startTranslationAudioBroadcast(
-  stream: MediaStream,
-  onError: (message: string) => void
-): () => void {
-  let stopped = false;
-  let uploadQueue = Promise.resolve();
-  let lastErrorAt = 0;
-  let recorder: Awaited<ReturnType<typeof startPcmChunkRecorder>> | null = null;
-
-  const reportError = (message: string) => {
-    const now = Date.now();
-
-    if (now - lastErrorAt < 10_000) {
-      return;
-    }
-
-    lastErrorAt = now;
-    onError(message);
-  };
-
-  void startPcmChunkRecorder(stream, CHUNK_MS, 0, (wavBase64) => {
-    if (stopped || !wavBase64) {
-      return;
-    }
-
-    uploadQueue = uploadQueue
-      .then(async () => {
-        const response = await fetch("/api/translation-audio", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            mimeType: TRANSLATION_BROADCAST_MIME_TYPE,
-            data: wavBase64,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(await readUploadError(response));
-        }
-      })
-      .catch((error) => {
-        reportError(error instanceof Error ? error.message : String(error));
-      });
+export function uploadTranslationWavChunk(
+  wavBase64: string,
+  onError: (message: string) => void,
+  onUploaded?: () => void
+): void {
+  void fetch("/api/translation-audio", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      mimeType: TRANSLATION_BROADCAST_MIME_TYPE,
+      data: wavBase64,
+    }),
   })
-    .then((activeRecorder) => {
-      if (stopped) {
-        activeRecorder.stop();
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error(await readUploadError(response));
+      }
+
+      onUploaded?.();
+    })
+    .catch((error) => {
+      onError(error instanceof Error ? error.message : String(error));
+    });
+}
+
+export function createTranslationWavUploader(
+  onError: (message: string) => void,
+  onUploaded?: () => void
+) {
+  let lastErrorAt = 0;
+
+  return (wavBase64: string) => {
+    if (!wavBase64) {
+      return;
+    }
+
+    uploadTranslationWavChunk(wavBase64, (message) => {
+      const now = Date.now();
+
+      if (now - lastErrorAt < 10_000) {
         return;
       }
 
-      recorder = activeRecorder;
-    })
-    .catch((error) => {
-      reportError(
-        error instanceof Error
-          ? error.message
-          : "Could not start phone audio broadcast."
-      );
-    });
-
-  return () => {
-    stopped = true;
-    recorder?.stop();
-    recorder = null;
+      lastErrorAt = now;
+      onError(message);
+    }, onUploaded);
   };
 }

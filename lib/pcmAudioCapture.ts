@@ -247,3 +247,54 @@ export async function startPcmChunkRecorder(
     },
   };
 }
+
+export function startAudioNodePcmUploader(
+  audioContext: AudioContext,
+  sourceNode: MediaStreamAudioSourceNode,
+  chunkMs: number,
+  onChunk: (wavBase64: string) => void
+): () => void {
+  const processor = audioContext.createScriptProcessor(4096, 1, 1);
+  const silentGain = audioContext.createGain();
+  const sourceRate = audioContext.sampleRate;
+  const pendingChunks: Int16Array[] = [];
+  let chunkTimer: ReturnType<typeof setInterval> | null = null;
+
+  silentGain.gain.value = 0;
+
+  processor.onaudioprocess = (event) => {
+    const mixed = mixInputBuffer(event.inputBuffer);
+    const pcm16 = resampleToPcm16(mixed, sourceRate, TARGET_SAMPLE_RATE);
+
+    if (pcm16.length > 0) {
+      pendingChunks.push(pcm16);
+    }
+  };
+
+  sourceNode.connect(processor);
+  processor.connect(silentGain);
+  silentGain.connect(audioContext.destination);
+
+  const flushChunk = () => {
+    if (pendingChunks.length === 0) {
+      return;
+    }
+
+    const pcm16 = concatPcm16(pendingChunks);
+    pendingChunks.length = 0;
+    onChunk(encodePcm16ToWavBase64(pcm16));
+  };
+
+  chunkTimer = setInterval(flushChunk, chunkMs);
+
+  return () => {
+    if (chunkTimer) {
+      clearInterval(chunkTimer);
+      chunkTimer = null;
+    }
+
+    flushChunk();
+    processor.disconnect();
+    silentGain.disconnect();
+  };
+}

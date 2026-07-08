@@ -12,7 +12,7 @@ import {
   loadStoredMicDeviceId,
   saveStoredMicDeviceId,
 } from "@/lib/microphoneDeviceStorage";
-import { startTranslationAudioBroadcast } from "@/lib/translationAudioBroadcast";
+import { createTranslationWavUploader } from "@/lib/translationAudioBroadcast";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type AudioLevels = {
@@ -49,26 +49,15 @@ export function useAudioTranslationOperator(audienceLive = false) {
   const outputDeviceIdRef = useRef("");
   const sessionStartedAtRef = useRef<number | null>(null);
   const audienceLiveRef = useRef(audienceLive);
-  const outputStreamRef = useRef<MediaStream | null>(null);
-  const broadcastStopRef = useRef<(() => void) | null>(null);
+  const uploadWavChunkRef = useRef<((wavBase64: string) => void) | null>(null);
+  const [chunksUploaded, setChunksUploaded] = useState(0);
 
   audienceLiveRef.current = audienceLive;
-
-  const stopAudienceBroadcast = useCallback(() => {
-    broadcastStopRef.current?.();
-    broadcastStopRef.current = null;
-  }, []);
-
-  const startAudienceBroadcast = useCallback(
-    (stream: MediaStream) => {
-      stopAudienceBroadcast();
-      broadcastStopRef.current = startTranslationAudioBroadcast(
-        stream,
-        setAudienceBroadcastError
-      );
-    },
-    [stopAudienceBroadcast]
-  );
+  uploadWavChunkRef.current = audienceLive
+    ? createTranslationWavUploader(setAudienceBroadcastError, () => {
+        setChunksUploaded((count) => count + 1);
+      })
+    : null;
 
   useEffect(() => {
     const storedMicId = loadStoredMicDeviceId();
@@ -81,22 +70,10 @@ export function useAudioTranslationOperator(audienceLive = false) {
 
   useEffect(() => {
     return () => {
-      stopAudienceBroadcast();
       connectionRef.current?.stop();
       connectionRef.current = null;
     };
-  }, [stopAudienceBroadcast]);
-
-  useEffect(() => {
-    if (!audienceLive) {
-      stopAudienceBroadcast();
-      return;
-    }
-
-    if (outputStreamRef.current && isListening) {
-      startAudienceBroadcast(outputStreamRef.current);
-    }
-  }, [audienceLive, isListening, startAudienceBroadcast, stopAudienceBroadcast]);
+  }, []);
 
   useEffect(() => {
     if (!outputDeviceId || !navigator.mediaDevices?.enumerateDevices) {
@@ -134,19 +111,16 @@ export function useAudioTranslationOperator(audienceLive = false) {
     setOutputTranscript("");
     setLatencyMs(null);
     sessionStartedAtRef.current = null;
-    outputStreamRef.current = null;
-    stopAudienceBroadcast();
-  }, [stopAudienceBroadcast]);
+  }, []);
 
   const stopListening = useCallback(() => {
-    stopAudienceBroadcast();
     connectionRef.current?.stop();
     connectionRef.current = null;
     startingRef.current = false;
     setIsListening(false);
     setIsTranslating(false);
     resetSessionState();
-  }, [resetSessionState, stopAudienceBroadcast]);
+  }, [resetSessionState]);
 
   const startListening = useCallback(async () => {
     if (connectionRef.current || startingRef.current) {
@@ -157,6 +131,7 @@ export function useAudioTranslationOperator(audienceLive = false) {
     setMicError("");
     setTranslationError("");
     setAudienceBroadcastError("");
+    setChunksUploaded(0);
     resetSessionState();
 
     try {
@@ -193,11 +168,9 @@ export function useAudioTranslationOperator(audienceLive = false) {
         onOutputTranscriptDelta: (delta) => {
           setOutputTranscript((current) => current + delta);
         },
-        onTranslatedStream: (stream) => {
-          outputStreamRef.current = stream;
-
+        onWavChunk: (wavBase64) => {
           if (audienceLiveRef.current) {
-            startAudienceBroadcast(stream);
+            uploadWavChunkRef.current?.(wavBase64);
           }
         },
         onError: (message) => {
@@ -217,7 +190,7 @@ export function useAudioTranslationOperator(audienceLive = false) {
       resetSessionState();
       return false;
     }
-  }, [resetSessionState, startAudienceBroadcast]);
+  }, [resetSessionState]);
 
   const restartListening = useCallback(async () => {
     stopListening();
@@ -248,6 +221,7 @@ export function useAudioTranslationOperator(audienceLive = false) {
     micError,
     translationError,
     audienceBroadcastError,
+    chunksUploaded,
     latencyMs,
     inputTranscript,
     outputTranscript,

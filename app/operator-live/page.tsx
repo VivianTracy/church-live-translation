@@ -33,6 +33,7 @@ export default function OperatorLivePage() {
     micError,
     translationError,
     audienceBroadcastError,
+    chunksUploaded,
     latencyMs,
     inputLevel,
     inputPeak,
@@ -99,14 +100,20 @@ export default function OperatorLivePage() {
   };
 
   const handleStartListening = async () => {
-    if (!(await startListening())) {
+    setIsLive(true);
+
+    try {
+      await markAudienceLive();
+    } catch (error) {
+      setIsLive(false);
+      setRelayError(error instanceof Error ? error.message : String(error));
       return;
     }
 
-    setIsLive(true);
-    void markAudienceLive().catch((error) => {
-      setRelayError(error instanceof Error ? error.message : String(error));
-    });
+    if (!(await startListening())) {
+      setIsLive(false);
+      void clearTranslationListenState().catch(() => undefined);
+    }
   };
 
   useEffect(() => {
@@ -174,6 +181,20 @@ export default function OperatorLivePage() {
           isRouting={isLive && isTranslating}
           outputDeviceLabel={outputDeviceLabel}
         />
+
+        {isLive && isListening && chunksUploaded > 0 ? (
+          <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200">
+            Phone relay active: {chunksUploaded} audio chunks sent.
+          </p>
+        ) : null}
+
+        {isLive && isListening && isTranslating && chunksUploaded === 0 ? (
+          <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
+            Translation audio is playing locally, but no chunks have reached phones
+            yet. Wait a few seconds; if this stays at 0, reload from the deployed
+            operator URL.
+          </p>
+        ) : null}
 
         <MicrophoneDeviceCard
           selectedDeviceId={micDeviceId}

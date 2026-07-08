@@ -4,6 +4,7 @@ import { CURRENT_SERVICE } from "@/lib/service";
 import {
   fetchTranslationAudioAfter,
   TranslationAudioChunkPlayer,
+  unlockMobileAudioPlayback,
 } from "@/lib/translationAudioPlayback";
 import { loadTranslationListenState } from "@/lib/translationListenApi";
 import { EMPTY_TRANSLATION_LISTEN_STATE } from "@/types/translationListen";
@@ -15,8 +16,11 @@ export default function ListenPage() {
   const [playbackError, setPlaybackError] = useState("");
   const [stateError, setStateError] = useState("");
   const [chunksReceived, setChunksReceived] = useState(0);
+  const [chunksPlayed, setChunksPlayed] = useState(0);
+  const [latestServerSeq, setLatestServerSeq] = useState(0);
   const lastSeqRef = useRef(0);
   const playerRef = useRef<TranslationAudioChunkPlayer | null>(null);
+  const unlockedAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const loadState = async () => {
@@ -34,6 +38,8 @@ export default function ListenPage() {
               updatedAt: payload.meta.updatedAt,
             });
           }
+
+          setLatestServerSeq(payload.meta.latestSeq);
         }
       } catch (error) {
         setStateError(
@@ -72,14 +78,21 @@ export default function ListenPage() {
 
         for (const chunk of payload.chunks) {
           playerRef.current?.enqueue(chunk);
-          lastSeqRef.current = chunk.seq;
+          lastSeqRef.current = Math.max(lastSeqRef.current, chunk.seq);
         }
 
         if (payload.chunks.length > 0) {
           setChunksReceived((count) => count + payload.chunks.length);
         }
 
-        setPlaybackError("");
+        setLatestServerSeq(payload.meta.latestSeq);
+        setChunksPlayed(playerRef.current?.chunksPlayed ?? 0);
+
+        if (playerRef.current?.lastError) {
+          setPlaybackError(playerRef.current.lastError);
+        } else {
+          setPlaybackError("");
+        }
       } catch (error) {
         if (!cancelled) {
           setPlaybackError(
@@ -106,23 +119,37 @@ export default function ListenPage() {
     }
   }, [state.isLive, isPlaying]);
 
-  const handleStartListening = async () => {
+  const handleStartListening = () => {
+    unlockedAudioRef.current = unlockMobileAudioPlayback();
     setPlaybackError("");
     setChunksReceived(0);
+    setChunksPlayed(0);
     lastSeqRef.current = 0;
-    playerRef.current?.reset();
-    playerRef.current ??= new TranslationAudioChunkPlayer();
+    playerRef.current?.reset(unlockedAudioRef.current);
+    playerRef.current ??= new TranslationAudioChunkPlayer(unlockedAudioRef.current);
+    playerRef.current.onError = (message) => {
+      setPlaybackError(message);
+    };
+    setIsPlaying(true);
 
-    try {
-      await playerRef.current.prepare();
-      setIsPlaying(true);
-    } catch (error) {
-      setPlaybackError(
-        error instanceof Error
-          ? error.message
-          : "Could not start audio on this phone."
-      );
-    }
+    void fetchTranslationAudioAfter(lastSeqRef.current)
+      .then((payload) => {
+        setLatestServerSeq(payload.meta.latestSeq);
+
+        for (const chunk of payload.chunks) {
+          playerRef.current?.enqueue(chunk);
+          lastSeqRef.current = Math.max(lastSeqRef.current, chunk.seq);
+        }
+
+        if (payload.chunks.length > 0) {
+          setChunksReceived(payload.chunks.length);
+        }
+      })
+      .catch((error) => {
+        setPlaybackError(
+          error instanceof Error ? error.message : "Could not load audio."
+        );
+      });
   };
 
   return (
@@ -146,9 +173,7 @@ export default function ListenPage() {
 
         <button
           type="button"
-          onClick={() => {
-            void handleStartListening();
-          }}
+          onClick={handleStartListening}
           disabled={!state.isLive || isPlaying}
           className={`rounded-2xl px-8 py-6 text-2xl font-bold ${
             !state.isLive || isPlaying
@@ -166,11 +191,18 @@ export default function ListenPage() {
         ) : null}
 
         {isPlaying && chunksReceived === 0 ? (
-          <p className="text-sm text-zinc-400">Waiting for audio from the operator…</p>
+          <p className="text-sm text-zinc-400">
+            Waiting for audio from the operator
+            {latestServerSeq > 0 ? ` (server seq ${latestServerSeq})` : ""}…
+          </p>
         ) : null}
 
         {isPlaying && chunksReceived > 0 ? (
-          <p className="text-sm text-emerald-400">Receiving live translation audio.</p>
+          <p className="text-sm text-emerald-400">
+            Receiving live translation audio ({chunksReceived} received
+            {chunksPlayed > 0 ? `, ${chunksPlayed} played` : ""}
+            {latestServerSeq > 0 ? `, seq ${latestServerSeq}` : ""}).
+          </p>
         ) : null}
 
         {playbackError ? (
