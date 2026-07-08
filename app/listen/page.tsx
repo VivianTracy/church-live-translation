@@ -14,6 +14,7 @@ export default function ListenPage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackError, setPlaybackError] = useState("");
   const [stateError, setStateError] = useState("");
+  const [chunksReceived, setChunksReceived] = useState(0);
   const lastSeqRef = useRef(0);
   const playerRef = useRef<TranslationAudioChunkPlayer | null>(null);
 
@@ -74,6 +75,10 @@ export default function ListenPage() {
           lastSeqRef.current = chunk.seq;
         }
 
+        if (payload.chunks.length > 0) {
+          setChunksReceived((count) => count + payload.chunks.length);
+        }
+
         setPlaybackError("");
       } catch (error) {
         if (!cancelled) {
@@ -101,12 +106,23 @@ export default function ListenPage() {
     }
   }, [state.isLive, isPlaying]);
 
-  const handleStartListening = () => {
+  const handleStartListening = async () => {
     setPlaybackError("");
+    setChunksReceived(0);
     lastSeqRef.current = 0;
     playerRef.current?.reset();
     playerRef.current ??= new TranslationAudioChunkPlayer();
-    setIsPlaying(true);
+
+    try {
+      await playerRef.current.prepare();
+      setIsPlaying(true);
+    } catch (error) {
+      setPlaybackError(
+        error instanceof Error
+          ? error.message
+          : "Could not start audio on this phone."
+      );
+    }
   };
 
   return (
@@ -130,7 +146,9 @@ export default function ListenPage() {
 
         <button
           type="button"
-          onClick={handleStartListening}
+          onClick={() => {
+            void handleStartListening();
+          }}
           disabled={!state.isLive || isPlaying}
           className={`rounded-2xl px-8 py-6 text-2xl font-bold ${
             !state.isLive || isPlaying
@@ -145,6 +163,14 @@ export default function ListenPage() {
           <p className="rounded-2xl bg-red-950 px-4 py-3 text-sm text-red-200">
             {stateError}
           </p>
+        ) : null}
+
+        {isPlaying && chunksReceived === 0 ? (
+          <p className="text-sm text-zinc-400">Waiting for audio from the operator…</p>
+        ) : null}
+
+        {isPlaying && chunksReceived > 0 ? (
+          <p className="text-sm text-emerald-400">Receiving live translation audio.</p>
         ) : null}
 
         {playbackError ? (
