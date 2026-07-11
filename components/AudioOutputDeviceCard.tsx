@@ -9,12 +9,14 @@ import { useEffect, useState } from "react";
 
 type AudioOutputDeviceCardProps = {
   selectedDeviceId: string;
+  outputLanguageLabel?: string;
   disabled?: boolean;
   onDeviceChange: (deviceId: string) => void;
 };
 
 export function AudioOutputDeviceCard({
   selectedDeviceId,
+  outputLanguageLabel = "translated",
   disabled = false,
   onDeviceChange,
 }: AudioOutputDeviceCardProps) {
@@ -57,15 +59,12 @@ export function AudioOutputDeviceCard({
   };
 
   return (
-    <section className="rounded-3xl border border-violet-200 bg-white p-6 shadow-sm ring-1 ring-violet-100 space-y-4">
-      <div className="space-y-1">
-        <p className="text-sm font-bold tracking-widest text-violet-700">
-          TRANSLATION CHANNEL OUTPUT
-        </p>
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-base font-semibold text-slate-900">Audio out</h2>
         <p className="text-sm text-slate-600">
-          Choose where English audio is sent for the TT125 transmitter. Use the
-          monitor headphone jack, a USB audio dongle, or another line output on
-          the church computer.
+          Where {outputLanguageLabel} audio goes — usually monitor headphone
+          jack or USB audio dongle to the TT125 transmitter.
         </p>
       </div>
 
@@ -74,7 +73,7 @@ export function AudioOutputDeviceCard({
           value={selectedDeviceId}
           disabled={disabled || devices.length === 0}
           onChange={(event) => handleChange(event.target.value)}
-          className="w-full rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-medium text-slate-900"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900"
         >
           <option value="">
             {devices.length === 0
@@ -94,22 +93,17 @@ export function AudioOutputDeviceCard({
           onClick={() => {
             void refreshDevices();
           }}
-          className="rounded-2xl bg-violet-700 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-violet-400"
+          className="rounded-xl bg-violet-700 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-violet-400"
         >
           {isRefreshing ? "Refreshing..." : "Refresh list"}
         </button>
       </div>
 
       {loadError ? (
-        <p className="rounded-2xl bg-red-50 p-3 text-xs font-semibold text-red-700">
+        <p className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700">
           {loadError}
         </p>
       ) : null}
-
-      <p className="text-xs text-slate-500">
-        Connect this output to the TT125-TX MIC port with a 3.5 mm cable. Stop
-        translation before changing outputs.
-      </p>
-    </section>
+    </div>
   );
 }

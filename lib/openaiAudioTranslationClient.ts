@@ -19,6 +19,7 @@ export type AudioTranslationConnection = {
 type ConnectOptions = {
   deviceId?: string;
   outputDeviceId?: string;
+  outputLanguage?: "en" | "zh";
   onListeningChange: (isListening: boolean) => void;
   onTranslatingChange: (isTranslating: boolean) => void;
   onInputLevels: (level: number, peak: number) => void;
@@ -98,6 +99,12 @@ export async function connectOpenAIAudioTranslation(
 ): Promise<AudioTranslationConnection> {
   const sessionResponse = await fetch("/api/openai/audio-translation-session", {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      outputLanguage: options.outputLanguage ?? "en",
+    }),
   });
 
   const sessionData = (await sessionResponse.json()) as {

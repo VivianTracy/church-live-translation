@@ -5,12 +5,27 @@ import {
   type AudioTranslationConnection,
 } from "@/lib/openaiAudioTranslationClient";
 import {
+  getAudioTranslationDirectionConfig,
+  loadStoredAudioTranslationDirection,
+  saveStoredAudioTranslationDirection,
+  type AudioTranslationDirection,
+} from "@/lib/audioTranslationDirection";
+import {
+  getAudioInputSourceLabel,
+  loadStoredAudioInputSource,
+  loadStoredInputDeviceId,
+  resolveInputDeviceForSource,
+  saveStoredAudioInputSource,
+  saveStoredInputDeviceId,
+  type AudioInputSource,
+} from "@/lib/audioInputSource";
+import {
   loadStoredAudioOutputDeviceId,
   saveStoredAudioOutputDeviceId,
 } from "@/lib/audioOutputDeviceStorage";
 import {
-  loadStoredMicDeviceId,
-  saveStoredMicDeviceId,
+  listMicrophoneDevices,
+  requestMicrophonePermission,
 } from "@/lib/microphoneDeviceStorage";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -42,6 +57,11 @@ export function useAudioTranslationOperator() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [micDeviceId, setMicDeviceIdState] = useState("");
   const [outputDeviceId, setOutputDeviceIdState] = useState("");
+  const [translationDirection, setTranslationDirectionState] =
+    useState<AudioTranslationDirection>("zh-to-en");
+  const [audioInputSource, setAudioInputSourceState] =
+    useState<AudioInputSource>("obs-streaming");
+  const [inputDeviceLabel, setInputDeviceLabel] = useState("");
   const [outputDeviceLabel, setOutputDeviceLabel] = useState("");
   const [micError, setMicError] = useState("");
   const [translationError, setTranslationError] = useState("");
@@ -52,16 +72,59 @@ export function useAudioTranslationOperator() {
   const startingRef = useRef(false);
   const micDeviceIdRef = useRef("");
   const outputDeviceIdRef = useRef("");
+  const translationDirectionRef = useRef<AudioTranslationDirection>("zh-to-en");
+  const audioInputSourceRef = useRef<AudioInputSource>("obs-streaming");
   const sessionStartedAtRef = useRef<number | null>(null);
 
+  const directionConfig = getAudioTranslationDirectionConfig(translationDirection);
+
+  const applyResolvedInputDevice = useCallback(
+    (source: AudioInputSource, deviceId: string, label: string) => {
+      micDeviceIdRef.current = deviceId;
+      setMicDeviceIdState(deviceId);
+      setInputDeviceLabel(label);
+      saveStoredInputDeviceId(source, deviceId);
+    },
+    []
+  );
+
+  const syncInputDeviceForSource = useCallback(
+    async (source: AudioInputSource, preferredDeviceId = "") => {
+      const devices = await listMicrophoneDevices();
+      const resolved = resolveInputDeviceForSource(
+        devices,
+        source,
+        preferredDeviceId || micDeviceIdRef.current
+      );
+
+      if (resolved.error) {
+        applyResolvedInputDevice(source, "", "Not selected");
+        return resolved;
+      }
+
+      applyResolvedInputDevice(source, resolved.deviceId, resolved.label);
+      return resolved;
+    },
+    [applyResolvedInputDevice]
+  );
+
   useEffect(() => {
-    const storedMicId = loadStoredMicDeviceId();
     const storedOutputId = loadStoredAudioOutputDeviceId();
-    micDeviceIdRef.current = storedMicId;
+    const storedDirection = loadStoredAudioTranslationDirection();
+    const storedInputSource = loadStoredAudioInputSource();
+
     outputDeviceIdRef.current = storedOutputId;
-    setMicDeviceIdState(storedMicId);
+    translationDirectionRef.current = storedDirection;
+    audioInputSourceRef.current = storedInputSource;
     setOutputDeviceIdState(storedOutputId);
-  }, []);
+    setTranslationDirectionState(storedDirection);
+    setAudioInputSourceState(storedInputSource);
+
+    void syncInputDeviceForSource(
+      storedInputSource,
+      loadStoredInputDeviceId(storedInputSource)
+    );
+  }, [syncInputDeviceForSource]);
 
   useEffect(() => {
     return () => {
@@ -134,9 +197,24 @@ export function useAudioTranslationOperator() {
       const startedAt = Date.now();
       sessionStartedAtRef.current = startedAt;
 
+      const resolvedInput = await syncInputDeviceForSource(
+        audioInputSourceRef.current,
+        micDeviceIdRef.current
+      );
+
+      if (resolvedInput.error || !resolvedInput.deviceId) {
+        throw new Error(
+          resolvedInput.error ??
+            "No input device is configured for the selected audio source."
+        );
+      }
+
       connectionRef.current = await connectOpenAIAudioTranslation({
-        deviceId: micDeviceIdRef.current || undefined,
+        deviceId: resolvedInput.deviceId,
         outputDeviceId: outputDeviceIdRef.current || undefined,
+        outputLanguage: getAudioTranslationDirectionConfig(
+          translationDirectionRef.current
+        ).outputLanguage,
         onListeningChange: setIsListening,
         onTranslatingChange: setIsTranslating,
         onInputLevels: (inputLevel, inputPeak) => {
@@ -175,18 +253,27 @@ export function useAudioTranslationOperator() {
       resetSessionState();
       return false;
     }
-  }, [resetSessionState]);
+  }, [resetSessionState, syncInputDeviceForSource]);
 
   const restartListening = useCallback(async () => {
     stopListening();
     return startListening();
   }, [startListening, stopListening]);
 
-  const setMicDeviceId = useCallback((deviceId: string) => {
-    micDeviceIdRef.current = deviceId;
-    setMicDeviceIdState(deviceId);
-    saveStoredMicDeviceId(deviceId);
-  }, []);
+  const setMicDeviceId = useCallback(
+    (deviceId: string) => {
+      const source = audioInputSourceRef.current;
+      micDeviceIdRef.current = deviceId;
+      setMicDeviceIdState(deviceId);
+      saveStoredInputDeviceId(source, deviceId);
+
+      void listMicrophoneDevices().then((devices) => {
+        const match = devices.find((device) => device.deviceId === deviceId);
+        setInputDeviceLabel(match?.label || (deviceId ? "Selected input" : "Not selected"));
+      });
+    },
+    []
+  );
 
   const setOutputDeviceId = useCallback((deviceId: string) => {
     outputDeviceIdRef.current = deviceId;
@@ -194,8 +281,47 @@ export function useAudioTranslationOperator() {
     saveStoredAudioOutputDeviceId(deviceId);
   }, []);
 
+  const setTranslationDirection = useCallback((direction: AudioTranslationDirection) => {
+    translationDirectionRef.current = direction;
+    setTranslationDirectionState(direction);
+    saveStoredAudioTranslationDirection(direction);
+  }, []);
+
+  const setAudioInputSource = useCallback(
+    async (source: AudioInputSource) => {
+      if (isListening) {
+        return;
+      }
+
+      audioInputSourceRef.current = source;
+      setAudioInputSourceState(source);
+      saveStoredAudioInputSource(source);
+
+      const resolved = await syncInputDeviceForSource(
+        source,
+        loadStoredInputDeviceId(source)
+      );
+
+      if (resolved.error) {
+        setMicError(resolved.error);
+      } else {
+        setMicError("");
+      }
+    },
+    [isListening, syncInputDeviceForSource]
+  );
+
   return {
-    translationStatusLabel: "OpenAI gpt-realtime-translate (Chinese → English audio)",
+    translationStatusLabel: directionConfig.statusLabel,
+    translationDirection,
+    setTranslationDirection,
+    audioInputSource,
+    setAudioInputSource,
+    audioInputSourceLabel: getAudioInputSourceLabel(audioInputSource),
+    inputDeviceLabel,
+    inputLanguageLabel: directionConfig.inputLanguageLabel,
+    outputLanguageLabel: directionConfig.outputLanguageLabel,
+    channelSummary: directionConfig.channelSummary,
     isListening,
     isTranslating,
     micDeviceId,

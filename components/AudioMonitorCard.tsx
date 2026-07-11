@@ -8,9 +8,8 @@ type AudioMonitorCardProps = {
   outputLevel: number;
   outputPeak: number;
   latencyMs: number | null;
-  inputTranscript?: string;
-  outputTranscript?: string;
-  translationStatusLabel?: string;
+  inputLanguageLabel?: string;
+  outputLanguageLabel?: string;
   micError: string;
   translationError: string;
   onStartListening: () => void;
@@ -26,9 +25,8 @@ export function AudioMonitorCard({
   outputLevel,
   outputPeak,
   latencyMs,
-  inputTranscript,
-  outputTranscript,
-  translationStatusLabel,
+  inputLanguageLabel = "Input",
+  outputLanguageLabel = "Output",
   micError,
   translationError,
   onStartListening,
@@ -36,57 +34,63 @@ export function AudioMonitorCard({
   onRestartListening,
 }: AudioMonitorCardProps) {
   return (
-    <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 space-y-5">
-      <h2 className="text-2xl font-bold text-center">Audio Monitor</h2>
+    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 space-y-5">
+      <div>
+        <h2 className="text-base font-semibold text-slate-900">4. Audio input</h2>
+        <p className="text-sm text-slate-600">
+          Start listening after translation is live. Check levels before relying
+          on the transmitter.
+        </p>
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <button
           type="button"
           onClick={onStartListening}
           disabled={isListening}
-          className={`rounded-2xl px-6 py-5 text-xl font-bold text-white ${
+          className={`rounded-xl px-5 py-4 text-lg font-semibold text-white ${
             isListening
               ? "cursor-not-allowed bg-violet-400"
               : "bg-violet-600 hover:bg-violet-700"
           }`}
         >
-          Start Audio Input
+          Start audio input
         </button>
 
         <button
           type="button"
           onClick={onStopListening}
           disabled={!isListening}
-          className={`rounded-2xl px-6 py-5 text-xl font-bold text-white ${
+          className={`rounded-xl px-5 py-4 text-lg font-semibold text-white ${
             !isListening
               ? "cursor-not-allowed bg-slate-400"
               : "bg-slate-700 hover:bg-slate-800"
           }`}
         >
-          Stop Audio Input
+          Stop audio input
         </button>
       </div>
 
-      {isListening && (
+      {isListening ? (
         <button
           type="button"
           onClick={onRestartListening}
-          className="w-full rounded-2xl border border-amber-300 bg-amber-50 px-6 py-4 text-lg font-semibold text-amber-950 hover:bg-amber-100"
+          className="w-full rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-950 hover:bg-amber-100"
         >
-          Restart Audio Input
+          Restart audio input
         </button>
-      )}
+      ) : null}
 
-      <div className="rounded-2xl bg-slate-50 p-5 space-y-4">
+      <div className="rounded-2xl bg-slate-50 p-4 space-y-4">
         <AudioLevelMeter
-          label="Chinese input (sermon audio)"
+          label={`${inputLanguageLabel} in`}
           level={inputLevel}
           peak={inputPeak}
           active={isListening}
           accent="sky"
         />
         <AudioLevelMeter
-          label="English output (translation channel)"
+          label={`${outputLanguageLabel} out`}
           level={outputLevel}
           peak={outputPeak}
           active={isListening && isTranslating}
@@ -94,60 +98,40 @@ export function AudioMonitorCard({
         />
       </div>
 
-      {(inputTranscript !== undefined || outputTranscript !== undefined) && (
-        <div className="grid gap-3">
-          {inputTranscript !== undefined && (
-            <div className="rounded-2xl bg-slate-50 p-4 min-h-20 text-sm text-slate-700 whitespace-pre-wrap">
-              {inputTranscript || "Chinese transcript will appear here."}
-            </div>
-          )}
-          {outputTranscript !== undefined && (
-            <div className="rounded-2xl bg-emerald-50 p-4 min-h-20 text-sm text-emerald-950 whitespace-pre-wrap">
-              {outputTranscript || "English transcript will appear here."}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="rounded-2xl bg-violet-50 p-4 text-sm text-violet-950 space-y-1">
-        {translationStatusLabel ? (
-          <p>
-            Engine: <span className="font-semibold">{translationStatusLabel}</span>
-          </p>
-        ) : null}
+      <div className="text-sm text-slate-600 space-y-1">
         <p>
-          Input status:{" "}
-          <span className="font-semibold">
-            {isListening ? "Receiving Chinese audio" : "Not receiving"}
+          Input:{" "}
+          <span className="font-semibold text-slate-900">
+            {isListening ? "Listening" : "Stopped"}
           </span>
         </p>
         <p>
-          Translation status:{" "}
-          <span className="font-semibold">
-            {isTranslating ? "Sending English audio" : "Ready"}
+          Output:{" "}
+          <span className="font-semibold text-slate-900">
+            {isTranslating ? "Sending translation" : "Waiting"}
           </span>
         </p>
-        {latencyMs !== null && (
+        {latencyMs !== null ? (
           <p>
-            Round-trip latency:{" "}
-            <span className="font-semibold">
+            Latency:{" "}
+            <span className="font-semibold text-slate-900">
               {(latencyMs / 1000).toFixed(1)}s
             </span>
           </p>
-        )}
+        ) : null}
       </div>
 
-      {micError && (
-        <p className="rounded-2xl bg-red-50 p-3 text-xs font-semibold text-red-700">
-          Audio input: {micError}
+      {micError ? (
+        <p className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700">
+          {micError}
         </p>
-      )}
+      ) : null}
 
-      {translationError && (
-        <p className="rounded-2xl bg-red-50 p-3 text-xs font-semibold text-red-700">
-          Translation: {translationError}
+      {translationError ? (
+        <p className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700">
+          {translationError}
         </p>
-      )}
+      ) : null}
     </section>
   );
 }

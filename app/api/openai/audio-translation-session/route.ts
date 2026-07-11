@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import {
-  OPENAI_AUDIO_TRANSLATION_LANGUAGE,
   OPENAI_AUDIO_TRANSLATION_MODEL,
   OPENAI_TRANSCRIPTION_MODEL,
 } from "@/lib/openaiModels";
@@ -9,13 +8,24 @@ import {
   getOpenAIApiKey,
 } from "@/lib/openaiServer";
 
-export async function POST() {
+type AudioTranslationSessionRequest = {
+  outputLanguage?: string;
+};
+
+function resolveOutputLanguage(value: string | undefined): "en" | "zh" {
+  return value === "zh" ? "zh" : "en";
+}
+
+export async function POST(request: Request) {
   if (!getOpenAIApiKey()) {
     return NextResponse.json(
       { error: "OPENAI_API_KEY is not configured" },
       { status: 500 }
     );
   }
+
+  const body = (await request.json().catch(() => ({}))) as AudioTranslationSessionRequest;
+  const outputLanguage = resolveOutputLanguage(body.outputLanguage);
 
   try {
     const secret = await createOpenAITranslationClientSecret({
@@ -27,7 +37,7 @@ export async function POST() {
           },
         },
         output: {
-          language: OPENAI_AUDIO_TRANSLATION_LANGUAGE,
+          language: outputLanguage,
         },
       },
     });
@@ -36,7 +46,7 @@ export async function POST() {
       clientSecret: secret.value,
       expiresAt: secret.expiresAt,
       model: OPENAI_AUDIO_TRANSLATION_MODEL,
-      outputLanguage: OPENAI_AUDIO_TRANSLATION_LANGUAGE,
+      outputLanguage,
     });
   } catch (error) {
     console.error("OpenAI audio translation session error:", error);
