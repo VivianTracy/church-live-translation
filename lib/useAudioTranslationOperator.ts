@@ -12,7 +12,6 @@ import {
   loadStoredMicDeviceId,
   saveStoredMicDeviceId,
 } from "@/lib/microphoneDeviceStorage";
-import { createTranslationWavUploader } from "@/lib/translationAudioBroadcast";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type AudioLevels = {
@@ -29,7 +28,16 @@ const INITIAL_LEVELS: AudioLevels = {
   outputPeak: 0,
 };
 
-export function useAudioTranslationOperator(audienceLive = false) {
+function deviceLabel(deviceId: string, devices: MediaDeviceInfo[], fallback: string) {
+  if (!deviceId) {
+    return fallback;
+  }
+
+  const match = devices.find((device) => device.deviceId === deviceId);
+  return match?.label || fallback;
+}
+
+export function useAudioTranslationOperator() {
   const [isListening, setIsListening] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [micDeviceId, setMicDeviceIdState] = useState("");
@@ -37,10 +45,7 @@ export function useAudioTranslationOperator(audienceLive = false) {
   const [outputDeviceLabel, setOutputDeviceLabel] = useState("");
   const [micError, setMicError] = useState("");
   const [translationError, setTranslationError] = useState("");
-  const [audienceBroadcastError, setAudienceBroadcastError] = useState("");
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
-  const [inputTranscript, setInputTranscript] = useState("");
-  const [outputTranscript, setOutputTranscript] = useState("");
   const [levels, setLevels] = useState<AudioLevels>(INITIAL_LEVELS);
 
   const connectionRef = useRef<AudioTranslationConnection | null>(null);
@@ -48,16 +53,6 @@ export function useAudioTranslationOperator(audienceLive = false) {
   const micDeviceIdRef = useRef("");
   const outputDeviceIdRef = useRef("");
   const sessionStartedAtRef = useRef<number | null>(null);
-  const audienceLiveRef = useRef(audienceLive);
-  const uploadWavChunkRef = useRef<((wavBase64: string) => void) | null>(null);
-  const [chunksUploaded, setChunksUploaded] = useState(0);
-
-  audienceLiveRef.current = audienceLive;
-  uploadWavChunkRef.current = audienceLive
-    ? createTranslationWavUploader(setAudienceBroadcastError, () => {
-        setChunksUploaded((count) => count + 1);
-      })
-    : null;
 
   useEffect(() => {
     const storedMicId = loadStoredMicDeviceId();
@@ -76,7 +71,7 @@ export function useAudioTranslationOperator(audienceLive = false) {
   }, []);
 
   useEffect(() => {
-    if (!outputDeviceId || !navigator.mediaDevices?.enumerateDevices) {
+    if (!navigator.mediaDevices?.enumerateDevices) {
       setOutputDeviceLabel("");
       return;
     }
@@ -88,8 +83,13 @@ export function useAudioTranslationOperator(audienceLive = false) {
         return;
       }
 
-      const match = devices.find((device) => device.deviceId === outputDeviceId);
-      setOutputDeviceLabel(match?.label || "Selected output");
+      setOutputDeviceLabel(
+        deviceLabel(
+          outputDeviceId,
+          devices,
+          outputDeviceId ? "Selected output" : "Not selected"
+        )
+      );
     });
 
     return () => {
@@ -98,7 +98,7 @@ export function useAudioTranslationOperator(audienceLive = false) {
   }, [outputDeviceId]);
 
   useEffect(() => {
-    if (!isListening || !connectionRef.current || !outputDeviceId) {
+    if (!isListening || !connectionRef.current) {
       return;
     }
 
@@ -107,8 +107,6 @@ export function useAudioTranslationOperator(audienceLive = false) {
 
   const resetSessionState = useCallback(() => {
     setLevels(INITIAL_LEVELS);
-    setInputTranscript("");
-    setOutputTranscript("");
     setLatencyMs(null);
     sessionStartedAtRef.current = null;
   }, []);
@@ -130,8 +128,6 @@ export function useAudioTranslationOperator(audienceLive = false) {
     startingRef.current = true;
     setMicError("");
     setTranslationError("");
-    setAudienceBroadcastError("");
-    setChunksUploaded(0);
     resetSessionState();
 
     try {
@@ -160,17 +156,6 @@ export function useAudioTranslationOperator(audienceLive = false) {
         onFirstOutputAudio: () => {
           if (sessionStartedAtRef.current !== null) {
             setLatencyMs(Date.now() - sessionStartedAtRef.current);
-          }
-        },
-        onInputTranscriptDelta: (delta) => {
-          setInputTranscript((current) => current + delta);
-        },
-        onOutputTranscriptDelta: (delta) => {
-          setOutputTranscript((current) => current + delta);
-        },
-        onWavChunk: (wavBase64) => {
-          if (audienceLiveRef.current) {
-            uploadWavChunkRef.current?.(wavBase64);
           }
         },
         onError: (message) => {
@@ -220,11 +205,7 @@ export function useAudioTranslationOperator(audienceLive = false) {
     outputDeviceLabel,
     micError,
     translationError,
-    audienceBroadcastError,
-    chunksUploaded,
     latencyMs,
-    inputTranscript,
-    outputTranscript,
     inputLevel: levels.inputLevel,
     inputPeak: levels.inputPeak,
     outputLevel: levels.outputLevel,

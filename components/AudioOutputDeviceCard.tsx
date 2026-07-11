@@ -63,8 +63,9 @@ export function AudioOutputDeviceCard({
           TRANSLATION CHANNEL OUTPUT
         </p>
         <p className="text-sm text-slate-600">
-          Choose where English audio is sent. Route this to your church&apos;s
-          translation channel so earpiece listeners hear the sermon in English.
+          Choose where English audio is sent for the TT125 transmitter. Use the
+          monitor headphone jack, a USB audio dongle, or another line output on
+          the church computer.
         </p>
       </div>
 
@@ -106,9 +107,8 @@ export function AudioOutputDeviceCard({
       ) : null}
 
       <p className="text-xs text-slate-500">
-        Connect this output to your translation transmitter input (mixer aux,
-        FM/IR system, or a dedicated translation laptop). Stop translation before
-        changing outputs.
+        Connect this output to the TT125-TX MIC port with a 3.5 mm cable. Stop
+        translation before changing outputs.
       </p>
     </section>
   );

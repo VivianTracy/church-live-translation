@@ -1,6 +1,5 @@
 import { startAudioLevelMonitor } from "@/lib/audioLevelMonitor";
 import { getCaptionMicrophoneStream } from "@/lib/microphoneStream";
-import { startAudioNodePcmUploader } from "@/lib/pcmAudioCapture";
 import { OPENAI_TRANSLATION_CALLS_URL } from "@/lib/openaiModels";
 
 type RealtimeTranslationEvent = {
@@ -25,9 +24,6 @@ type ConnectOptions = {
   onInputLevels: (level: number, peak: number) => void;
   onOutputLevels: (level: number, peak: number) => void;
   onFirstOutputAudio?: () => void;
-  onInputTranscriptDelta?: (delta: string) => void;
-  onOutputTranscriptDelta?: (delta: string) => void;
-  onWavChunk?: (wavBase64: string) => void;
   onError: (message: string) => void;
 };
 
@@ -64,6 +60,7 @@ function stopPlaybackElement(audio: HTMLAudioElement): void {
   audio.srcObject = null;
   audio.removeAttribute("src");
   audio.load();
+  audio.remove();
 }
 
 function stopPeerConnectionTracks(peerConnection: RTCPeerConnection): void {
@@ -74,6 +71,26 @@ function stopPeerConnectionTracks(peerConnection: RTCPeerConnection): void {
   for (const sender of peerConnection.getSenders()) {
     sender.track?.stop();
   }
+}
+
+function createPlaybackElement(): HTMLAudioElement {
+  const audio = document.createElement("audio");
+  audio.autoplay = true;
+  audio.setAttribute("playsinline", "true");
+  audio.setAttribute("webkit-playsinline", "true");
+  audio.style.display = "none";
+  document.body.appendChild(audio);
+  return audio;
+}
+
+async function playRoutedAudio(
+  audio: HTMLAudioElement,
+  stream: MediaStream,
+  deviceId: string
+): Promise<void> {
+  audio.srcObject = stream;
+  await applyAudioOutputDevice(audio, deviceId);
+  await audio.play();
 }
 
 export async function connectOpenAIAudioTranslation(
@@ -116,25 +133,23 @@ export async function connectOpenAIAudioTranslation(
   const peerConnection = new RTCPeerConnection();
   const events = peerConnection.createDataChannel("oai-events");
 
-  const translatedAudio = document.createElement("audio");
-  translatedAudio.autoplay = true;
+  const transmitterAudio = createPlaybackElement();
 
-  let outputMonitorContext: AudioContext | null = null;
+  let monitorContext: AudioContext | null = null;
+  let outputAnalyser: AnalyserNode | null = null;
   let stopOutputMonitor: (() => void) | null = null;
   let outputDeviceId = options.outputDeviceId ?? "";
   let hasReceivedOutput = false;
   let stopped = false;
   let attachGeneration = 0;
   let activeOutputTrackId: string | null = null;
-  let stopPcmUpload: (() => void) | null = null;
 
   const teardownOutputMonitor = () => {
-    stopPcmUpload?.();
-    stopPcmUpload = null;
     stopOutputMonitor?.();
     stopOutputMonitor = null;
-    void outputMonitorContext?.close();
-    outputMonitorContext = null;
+    outputAnalyser = null;
+    void monitorContext?.close();
+    monitorContext = null;
   };
 
   const attachTranslatedStream = async (outputStream: MediaStream) => {
@@ -143,16 +158,9 @@ export async function connectOpenAIAudioTranslation(
     }
 
     const generation = ++attachGeneration;
-    translatedAudio.srcObject = outputStream;
 
     try {
-      await applyAudioOutputDevice(translatedAudio, outputDeviceId);
-
-      if (generation !== attachGeneration || stopped) {
-        return;
-      }
-
-      await translatedAudio.play();
+      await playRoutedAudio(transmitterAudio, outputStream, outputDeviceId);
     } catch (error) {
       if (generation === attachGeneration && !stopped) {
         options.onError(
@@ -170,35 +178,29 @@ export async function connectOpenAIAudioTranslation(
 
     teardownOutputMonitor();
 
-    outputMonitorContext = new AudioContext();
+    try {
+      monitorContext = new AudioContext();
 
-    if (outputMonitorContext.state === "suspended") {
-      await outputMonitorContext.resume();
+      if (monitorContext.state === "suspended") {
+        await monitorContext.resume();
+      }
+
+      const outputSource = monitorContext.createMediaStreamSource(outputStream);
+      outputAnalyser = monitorContext.createAnalyser();
+      outputAnalyser.fftSize = 2048;
+      outputSource.connect(outputAnalyser);
+    } catch {
+      outputAnalyser = null;
     }
 
-    const outputSource =
-      outputMonitorContext.createMediaStreamSource(outputStream);
-    const outputAnalyser = outputMonitorContext.createAnalyser();
-    outputAnalyser.fftSize = 2048;
-    outputSource.connect(outputAnalyser);
-
     if (generation !== attachGeneration || stopped) {
-      void outputMonitorContext.close();
-      outputMonitorContext = null;
       return;
     }
 
-    stopOutputMonitor = startAudioLevelMonitor(
-      outputAnalyser,
-      options.onOutputLevels
-    );
-
-    if (options.onWavChunk) {
-      stopPcmUpload = startAudioNodePcmUploader(
-        outputMonitorContext,
-        outputSource,
-        600,
-        options.onWavChunk
+    if (outputAnalyser) {
+      stopOutputMonitor = startAudioLevelMonitor(
+        outputAnalyser,
+        options.onOutputLevels
       );
     }
 
@@ -224,8 +226,7 @@ export async function connectOpenAIAudioTranslation(
 
     activeOutputTrackId = event.track.id;
 
-    const outputStream =
-      event.streams[0] ?? new MediaStream([event.track]);
+    const outputStream = event.streams[0] ?? new MediaStream([event.track]);
 
     void attachTranslatedStream(outputStream);
   };
@@ -244,12 +245,10 @@ export async function connectOpenAIAudioTranslation(
         options.onFirstOutputAudio?.();
       }
 
-      options.onOutputTranscriptDelta?.(event.delta ?? "");
       return;
     }
 
     if (event.type === "session.input_transcript.delta") {
-      options.onInputTranscriptDelta?.(event.delta ?? "");
       return;
     }
 
@@ -307,11 +306,9 @@ export async function connectOpenAIAudioTranslation(
     stopped = true;
     attachGeneration += 1;
     activeOutputTrackId = null;
-    stopPcmUpload?.();
-    stopPcmUpload = null;
     stopInputMonitor();
     teardownOutputMonitor();
-    stopPlaybackElement(translatedAudio);
+    stopPlaybackElement(transmitterAudio);
     stopPeerConnectionTracks(peerConnection);
     peerConnection.close();
     mic.stream.getTracks().forEach((track) => track.stop());
@@ -325,12 +322,16 @@ export async function connectOpenAIAudioTranslation(
       outputDeviceId = deviceId;
 
       try {
-        await applyAudioOutputDevice(translatedAudio, deviceId);
+        await applyAudioOutputDevice(transmitterAudio, deviceId);
+
+        if (transmitterAudio.srcObject) {
+          await transmitterAudio.play();
+        }
       } catch (error) {
         options.onError(
           error instanceof Error
             ? error.message
-            : "Failed to route translated audio to the selected output."
+            : "Failed to route translated audio to the transmitter output."
         );
       }
     },

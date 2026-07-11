@@ -14,14 +14,14 @@ export function TranslationChannelCard({
           AUDIO PATH
         </p>
         <p className="text-base font-semibold">
-          Chinese sermon audio becomes English audio for earpiece listeners.
+          Chinese sermon audio becomes English audio for wireless receivers.
         </p>
       </div>
 
       <div className="rounded-2xl bg-white/80 p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-center gap-2 text-center text-sm font-semibold">
           <span className="rounded-xl bg-sky-100 px-3 py-2 text-sky-900">
-            Chinese audio in
+            Sermon audio in
           </span>
           <span className="text-violet-400">→</span>
           <span className="rounded-xl bg-violet-100 px-3 py-2 text-violet-900">
@@ -33,18 +33,17 @@ export function TranslationChannelCard({
           </span>
           <span className="text-violet-400">→</span>
           <span className="rounded-xl bg-amber-100 px-3 py-2 text-amber-900">
-            Translation channel
+            TT125 transmitter
           </span>
           <span className="text-violet-400">→</span>
           <span className="rounded-xl bg-slate-200 px-3 py-2 text-slate-900">
-            Earpieces
+            Wireless headsets
           </span>
         </div>
 
         <p className="text-center text-xs text-violet-900/80">
-          This page replaces a live human interpreter on the translation channel.
-          YouTube captions on <span className="font-mono">/overlay</span> stay
-          separate.
+          Run this on the church computer. Connect English output to the Retekess
+          TT125-TX MIC port with a 3.5 mm cable.
         </p>
       </div>
 
@@ -56,7 +55,7 @@ export function TranslationChannelCard({
           </span>
         </p>
         <p>
-          Output device:{" "}
+          Transmitter output:{" "}
           <span className="font-semibold">
             {outputDeviceLabel || "Not selected"}
           </span>
