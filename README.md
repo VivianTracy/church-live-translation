@@ -4,102 +4,53 @@
 
 > **Making bilingual worship accessible without requiring a dedicated interpreter.**
 
-Church Caption helps bilingual churches provide live English translation during worship services while fitting naturally into their existing AV and livestream workflow.
-
-The goal is not to replace church volunteers, but to reduce the burden on translation coworkers and make worship more accessible for English-speaking attendees.
+Church Caption helps churches bridge language barriers during live events — wireless headset translation, YouTube captions, or both — while fitting into existing AV workflows.
 
 ---
 
-## Current Version
+## Current focus — live audio translation
 
-### Version 0.3 – Church Streaming Kit
+**Production operator:** [`/operator-live`](http://localhost:3000/operator-live) — **Church Translation**
 
-Church Caption runs on the **streaming computer** with OBS. The operator captures Chinese sermon audio; English captions appear on the YouTube stream through an OBS Browser Source.
+Runs on the church computer in Chrome or Edge. Live speech is translated to audio and routed to wireless receivers (e.g. Retekess TT125) via a 3.5 mm cable from the PC audio out.
 
-**Production operator:** [`/operator-caption`](http://localhost:3000/operator-caption)
+| Capability | Details |
+|---|---|
+| Translation | `gpt-realtime-translate` — speech-to-speech, bidirectional |
+| Directions | Chinese → English or English → Chinese |
+| Audio in | OBS stream (BlackHole / VB-Cable) or physical microphone |
+| Audio out | Any Windows/Mac playback device (`setSinkId`) — monitor jack, USB dongle, line out |
+| Device detection | Input and output devices listed automatically after mic permission |
+| Operator workflow | Direction → audio in/out → go live → start audio input |
+
+**Setup:** [`church-setup/README.md`](./church-setup/README.md) — Windows/Mac install, VB-Cable, OBS monitoring, troubleshooting
+
+```text
+OBS / mic → Chrome (/operator-live)
+                  ↓
+        gpt-realtime-translate (WebRTC)
+                  ↓
+        translated audio → PC audio out → TT125-TX → wireless headsets
+```
+
+---
+
+## Also available — YouTube caption overlay
+
+Earlier work on **`main`** focused on **English captions on the YouTube stream** through OBS. That path remains production-ready and shares the same repo.
+
+**Operator:** [`/operator-caption`](http://localhost:3000/operator-caption)
 
 | Capability | Details |
 |---|---|
 | Speech-to-text | `gpt-4o-mini-transcribe` (5-second REST audio chunks) |
 | Translation | `gpt-4o-mini` (Chinese text → English captions) |
-| OBS overlay | `/overlay` — Browser Source at 1920×1080 |
+| OBS overlay | [`/overlay`](http://localhost:3000/overlay) — Browser Source at 1920×1080 |
 | Sermon transcripts | Auto-saved to `transcripts/<session-id>/` in Sermon mode |
 | Caption modes | **Sermon** (captions + files), **Others** (prayer/announcements) |
-| Local Sunday runtime | `npm run dev` on the streaming PC; see [`church-setup/`](./church-setup/) |
+| Overlay styling | [`/caption-settings`](http://localhost:3000/caption-settings) |
 
-**Pages:**
-
-| URL | Role |
-|---|---|
-| `/operator-caption` | Caption operator (YouTube stream + sermon transcripts) |
-| `/operator-live` | Live output operator (earpiece audio, captions, or both) |
-| `/caption-settings` | OBS overlay font, position, and alignment |
-| `/overlay` | OBS Browser Source (YouTube stream captions) |
-
-**Setup bundle:** [`church-setup/README-SUNDAY.md`](./church-setup/README-SUNDAY.md)
-
----
-
-## Quick Start
-
-```bash
-npm install
-npm run dev
-```
-
-Required environment variables (see [`docs/COLLABORATOR_SETUP.md`](./docs/COLLABORATOR_SETUP.md)):
-
-| Variable | Required for |
-|---|---|
-| `OPENAI_API_KEY` | `/operator-caption` and `/operator-live` (transcription + translation) |
-| Redis / KV vars | Caption state (optional on streaming PC — set `CAPTION_STORAGE=local`) |
-
-Open **http://localhost:3000/operator-caption**, add **http://localhost:3000/overlay** as an OBS Browser Source, and start captions.
-
----
-
-## Cost Estimate (OpenAI API)
-
-Production uses **pay-as-you-go** OpenAI API billing (not ChatGPT Plus). Check [platform.openai.com/usage](https://platform.openai.com/usage) after a test run.
-
-| Model | Role | List price (Standard API) |
-|---|---|---|
-| `gpt-4o-mini-transcribe` | Chinese speech → text | $1.25 / 1M audio input tokens + $5.00 / 1M text output tokens |
-| `gpt-4o-mini` | Chinese text → English captions | $0.15 / 1M input tokens + $0.60 / 1M output tokens |
-
-**Rough estimates for one service** (mic live during preaching; quiet pauses reduce cost):
-
-| Duration | Estimated API cost |
-|---|---|
-| 5-minute test | ~$0.02–0.04 |
-| 45-minute sermon | ~$0.15–0.25 |
-
-Transcription is billed on audio processed; translation is billed per caption chunk (each ~5 seconds of speech triggers one transcribe + one translate call). Run a short rehearsal before Sunday and confirm on the usage dashboard.
-
----
-
-## Design Principles
-
-- Integrate into the existing church AV workflow.
-- Do not require changes to the production audio system.
-- Keep the operator workflow simple.
-- Preserve biblical accuracy.
-- Optimize for readable captions, not word-for-word translation.
-- Support churches with or without volunteer interpreters.
-- Build incrementally and validate with real worship services.
-
----
-
-## Technology Stack
-
-- Next.js, React, TypeScript, Tailwind CSS
-- **OpenAI** — production STT + translation (`/operator-caption`)
-- **Upstash Redis / Vercel KV** — caption state (optional locally via `CAPTION_STORAGE=local`)
-- **OBS** — Browser Source overlay for YouTube stream
-
----
-
-## Architecture Overview
+**Sunday checklist (captions):** [`church-setup/README-SUNDAY.md`](./church-setup/README-SUNDAY.md)
 
 ```text
 BlackHole / VB-Cable → Chrome (/operator-caption)
@@ -108,34 +59,124 @@ BlackHole / VB-Cable → Chrome (/operator-caption)
                               ↓
                     gpt-4o-mini (English captions)
                               ↓
-                    POST /api/caption-state
-                              ↓
-                    Redis or local storage
-                              ↓
-                    GET /api/caption-state (poll)
+                    caption state (Redis or local)
                               ↓
                     /overlay → OBS → YouTube
 ```
 
-For full detail, see [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+---
+
+## Pages
+
+| URL | Role |
+|---|---|
+| `/operator-live` | **Live audio translation** to wireless headsets |
+| `/operator-caption` | YouTube caption operator + sermon transcripts |
+| `/overlay` | OBS Browser Source (stream captions) |
+| `/caption-settings` | Overlay font, position, alignment |
+| `/operator` | Backup Gemini + manuscript operator (legacy) |
+
+---
+
+## Quick start
+
+```bash
+git clone https://github.com/VivianTracy/church-caption.git
+cd church-caption
+npm install
+cp church-setup/env.example .env.local   # add OPENAI_API_KEY
+npm run dev
+```
+
+Open **http://localhost:3000/operator-live** in Chrome or Edge.
+
+**Windows church PC:** see [`church-setup/README.md`](./church-setup/README.md) for clone, install script, VB-Cable, and device setup.
+
+**Required env var for both live translation and captions:**
+
+| Variable | Required for |
+|---|---|
+| `OPENAI_API_KEY` | `/operator-live` and `/operator-caption` |
+| `GEMINI_API_KEY` | `/operator` only (legacy backup path) |
+| Redis / KV vars | Caption overlay sharing (optional — use `CAPTION_STORAGE=local` on one PC) |
+
+---
+
+## Cost estimate (OpenAI API)
+
+Production uses **pay-as-you-go** API billing (not ChatGPT Plus). Confirm spend at [platform.openai.com/usage](https://platform.openai.com/usage) after a rehearsal.
+
+### Live audio translation — `gpt-realtime-translate` (`/operator-live`)
+
+Billed by **minutes of audio streamed** while the session is active ([pricing](https://developers.openai.com/api/docs/models/gpt-realtime-translate)).
+
+| List price | |
+|---|---|
+| **$0.034 / minute** | Speech-to-speech translation (Chinese ↔ English) |
+
+**Rough estimates** (active translation time; stop the session during long breaks to save cost):
+
+| Duration | Estimated API cost |
+|---|---|
+| 5-minute test | ~$0.17 |
+| 45-minute session | ~$1.50 |
+| 60-minute session | ~$2.00 |
+
+### YouTube captions — `gpt-4o-mini-transcribe` + `gpt-4o-mini` (`/operator-caption`)
+
+| Model | Role | List price (Standard API) |
+|---|---|---|
+| `gpt-4o-mini-transcribe` | Chinese speech → text | $1.25 / 1M audio input tokens + $5.00 / 1M text output tokens |
+| `gpt-4o-mini` | Chinese text → English captions | $0.15 / 1M input tokens + $0.60 / 1M output tokens |
+
+| Duration | Estimated API cost |
+|---|---|
+| 5-minute test | ~$0.02–0.04 |
+| 45-minute sermon | ~$0.15–0.25 |
+
+Caption costs are lower because the pipeline transcribes and translates text in chunks; live translation streams audio continuously through the Realtime API.
+
+---
+
+## Design principles
+
+- Integrate into existing church AV workflows.
+- Keep the operator workflow simple — one volunteer, few steps.
+- Reliability over cleverness; optimize for live events, not demos.
+- Preserve biblical accuracy in translation and captions.
+- Build incrementally and validate with real services.
+
+---
+
+## Technology stack
+
+- Next.js, React, TypeScript, Tailwind CSS
+- **OpenAI Realtime API** — live speech translation (`gpt-realtime-translate`)
+- **OpenAI REST** — caption transcribe + translate (`gpt-4o-mini-transcribe`, `gpt-4o-mini`)
+- **OBS** — Browser Source overlay for YouTube captions
+- **Upstash Redis / Vercel KV** — caption state (optional locally via `CAPTION_STORAGE=local`)
+
+---
+
+## Past efforts and branches
+
+| Effort | Status |
+|---|---|
+| Gemini + sermon manuscript operator (`/operator`) | Backup / reference — `preserve/gemini-manuscript-operator` |
+| OpenAI Realtime Whisper + GPT Realtime captions | Research — see [`docs/WHISPER_GPT_REALTIME.md`](./docs/WHISPER_GPT_REALTIME.md) |
+| Phone audience relay + QR listen page | Parked on `feature/zoom-audio-output` |
+| Zoom dual-routing (transmitter + meeting) | Experimental — `feature/zoom-audio-output` |
+
+For full architecture detail, see [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
 **Additional docs:**
 
-- [`church-setup/`](./church-setup/) — Sunday install and OBS setup
+- [`church-setup/`](./church-setup/) — install, OBS, Windows troubleshooting
 - [`docs/COLLABORATOR_SETUP.md`](./docs/COLLABORATOR_SETUP.md) — clone, env, dev workflow
-- [`docs/WHISPER_GPT_REALTIME.md`](./docs/WHISPER_GPT_REALTIME.md) — OpenAI billing and API notes
+- [`docs/WHISPER_GPT_REALTIME.md`](./docs/WHISPER_GPT_REALTIME.md) — Realtime API billing notes
 
 ---
 
-## Branch Strategy
+## Long-term vision
 
-| Branch | Purpose |
-|---|---|
-| `main` | Deployable app: OpenAI production operator + OBS overlay |
-| `preserve/gemini-manuscript-operator` | Snapshot of Gemini + manuscript operator (reference) |
-
----
-
-## Long-Term Vision
-
-Church Caption is a church translation platform — not just a caption app — designed to help churches communicate the Gospel across language barriers while fitting naturally into existing worship technology.
+Church Caption is a church translation platform — live audio, stream captions, and future tools (scripture display, sermon archive, multi-language) — designed to help churches communicate across language barriers using technology they already have.
