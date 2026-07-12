@@ -3,7 +3,7 @@
 import {
   devicesNeedMicrophonePermission,
   filterDevicesForInputSource,
-  isMixerUsbDevice,
+  isBoardFeedDevice,
   isStreamingInputDevice,
   loadStoredAudioInputSource,
   resolveInputDeviceForSource,
@@ -123,7 +123,6 @@ export function AudioInputSourceCard({
     return () => {
       mediaDevices.removeEventListener("devicechange", handleDeviceChange);
     };
-    // Load stored preference once on mount; devicechange keeps the list current.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -139,7 +138,7 @@ export function AudioInputSourceCard({
   };
 
   const boardFeedConnected = devices.some((device) =>
-    isMixerUsbDevice(device.label)
+    isBoardFeedDevice(device.label)
   );
 
   const showingFallbackDevices =
@@ -153,7 +152,7 @@ export function AudioInputSourceCard({
       <div>
         <h2 className="text-base font-semibold text-slate-900">2. Audio in</h2>
         <p className="text-sm text-slate-600">
-          Same system inputs OBS sees — ClearClick, BlackHole, mic, or Default.
+          X32 board feed over USB-C, or a microphone for direct input.
         </p>
       </div>
 
@@ -170,7 +169,7 @@ export function AudioInputSourceCard({
               : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
           } disabled:cursor-not-allowed disabled:opacity-60`}
         >
-          <p className="font-semibold">OBS (Streaming)</p>
+          <p className="font-semibold">Streaming</p>
           <p className="mt-1 text-xs text-slate-600">
             ClearClick (X32), BlackHole, or any other system audio input.
           </p>
@@ -237,7 +236,7 @@ export function AudioInputSourceCard({
         </p>
       ) : null}
 
-      {boardFeedConnected ? (
+      {boardFeedConnected && selectedSource === "obs-streaming" ? (
         <p className="rounded-xl bg-sky-50 p-3 text-sm text-sky-950">
           ClearClick / X32 board feed detected and selected automatically.
         </p>
@@ -251,8 +250,9 @@ export function AudioInputSourceCard({
 
       {showingFallbackDevices ? (
         <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
-          No ClearClick, X32, or virtual cable found yet. Pick the input that
-          matches OBS, or connect the board feed and refresh.
+          No ClearClick, X32, or virtual cable found yet. Connect the USB-C
+          board feed, then refresh, or pick the input that carries the mixer
+          signal.
         </p>
       ) : null}
 

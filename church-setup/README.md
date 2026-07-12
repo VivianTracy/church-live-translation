@@ -8,8 +8,8 @@ On **Chrome** or **Edge**, the operator pages use the browser’s built-in devic
 
 | Setting | How it is detected |
 |---|---|
-| **Audio input (OBS mode)** | Lists **all** system audio inputs Chrome can see (same pool as OBS: ClearClick, BlackHole, Default, etc.). Prefers **ClearClick / X32** when connected, then BlackHole 2ch / VB-Cable. Plugging or unplugging updates the list without a refresh. |
-| **Audio input (Microphone mode)** | Lists physical microphones and **excludes** virtual cables. X32 / X-USB is still preferred when present. The first usable mic is selected if nothing was saved before. |
+| **Audio input (Streaming)** | Lists **all** system audio inputs Chrome can see (ClearClick, BlackHole, Default, etc.). Prefers **ClearClick / X32** when connected, then BlackHole 2ch / VB-Cable. Plugging or unplugging updates the list without a refresh. |
+| **Audio input (Microphone)** | Lists physical microphones and **excludes** virtual cables. ClearClick / X32 is still preferred when present. The first usable mic is selected if nothing was saved before. |
 | **Audio output** | Lists all speakers and USB audio devices Windows exposes. Your last choice is remembered; otherwise the first listed device is used. |
 | **Translation direction** | Chinese → English or English → Chinese; saved in the browser. |
 
@@ -85,7 +85,7 @@ Skip this section if you use **Microphone** mode with a room mic or headset.
    - Set **Advanced** → **Monitoring Device** to **CABLE Input (VB-Audio Virtual Cable)**
 4. For each audio source you want translated, open **Advanced Audio Properties** and set **Audio Monitoring** to **Monitor and Output**
 
-After setup, Chrome should list **CABLE Output (VB-Audio Virtual Cable)** under Audio in when **OBS (Streaming)** is selected.
+After setup, Chrome should list **CABLE Output (VB-Audio Virtual Cable)** under Audio in when **Streaming** is selected.
 
 ### 5. Start the app
 
@@ -117,7 +117,7 @@ Use **operator-live** for Retekess headset translation.
 
 1. **Translation direction** — Chinese → English or English → Chinese
 2. **Audio in**
-   - **OBS (Streaming)** — **ClearClick** when it carries the X32 feed (auto-selected), or **BlackHole 2ch** / **CABLE Output**
+   - **Streaming** — **ClearClick** when it carries the X32 feed (auto-selected), or **BlackHole 2ch** / **CABLE Output**
    - **Microphone** — choose the room mic, headset, or built-in mic
 3. **Audio out** — choose where translated audio plays:
    - **Monitor headphone jack** on the PC (often labeled **Speakers** or **Realtek**)
@@ -165,7 +165,7 @@ See [`obs/browser-source.md`](./obs/browser-source.md). Optional starter scene: 
 |---|---|
 | Empty input dropdown | Click **Allow access & refresh**. Allow microphone access when Chrome/Edge prompts. |
 | No VB-Cable in the list | Install VB-Cable, reboot, confirm OBS monitoring uses **CABLE Input**, then refresh. |
-| Wrong input after switching OBS ↔ Mic | Stop translation first. Each mode remembers its own device. |
+| Wrong input after switching Streaming ↔ Mic | Stop translation first. Each mode remembers its own device. |
 | No output devices | Use Chrome or Edge (not Firefox). Click **Refresh list** under Audio out. |
 | Translation silent on headsets | Audio out must be the jack or dongle feeding the TT125-TX. Check Windows Sound settings. |
 | `OPENAI_API_KEY` error | `.env.local` in project root; restart `npm run dev` or `npm run start` after editing. |

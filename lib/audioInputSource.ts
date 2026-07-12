@@ -117,9 +117,9 @@ export function filterDevicesForInputSource(
 ): MediaDeviceInfo[] {
   const usableDevices = listUsableDevices(devices);
 
-  // OBS (Streaming) shows every system audio input Chrome can see — same set
-  // OBS lists (ClearClick, BlackHole, Default, etc.). Preference is applied
-  // when auto-selecting, not by hiding devices.
+  // Streaming mode shows every system audio input Chrome can see (ClearClick,
+  // BlackHole, Default, etc.). Preference is applied when auto-selecting, not
+  // by hiding devices.
   if (source === "obs-streaming") {
     return usableDevices;
   }
@@ -133,10 +133,10 @@ export function filterDevicesForInputSource(
 
 export function getEmptyInputDeviceMessage(source: AudioInputSource): string {
   if (source === "obs-streaming") {
-    return "No audio input found. Connect ClearClick / X32, allow microphone access, then refresh.";
+    return "No audio input found. Connect ClearClick / X32 over USB-C, allow microphone access, then refresh.";
   }
 
-  return "No physical microphone found. Connect a microphone or switch to OBS (Streaming).";
+  return "No physical microphone found. Connect a microphone or the X32 USB-C board feed.";
 }
 
 function isValidDeviceForSource(
@@ -280,5 +280,5 @@ export function resolveInputDeviceForSource(
 }
 
 export function getAudioInputSourceLabel(source: AudioInputSource): string {
-  return source === "obs-streaming" ? "OBS (Streaming)" : "Microphone";
+  return source === "obs-streaming" ? "Streaming" : "Microphone";
 }
