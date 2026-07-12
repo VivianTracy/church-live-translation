@@ -9,11 +9,40 @@ export const OBS_INPUT_DEVICE_STORAGE_KEY =
 export const MICROPHONE_INPUT_DEVICE_STORAGE_KEY =
   "church-caption-microphone-input-device-id";
 
+/**
+ * Church board feed over USB (X32 X-USB, ClearClick interface, Behringer).
+ * These are real hardware inputs OBS also lists — not software loopbacks.
+ */
+const BOARD_FEED_PATTERN = /clearclick|clear.?click|x-?usb|x32|behringer/i;
+
+/** Software loopback devices used when routing through OBS. */
 const VIRTUAL_CABLE_PATTERN =
-  /blackhole|vb-?audio|cable|loopback|x-?usb|virtual/i;
+  /blackhole|vb-?audio|cable|loopback|virtual/i;
+
+/** Prefer stereo BlackHole / VB-Cable over multichannel variants. */
+const PREFERRED_VIRTUAL_CABLE_PATTERN =
+  /blackhole\s*2|2\s*ch|cable output|vb-?audio/i;
+
+export function isBoardFeedDevice(label: string): boolean {
+  return BOARD_FEED_PATTERN.test(label);
+}
+
+/** @deprecated Use isBoardFeedDevice — kept for existing imports. */
+export function isMixerUsbDevice(label: string): boolean {
+  return isBoardFeedDevice(label);
+}
 
 export function isVirtualCableDevice(label: string): boolean {
+  // Board feeds are real USB interfaces, not software loopbacks.
+  if (isBoardFeedDevice(label)) {
+    return false;
+  }
+
   return VIRTUAL_CABLE_PATTERN.test(label);
+}
+
+export function isStreamingInputDevice(label: string): boolean {
+  return isBoardFeedDevice(label) || isVirtualCableDevice(label);
 }
 
 export function devicesNeedMicrophonePermission(
@@ -88,12 +117,11 @@ export function filterDevicesForInputSource(
 ): MediaDeviceInfo[] {
   const usableDevices = listUsableDevices(devices);
 
+  // OBS (Streaming) shows every system audio input Chrome can see — same set
+  // OBS lists (ClearClick, BlackHole, Default, etc.). Preference is applied
+  // when auto-selecting, not by hiding devices.
   if (source === "obs-streaming") {
-    const virtualDevices = usableDevices.filter((device) =>
-      isVirtualCableDevice(device.label)
-    );
-
-    return virtualDevices.length > 0 ? virtualDevices : usableDevices;
+    return usableDevices;
   }
 
   const physicalDevices = usableDevices.filter(
@@ -105,7 +133,7 @@ export function filterDevicesForInputSource(
 
 export function getEmptyInputDeviceMessage(source: AudioInputSource): string {
   if (source === "obs-streaming") {
-    return "No streaming input found. Install BlackHole or VB-Cable, then refresh the list.";
+    return "No audio input found. Connect ClearClick / X32, allow microphone access, then refresh.";
   }
 
   return "No physical microphone found. Connect a microphone or switch to OBS (Streaming).";
@@ -126,29 +154,71 @@ function isValidDeviceForSource(
   return true;
 }
 
+function findFirstDeviceId(
+  devices: MediaDeviceInfo[],
+  predicate: (device: MediaDeviceInfo) => boolean
+): string {
+  return devices.find((device) => device.deviceId && predicate(device))?.deviceId || "";
+}
+
+function pickPreferredVirtualCableId(devices: MediaDeviceInfo[]): string {
+  return (
+    findFirstDeviceId(devices, (device) =>
+      PREFERRED_VIRTUAL_CABLE_PATTERN.test(device.label)
+    ) ||
+    findFirstDeviceId(devices, (device) => isVirtualCableDevice(device.label))
+  );
+}
+
+/**
+ * Prefer ClearClick / X32 board feed, then a remembered choice, then BlackHole 2ch.
+ */
 export function pickPreferredInputDevice(
   devices: MediaDeviceInfo[],
   source: AudioInputSource,
   storedDeviceId: string
 ): string {
   const storedDevice = devices.find((device) => device.deviceId === storedDeviceId);
+  const boardFeedDeviceId = findFirstDeviceId(devices, (device) =>
+    isBoardFeedDevice(device.label)
+  );
+
+  if (source === "obs-streaming") {
+    // Sunday default: ClearClick / X32 when the board feed is connected.
+    if (boardFeedDeviceId) {
+      if (
+        storedDevice &&
+        isValidDeviceForSource(storedDevice, source) &&
+        isBoardFeedDevice(storedDevice.label)
+      ) {
+        return storedDeviceId;
+      }
+
+      return boardFeedDeviceId;
+    }
+
+    if (isValidDeviceForSource(storedDevice, source)) {
+      return storedDeviceId;
+    }
+
+    return (
+      pickPreferredVirtualCableId(devices) ||
+      findFirstDeviceId(devices, () => true) ||
+      ""
+    );
+  }
 
   if (isValidDeviceForSource(storedDevice, source)) {
     return storedDeviceId;
   }
 
-  if (source === "obs-streaming") {
-    return (
-      devices.find((device) => isVirtualCableDevice(device.label))?.deviceId ||
-      devices.find((device) => device.deviceId)?.deviceId ||
-      ""
-    );
+  if (boardFeedDeviceId) {
+    return boardFeedDeviceId;
   }
 
-  return (
-    devices.find(
-      (device) => device.deviceId && !isVirtualCableDevice(device.label)
-    )?.deviceId || ""
+  return findFirstDeviceId(
+    devices,
+    (device) => !isVirtualCableDevice(device.label)
   );
 }
 

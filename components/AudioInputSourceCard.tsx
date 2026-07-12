@@ -3,11 +3,10 @@
 import {
   devicesNeedMicrophonePermission,
   filterDevicesForInputSource,
-  getAudioInputSourceLabel,
-  isVirtualCableDevice,
+  isMixerUsbDevice,
+  isStreamingInputDevice,
   loadStoredAudioInputSource,
   resolveInputDeviceForSource,
-  saveStoredAudioInputSource,
   saveStoredInputDeviceId,
   type AudioInputSource,
 } from "@/lib/audioInputSource";
@@ -15,7 +14,7 @@ import {
   listMicrophoneDevices,
   requestMicrophonePermission,
 } from "@/lib/microphoneDeviceStorage";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type AudioInputSourceCardProps = {
   selectedSource: AudioInputSource;
@@ -37,11 +36,24 @@ export function AudioInputSourceCard({
   const [loadError, setLoadError] = useState("");
   const [needsPermission, setNeedsPermission] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const selectedSourceRef = useRef(selectedSource);
+  const selectedDeviceIdRef = useRef(selectedDeviceId);
 
-  const applyDeviceList = (inputs: MediaDeviceInfo[], source: AudioInputSource) => {
+  selectedSourceRef.current = selectedSource;
+  selectedDeviceIdRef.current = selectedDeviceId;
+
+  const applyDeviceList = (
+    inputs: MediaDeviceInfo[],
+    source: AudioInputSource,
+    preferredDeviceId = selectedDeviceIdRef.current
+  ) => {
     const permissionRequired = devicesNeedMicrophonePermission(inputs);
     const filtered = filterDevicesForInputSource(inputs, source);
-    const resolved = resolveInputDeviceForSource(inputs, source, selectedDeviceId);
+    const resolved = resolveInputDeviceForSource(
+      inputs,
+      source,
+      preferredDeviceId
+    );
 
     setDevices(inputs);
     setVisibleDevices(filtered);
@@ -59,13 +71,16 @@ export function AudioInputSourceCard({
 
     setLoadError("");
 
-    if (resolved.deviceId && resolved.deviceId !== selectedDeviceId) {
+    if (resolved.deviceId && resolved.deviceId !== preferredDeviceId) {
       onDeviceChange(resolved.deviceId);
       saveStoredInputDeviceId(source, resolved.deviceId);
     }
   };
 
-  const refreshDevices = async (requestPermission: boolean, source = selectedSource) => {
+  const refreshDevices = async (
+    requestPermission: boolean,
+    source = selectedSourceRef.current
+  ) => {
     setIsRefreshing(true);
     setLoadError("");
 
@@ -92,7 +107,23 @@ export function AudioInputSourceCard({
     }
 
     void refreshDevices(true, storedSource);
-    // Load stored preference once on mount.
+
+    const mediaDevices = navigator.mediaDevices;
+
+    if (!mediaDevices?.addEventListener) {
+      return;
+    }
+
+    const handleDeviceChange = () => {
+      void refreshDevices(false, selectedSourceRef.current);
+    };
+
+    mediaDevices.addEventListener("devicechange", handleDeviceChange);
+
+    return () => {
+      mediaDevices.removeEventListener("devicechange", handleDeviceChange);
+    };
+    // Load stored preference once on mount; devicechange keeps the list current.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -107,18 +138,22 @@ export function AudioInputSourceCard({
     setLoadError("");
   };
 
+  const boardFeedConnected = devices.some((device) =>
+    isMixerUsbDevice(device.label)
+  );
+
   const showingFallbackDevices =
     !needsPermission &&
     selectedSource === "obs-streaming" &&
     devices.length > 0 &&
-    !devices.some((device) => isVirtualCableDevice(device.label));
+    !devices.some((device) => isStreamingInputDevice(device.label));
 
   return (
     <div className="space-y-4">
       <div>
         <h2 className="text-base font-semibold text-slate-900">2. Audio in</h2>
         <p className="text-sm text-slate-600">
-          OBS stream from your mixer or computer, or a microphone for direct input.
+          Same system inputs OBS sees — ClearClick, BlackHole, mic, or Default.
         </p>
       </div>
 
@@ -137,7 +172,7 @@ export function AudioInputSourceCard({
         >
           <p className="font-semibold">OBS (Streaming)</p>
           <p className="mt-1 text-xs text-slate-600">
-            Audio from OBS through BlackHole (Mac) or VB-Cable (Windows).
+            ClearClick (X32), BlackHole, or any other system audio input.
           </p>
         </button>
 
@@ -174,7 +209,7 @@ export function AudioInputSourceCard({
                 ? "No input devices found"
                 : selectedSource === "microphone"
                   ? "Select a microphone"
-                  : "Select streaming input"}
+                  : "Select audio input"}
           </option>
           {visibleDevices.map((device) => (
             <option key={device.deviceId} value={device.deviceId}>
@@ -197,7 +232,14 @@ export function AudioInputSourceCard({
 
       {selectedSource === "obs-streaming" ? (
         <p className="text-xs text-slate-500">
-          OBS mode: BlackHole 2ch (Mac) or VB-Cable Output (Windows).
+          Lists all inputs. Auto-selects ClearClick / X32 when present, then
+          BlackHole 2ch.
+        </p>
+      ) : null}
+
+      {boardFeedConnected ? (
+        <p className="rounded-xl bg-sky-50 p-3 text-sm text-sky-950">
+          ClearClick / X32 board feed detected and selected automatically.
         </p>
       ) : null}
 
@@ -209,7 +251,8 @@ export function AudioInputSourceCard({
 
       {showingFallbackDevices ? (
         <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
-          No virtual cable found. Install BlackHole or VB-Cable, then refresh.
+          No ClearClick, X32, or virtual cable found yet. Pick the input that
+          matches OBS, or connect the board feed and refresh.
         </p>
       ) : null}
 

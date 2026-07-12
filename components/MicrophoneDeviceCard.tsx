@@ -1,18 +1,65 @@
 "use client";
 
 import {
+  isMixerUsbDevice,
+  isStreamingInputDevice,
+  isVirtualCableDevice,
+} from "@/lib/audioInputSource";
+import {
   listMicrophoneDevices,
   loadStoredMicDeviceId,
   requestMicrophonePermission,
   saveStoredMicDeviceId,
 } from "@/lib/microphoneDeviceStorage";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type MicrophoneDeviceCardProps = {
   selectedDeviceId: string;
   disabled?: boolean;
   onDeviceChange: (deviceId: string) => void;
 };
+
+function pickPreferredCaptionInput(
+  inputs: MediaDeviceInfo[],
+  selectedDeviceId: string,
+  storedId: string
+): string {
+  const preferredExisting =
+    inputs.find((device) => device.deviceId === selectedDeviceId)?.deviceId ||
+    inputs.find((device) => device.deviceId === storedId)?.deviceId ||
+    "";
+
+  const mixerId = inputs.find(
+    (device) => device.deviceId && isMixerUsbDevice(device.label)
+  )?.deviceId;
+
+  if (mixerId) {
+    if (
+      preferredExisting &&
+      inputs.some(
+        (device) =>
+          device.deviceId === preferredExisting &&
+          isMixerUsbDevice(device.label)
+      )
+    ) {
+      return preferredExisting;
+    }
+
+    return mixerId;
+  }
+
+  if (preferredExisting) {
+    return preferredExisting;
+  }
+
+  return (
+    inputs.find(
+      (device) => device.deviceId && isVirtualCableDevice(device.label)
+    )?.deviceId ||
+    inputs.find((device) => device.deviceId)?.deviceId ||
+    ""
+  );
+}
 
 export function MicrophoneDeviceCard({
   selectedDeviceId,
@@ -22,6 +69,9 @@ export function MicrophoneDeviceCard({
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [loadError, setLoadError] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const selectedDeviceIdRef = useRef(selectedDeviceId);
+
+  selectedDeviceIdRef.current = selectedDeviceId;
 
   const refreshDevices = async (requestPermission: boolean) => {
     setIsRefreshing(true);
@@ -36,13 +86,14 @@ export function MicrophoneDeviceCard({
       setDevices(inputs);
 
       const storedId = loadStoredMicDeviceId();
-      const preferredId =
-        selectedDeviceId ||
-        storedId ||
-        inputs.find((device) => device.deviceId)?.deviceId ||
-        "";
+      const preferredId = pickPreferredCaptionInput(
+        inputs,
+        selectedDeviceIdRef.current,
+        storedId
+      );
 
-      if (preferredId && preferredId !== selectedDeviceId) {
+      if (preferredId && preferredId !== selectedDeviceIdRef.current) {
+        saveStoredMicDeviceId(preferredId);
         onDeviceChange(preferredId);
       }
     } catch (error) {
@@ -54,12 +105,36 @@ export function MicrophoneDeviceCard({
 
   useEffect(() => {
     void refreshDevices(false);
+
+    const mediaDevices = navigator.mediaDevices;
+
+    if (!mediaDevices?.addEventListener) {
+      return;
+    }
+
+    const handleDeviceChange = () => {
+      void refreshDevices(false);
+    };
+
+    mediaDevices.addEventListener("devicechange", handleDeviceChange);
+
+    return () => {
+      mediaDevices.removeEventListener("devicechange", handleDeviceChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChange = (deviceId: string) => {
     saveStoredMicDeviceId(deviceId);
     onDeviceChange(deviceId);
   };
+
+  const mixerConnected = devices.some((device) =>
+    isMixerUsbDevice(device.label)
+  );
+  const streamingInputConnected = devices.some((device) =>
+    isStreamingInputDevice(device.label)
+  );
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm ring-1 ring-slate-200 space-y-4">
@@ -68,8 +143,9 @@ export function MicrophoneDeviceCard({
           MICROPHONE INPUT
         </p>
         <p className="text-sm text-slate-600">
-          Choose the audio input for captions. For AV replay or OBS streaming,
-          select BlackHole (Mac) or VB-Cable (Windows).
+          Choose the audio input for captions. ClearClick / X32 is selected
+          automatically when connected; otherwise use BlackHole 2ch (Mac) or
+          VB-Cable (Windows).
         </p>
       </div>
 
@@ -103,6 +179,19 @@ export function MicrophoneDeviceCard({
           {isRefreshing ? "Refreshing..." : "Refresh list"}
         </button>
       </div>
+
+      {mixerConnected ? (
+        <p className="rounded-2xl bg-sky-50 p-3 text-xs font-semibold text-sky-950">
+          ClearClick / X32 detected — selected automatically when available.
+        </p>
+      ) : null}
+
+      {!mixerConnected && streamingInputConnected ? (
+        <p className="text-xs text-slate-500">
+          Virtual cable detected. Connect ClearClick for the X32 board feed to
+          select it automatically.
+        </p>
+      ) : null}
 
       {loadError ? (
         <p className="rounded-2xl bg-red-50 p-3 text-xs font-semibold text-red-700">
