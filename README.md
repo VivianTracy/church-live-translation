@@ -17,11 +17,11 @@ Runs on the church computer in Chrome or Edge. Live speech is translated to audi
 | Capability | Details |
 |---|---|
 | Translation | `gpt-realtime-translate` — speech-to-speech, bidirectional |
-| Directions | Chinese → English or English → Chinese |
+| Directions | Auto-detect Chinese or English, or lock Chinese → English / English → Chinese |
 | Audio in | OBS stream (BlackHole / VB-Cable) or physical microphone |
 | Audio out | Any Windows/Mac playback device (`setSinkId`) — monitor jack, USB dongle, line out |
 | Device detection | Input and output devices listed automatically after mic permission |
-| Operator workflow | Direction → audio in/out → go live → start audio input |
+| Operator workflow | Direction (auto or manual) → audio in/out → go live → start audio input |
 
 **Setup:** [`church-setup/README.md`](./church-setup/README.md) — Windows/Mac install, VB-Cable, OBS monitoring, troubleshooting
 

@@ -11,7 +11,7 @@ On **Chrome** or **Edge**, the operator pages use the browser’s built-in devic
 | **Audio input (Streaming)** | Lists **all** system audio inputs Chrome can see (ClearClick, BlackHole, Default, etc.). Prefers **ClearClick / X32** when connected, then BlackHole 2ch / VB-Cable. Plugging or unplugging updates the list without a refresh. |
 | **Audio input (Microphone)** | Lists physical microphones and **excludes** virtual cables. ClearClick / X32 is still preferred when present. The first usable mic is selected if nothing was saved before. |
 | **Audio output** | Lists all speakers and USB audio devices Windows exposes. Your last choice is remembered; otherwise the first listed device is used. |
-| **Translation direction** | Chinese → English or English → Chinese; saved in the browser. |
+| **Translation direction** | Auto listens for Chinese or English and translates the other way; Chinese → English and English → Chinese remain as manual overrides. Saved in the browser. |
 
 **First visit:** click **Allow access & refresh** on the Audio in step so Windows can show real device names (not blank entries). Output devices usually appear without extra permission.
 
@@ -115,7 +115,7 @@ Use **operator-live** for Retekess headset translation.
 
 ### 7. Configure audio on operator-live
 
-1. **Translation direction** — Chinese → English or English → Chinese
+1. **Translation direction** — Auto (detect Chinese or English), or lock Chinese → English / English → Chinese
 2. **Audio in**
    - **Streaming** — **ClearClick** when it carries the X32 feed (auto-selected), or **BlackHole 2ch** / **CABLE Output**
    - **Microphone** — choose the room mic, headset, or built-in mic
