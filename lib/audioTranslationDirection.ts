@@ -7,6 +7,9 @@ export const AUDIO_TRANSLATION_DIRECTION_STORAGE_KEY =
 export const AUDIO_TRANSLATION_AUTO_RESOLVED_STORAGE_KEY =
   "church-caption-audio-translation-auto-resolved";
 
+const AUDIO_TRANSLATION_DIRECTION_V2_KEY =
+  "church-caption-audio-translation-direction-v2";
+
 export type AudioTranslationDirectionConfig = {
   outputLanguage: "en" | "zh";
   inputLanguageLabel: string;
@@ -70,7 +73,16 @@ export function loadStoredAudioTranslationDirection(): AudioTranslationDirection
     return "auto";
   }
 
+  const migrated = window.localStorage.getItem(AUDIO_TRANSLATION_DIRECTION_V2_KEY);
   const stored = window.localStorage.getItem(AUDIO_TRANSLATION_DIRECTION_STORAGE_KEY);
+
+  if (migrated !== "1") {
+    window.localStorage.setItem(AUDIO_TRANSLATION_DIRECTION_V2_KEY, "1");
+    window.localStorage.setItem(AUDIO_TRANSLATION_DIRECTION_STORAGE_KEY, "auto");
+    // Older builds stored Chinese → English. Auto must win once so an
+    // English sermon is not locked to English headset audio.
+    return "auto";
+  }
 
   return isAudioTranslationDirection(stored) ? stored : "auto";
 }
