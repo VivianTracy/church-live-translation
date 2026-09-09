@@ -5,11 +5,42 @@ import { OPENAI_TRANSLATION_CALLS_URL } from "@/lib/openaiModels";
 type RealtimeTranslationEvent = {
   type?: string;
   delta?: string;
+  transcript?: string;
+  text?: string;
   message?: string;
   error?: {
     message?: string;
   };
 };
+
+function readTranscriptText(event: RealtimeTranslationEvent): string {
+  if (typeof event.delta === "string" && event.delta) {
+    return event.delta;
+  }
+
+  if (typeof event.transcript === "string" && event.transcript) {
+    return event.transcript;
+  }
+
+  if (typeof event.text === "string" && event.text) {
+    return event.text;
+  }
+
+  return "";
+}
+
+function isInputTranscriptEvent(type: string | undefined): boolean {
+  if (!type) {
+    return false;
+  }
+
+  return (
+    type === "session.input_transcript.delta" ||
+    type === "session.input_transcript.done" ||
+    type.includes("input_transcript") ||
+    type.includes("input_audio_transcription")
+  );
+}
 
 export type AudioTranslationConnection = {
   stop: () => void;
@@ -283,7 +314,13 @@ export async function connectOpenAIAudioTranslation(
       return;
     }
 
-    const event = JSON.parse(data as string) as RealtimeTranslationEvent;
+    let event: RealtimeTranslationEvent;
+
+    try {
+      event = JSON.parse(data as string) as RealtimeTranslationEvent;
+    } catch {
+      return;
+    }
 
     if (event.type === "session.output_transcript.delta") {
       if (!hasReceivedOutput) {
@@ -295,9 +332,11 @@ export async function connectOpenAIAudioTranslation(
       return;
     }
 
-    if (event.type === "session.input_transcript.delta") {
-      if (typeof event.delta === "string" && event.delta) {
-        options.onInputTranscript?.(event.delta);
+    if (isInputTranscriptEvent(event.type)) {
+      const text = readTranscriptText(event);
+
+      if (text) {
+        options.onInputTranscript?.(text);
       }
 
       return;

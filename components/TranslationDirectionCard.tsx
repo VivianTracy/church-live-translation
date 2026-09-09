@@ -76,8 +76,9 @@ export function TranslationDirectionCard({
 
       {selectedDirection === "auto" ? (
         <p className="text-xs text-slate-500">
-          Auto locks after the first clear speech so a Bible verse or Amen does
-          not flip the headsets.{" "}
+          Auto starts translating right away. It only changes direction after
+          clear Chinese or English speech, so a Bible verse or Amen does not
+          flip the headsets.{" "}
           {AUDIO_TRANSLATION_DIRECTION_LABELS["zh-to-en"]} and{" "}
           {AUDIO_TRANSLATION_DIRECTION_LABELS["en-to-zh"]} stay available as a
           manual override.
