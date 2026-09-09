@@ -48,8 +48,7 @@ export function TranslationDirectionCard({
         </h2>
         <p className="text-sm text-slate-600">
           Auto listens for Chinese or English, then translates the other way.
-          Headset audio waits until the language is clear. Choose a fixed
-          direction if you already know.
+          Choose a fixed direction if you already know.
         </p>
       </div>
 
@@ -78,8 +77,7 @@ export function TranslationDirectionCard({
       {selectedDirection === "auto" ? (
         <p className="text-xs text-slate-500">
           Auto locks after the first clear speech so a Bible verse or Amen does
-          not flip the headsets. An English sermon becomes Chinese audio; a
-          Chinese sermon becomes English audio.{" "}
+          not flip the headsets.{" "}
           {AUDIO_TRANSLATION_DIRECTION_LABELS["zh-to-en"]} and{" "}
           {AUDIO_TRANSLATION_DIRECTION_LABELS["en-to-zh"]} stay available as a
           manual override.

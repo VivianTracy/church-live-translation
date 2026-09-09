@@ -1,15 +1,10 @@
 import { startAudioLevelMonitor } from "@/lib/audioLevelMonitor";
 import { getCaptionMicrophoneStream } from "@/lib/microphoneStream";
-import {
-  OPENAI_TRANSCRIPTION_MODEL,
-  OPENAI_TRANSLATION_CALLS_URL,
-} from "@/lib/openaiModels";
+import { OPENAI_TRANSLATION_CALLS_URL } from "@/lib/openaiModels";
 
 type RealtimeTranslationEvent = {
   type?: string;
   delta?: string;
-  transcript?: string;
-  text?: string;
   message?: string;
   error?: {
     message?: string;
@@ -20,14 +15,12 @@ export type AudioTranslationConnection = {
   stop: () => void;
   setOutputDeviceId: (deviceId: string) => Promise<void>;
   updateOutputLanguage: (language: "en" | "zh") => void;
-  releaseOutput: () => void;
 };
 
 type ConnectOptions = {
   deviceId?: string;
   outputDeviceId?: string;
   outputLanguage?: "en" | "zh";
-  holdOutput?: boolean;
   onListeningChange: (isListening: boolean) => void;
   onTranslatingChange: (isTranslating: boolean) => void;
   onInputLevels: (level: number, peak: number) => void;
@@ -37,45 +30,11 @@ type ConnectOptions = {
   onError: (message: string) => void;
 };
 
-function readTranscriptText(event: RealtimeTranslationEvent): string {
-  if (typeof event.delta === "string" && event.delta) {
-    return event.delta;
-  }
-
-  if (typeof event.transcript === "string" && event.transcript) {
-    return event.transcript;
-  }
-
-  if (typeof event.text === "string" && event.text) {
-    return event.text;
-  }
-
-  return "";
-}
-
-function isInputTranscriptEvent(type: string | undefined): boolean {
-  if (!type) {
-    return false;
-  }
-
-  return (
-    type === "session.input_transcript.delta" ||
-    type === "session.input_transcript.done" ||
-    type.includes("input_transcript") ||
-    type.includes("input_audio_transcription")
-  );
-}
-
-function buildSessionUpdate(language: "en" | "zh"): string {
+function buildOutputLanguageUpdate(language: "en" | "zh"): string {
   return JSON.stringify({
     type: "session.update",
     session: {
       audio: {
-        input: {
-          transcription: {
-            model: OPENAI_TRANSCRIPTION_MODEL,
-          },
-        },
         output: {
           language,
         },
@@ -203,21 +162,23 @@ export async function connectOpenAIAudioTranslation(
   let stopOutputMonitor: (() => void) | null = null;
   let outputDeviceId = options.outputDeviceId ?? "";
   let outputLanguage = options.outputLanguage ?? "en";
-  let outputReleased = !options.holdOutput;
-  let pendingOutputStream: MediaStream | null = null;
+  let pendingOutputLanguage: "en" | "zh" | null = null;
   let hasReceivedOutput = false;
   let stopped = false;
   let attachGeneration = 0;
   let activeOutputTrackId: string | null = null;
 
-  transmitterAudio.muted = !outputReleased;
-
-  const sendSessionUpdate = (language: "en" | "zh") => {
-    if (stopped || events.readyState !== "open") {
+  const sendOutputLanguageUpdate = (language: "en" | "zh") => {
+    if (stopped) {
       return;
     }
 
-    events.send(buildSessionUpdate(language));
+    if (events.readyState === "open") {
+      events.send(buildOutputLanguageUpdate(language));
+      return;
+    }
+
+    pendingOutputLanguage = language;
   };
 
   const teardownOutputMonitor = () => {
@@ -230,11 +191,6 @@ export async function connectOpenAIAudioTranslation(
 
   const attachTranslatedStream = async (outputStream: MediaStream) => {
     if (stopped) {
-      return;
-    }
-
-    if (!outputReleased) {
-      pendingOutputStream = outputStream;
       return;
     }
 
@@ -312,27 +268,14 @@ export async function connectOpenAIAudioTranslation(
     void attachTranslatedStream(outputStream);
   };
 
-  const releaseOutput = () => {
-    if (stopped || outputReleased) {
-      return;
-    }
-
-    outputReleased = true;
-    transmitterAudio.muted = false;
-
-    if (pendingOutputStream) {
-      const stream = pendingOutputStream;
-      pendingOutputStream = null;
-      void attachTranslatedStream(stream);
-    }
-  };
-
   events.onopen = () => {
-    if (stopped) {
+    if (stopped || !pendingOutputLanguage) {
       return;
     }
 
-    sendSessionUpdate(outputLanguage);
+    const language = pendingOutputLanguage;
+    pendingOutputLanguage = null;
+    sendOutputLanguageUpdate(language);
   };
 
   events.onmessage = ({ data }) => {
@@ -342,21 +285,19 @@ export async function connectOpenAIAudioTranslation(
 
     const event = JSON.parse(data as string) as RealtimeTranslationEvent;
 
-    if (isInputTranscriptEvent(event.type)) {
-      const text = readTranscriptText(event);
-
-      if (text) {
-        options.onInputTranscript?.(text);
+    if (event.type === "session.output_transcript.delta") {
+      if (!hasReceivedOutput) {
+        hasReceivedOutput = true;
+        options.onTranslatingChange(true);
+        options.onFirstOutputAudio?.();
       }
 
       return;
     }
 
-    if (event.type === "session.output_transcript.delta") {
-      if (outputReleased && !hasReceivedOutput) {
-        hasReceivedOutput = true;
-        options.onTranslatingChange(true);
-        options.onFirstOutputAudio?.();
+    if (event.type === "session.input_transcript.delta") {
+      if (typeof event.delta === "string" && event.delta) {
+        options.onInputTranscript?.(event.delta);
       }
 
       return;
@@ -434,10 +375,8 @@ export async function connectOpenAIAudioTranslation(
       }
 
       outputLanguage = language;
-      sendSessionUpdate(language);
+      sendOutputLanguageUpdate(language);
     },
-
-    releaseOutput,
 
     async setOutputDeviceId(deviceId: string) {
       outputDeviceId = deviceId;
@@ -445,7 +384,7 @@ export async function connectOpenAIAudioTranslation(
       try {
         await applyAudioOutputDevice(transmitterAudio, deviceId);
 
-        if (outputReleased && transmitterAudio.srcObject) {
+        if (transmitterAudio.srcObject) {
           await transmitterAudio.play();
         }
       } catch (error) {

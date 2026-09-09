@@ -10,9 +10,7 @@ const MIN_HAN_CHARACTERS = 4;
  * Enough Latin letters to trust this is English speech.
  * Short words like Amen or John should not flip direction.
  */
-const MIN_LATIN_LETTERS = 12;
-const MIN_ENGLISH_WORDS = 3;
-const MIN_LATIN_LETTERS_ALONE = 18;
+const MIN_LATIN_LETTERS = 18;
 
 export function countHanCharacters(text: string): number {
   let count = 0;
@@ -38,10 +36,6 @@ export function countLatinLetters(text: string): number {
   return count;
 }
 
-export function countEnglishWords(text: string): number {
-  return text.split(/[^A-Za-z]+/).filter((word) => word.length >= 2).length;
-}
-
 /**
  * Decide Chinese vs English from live transcript text.
  * Returns null until there is enough of one script to be confident.
@@ -55,11 +49,7 @@ export function detectSpeechLanguage(text: string): DetectedSpeechLanguage | nul
     return "zh";
   }
 
-  if (
-    han === 0 &&
-    (latin >= MIN_LATIN_LETTERS_ALONE ||
-      (latin >= MIN_LATIN_LETTERS && countEnglishWords(text) >= MIN_ENGLISH_WORDS))
-  ) {
+  if (latin >= MIN_LATIN_LETTERS && han === 0) {
     return "en";
   }
 
