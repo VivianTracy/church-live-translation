@@ -39,8 +39,10 @@ export function AudioInputSourceCard({
   const selectedSourceRef = useRef(selectedSource);
   const selectedDeviceIdRef = useRef(selectedDeviceId);
 
-  selectedSourceRef.current = selectedSource;
-  selectedDeviceIdRef.current = selectedDeviceId;
+  useEffect(() => {
+    selectedSourceRef.current = selectedSource;
+    selectedDeviceIdRef.current = selectedDeviceId;
+  }, [selectedDeviceId, selectedSource]);
 
   const applyDeviceList = (
     inputs: MediaDeviceInfo[],
@@ -100,27 +102,41 @@ export function AudioInputSourceCard({
   };
 
   useEffect(() => {
-    const storedSource = loadStoredAudioInputSource();
-
-    if (storedSource !== selectedSource) {
-      void onSourceChange(storedSource);
-    }
-
-    void refreshDevices(true, storedSource);
-
     const mediaDevices = navigator.mediaDevices;
-
-    if (!mediaDevices?.addEventListener) {
-      return;
-    }
+    let cancelled = false;
 
     const handleDeviceChange = () => {
       void refreshDevices(false, selectedSourceRef.current);
     };
 
+    void Promise.resolve().then(async () => {
+      const storedSource = loadStoredAudioInputSource();
+
+      if (cancelled) {
+        return;
+      }
+
+      if (storedSource !== selectedSource) {
+        await onSourceChange(storedSource);
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      await refreshDevices(true, storedSource);
+    });
+
+    if (!mediaDevices?.addEventListener) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
     mediaDevices.addEventListener("devicechange", handleDeviceChange);
 
     return () => {
+      cancelled = true;
       mediaDevices.removeEventListener("devicechange", handleDeviceChange);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -2,6 +2,10 @@
 
 ## 2026-09-09
 
+Reliable single-church operator: one **Start translation** button, explicit Off / Connecting / Live / Reconnecting / Failed status, two automatic reconnects, and `next start` bound to `127.0.0.1`.
+
+**Reason:** Volunteers should never see Live when audio is not running. The church computer should not expose the OpenAI session endpoint on the LAN.
+
 Main is live headset translation only (`/operator-live`).
 
 YouTube caption overlay, Gemini caption operator, Redis caption state, and related pages were removed from main so Sunday setup stays one path: audio in → translated audio out.

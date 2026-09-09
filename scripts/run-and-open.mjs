@@ -7,10 +7,14 @@ const port = process.env.PORT || "3000";
 const url = `http://localhost:${port}/operator-live`;
 const nextCli = path.join(process.cwd(), "node_modules/next/dist/bin/next");
 
-const child = spawn(process.execPath, [nextCli, mode, ...extraArgs], {
-  stdio: "inherit",
-  env: process.env,
-});
+const child = spawn(
+  process.execPath,
+  [nextCli, mode, "-H", "127.0.0.1", ...extraArgs],
+  {
+    stdio: "inherit",
+    env: process.env,
+  }
+);
 
 child.on("exit", (code, signal) => {
   if (signal) {

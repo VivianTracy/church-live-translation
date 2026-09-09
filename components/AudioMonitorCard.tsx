@@ -1,7 +1,8 @@
 import { AudioLevelMeter } from "@/components/AudioLevelMeter";
+import type { OperatorSessionStatus } from "@/lib/operatorSessionState";
 
 type AudioMonitorCardProps = {
-  isListening: boolean;
+  status: OperatorSessionStatus;
   isTranslating: boolean;
   inputLevel: number;
   inputPeak: number;
@@ -12,13 +13,10 @@ type AudioMonitorCardProps = {
   outputLanguageLabel?: string;
   micError: string;
   translationError: string;
-  onStartListening: () => void;
-  onStopListening: () => void;
-  onRestartListening: () => void;
 };
 
 export function AudioMonitorCard({
-  isListening,
+  status,
   isTranslating,
   inputLevel,
   inputPeak,
@@ -29,71 +27,31 @@ export function AudioMonitorCard({
   outputLanguageLabel = "Output",
   micError,
   translationError,
-  onStartListening,
-  onStopListening,
-  onRestartListening,
 }: AudioMonitorCardProps) {
+  const metersActive = status === "live" || status === "reconnecting";
+
   return (
     <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 space-y-5">
       <div>
-        <h2 className="text-base font-semibold text-slate-900">4. Audio input</h2>
+        <h2 className="text-base font-semibold text-slate-900">Audio levels</h2>
         <p className="text-sm text-slate-600">
-          Start listening after translation is live. Check levels before relying
-          on the transmitter.
+          Check input and headset output after translation starts.
         </p>
       </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <button
-          type="button"
-          onClick={onStartListening}
-          disabled={isListening}
-          className={`rounded-xl px-5 py-4 text-lg font-semibold text-white ${
-            isListening
-              ? "cursor-not-allowed bg-violet-400"
-              : "bg-violet-600 hover:bg-violet-700"
-          }`}
-        >
-          Start audio input
-        </button>
-
-        <button
-          type="button"
-          onClick={onStopListening}
-          disabled={!isListening}
-          className={`rounded-xl px-5 py-4 text-lg font-semibold text-white ${
-            !isListening
-              ? "cursor-not-allowed bg-slate-400"
-              : "bg-slate-700 hover:bg-slate-800"
-          }`}
-        >
-          Stop audio input
-        </button>
-      </div>
-
-      {isListening ? (
-        <button
-          type="button"
-          onClick={onRestartListening}
-          className="w-full rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-950 hover:bg-amber-100"
-        >
-          Restart audio input
-        </button>
-      ) : null}
 
       <div className="rounded-2xl bg-slate-50 p-4 space-y-4">
         <AudioLevelMeter
           label={`${inputLanguageLabel} in`}
           level={inputLevel}
           peak={inputPeak}
-          active={isListening}
+          active={metersActive}
           accent="sky"
         />
         <AudioLevelMeter
           label={`${outputLanguageLabel} out`}
           level={outputLevel}
           peak={outputPeak}
-          active={isListening && isTranslating}
+          active={metersActive && isTranslating}
           accent="emerald"
         />
       </div>
@@ -102,13 +60,19 @@ export function AudioMonitorCard({
         <p>
           Input:{" "}
           <span className="font-semibold text-slate-900">
-            {isListening ? "Listening" : "Stopped"}
+            {status === "live"
+              ? "Listening"
+              : status === "connecting" || status === "reconnecting"
+                ? "Starting"
+                : "Stopped"}
           </span>
         </p>
         <p>
           Output:{" "}
           <span className="font-semibold text-slate-900">
-            {isTranslating ? "Sending translation" : "Waiting"}
+            {isTranslating && status === "live"
+              ? "Sending translation"
+              : "Waiting"}
           </span>
         </p>
         {latencyMs !== null ? (
@@ -121,13 +85,13 @@ export function AudioMonitorCard({
         ) : null}
       </div>
 
-      {micError ? (
+      {micError && micError !== translationError ? (
         <p className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700">
           {micError}
         </p>
       ) : null}
 
-      {translationError ? (
+      {Boolean(translationError) && status === "live" ? (
         <p className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700">
           {translationError}
         </p>

@@ -8,15 +8,14 @@ import { ChurchTranslationHeader } from "@/components/ChurchTranslationHeader";
 import { TranslationDirectionCard } from "@/components/TranslationDirectionCard";
 import { TranslationSetupSummary } from "@/components/TranslationSetupSummary";
 import { formatAudioTranslationDirectionLabel } from "@/lib/audioTranslationDirection";
+import { isOperatorSessionTiming } from "@/lib/operatorSessionState";
 import { useAudioTranslationOperator } from "@/lib/useAudioTranslationOperator";
 import { useEffect, useState } from "react";
 
 export default function OperatorLivePage() {
-  const [isLive, setIsLive] = useState(false);
   const [seconds, setSeconds] = useState(0);
 
   const {
-    isListening,
     isTranslating,
     micDeviceId,
     setMicDeviceId,
@@ -39,34 +38,15 @@ export default function OperatorLivePage() {
     inputPeak,
     outputLevel,
     outputPeak,
+    sessionStatus,
+    autoReconnectsUsed,
+    settingsLocked,
     startListening,
     stopListening,
-    restartListening,
   } = useAudioTranslationOperator();
 
-  const handleToggleLive = () => {
-    const nextIsLive = !isLive;
-
-    if (!nextIsLive) {
-      setIsLive(false);
-      stopListening();
-      setSeconds(0);
-      return;
-    }
-
-    setIsLive(true);
-  };
-
-  const handleStartListening = async () => {
-    setIsLive(true);
-
-    if (!(await startListening())) {
-      return;
-    }
-  };
-
   useEffect(() => {
-    if (!isLive) {
+    if (!isOperatorSessionTiming(sessionStatus)) {
       return;
     }
 
@@ -75,7 +55,7 @@ export default function OperatorLivePage() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isLive]);
+  }, [sessionStatus]);
 
   return (
     <main className="min-h-screen bg-stone-50 px-6 py-10 text-slate-900">
@@ -87,9 +67,11 @@ export default function OperatorLivePage() {
             selectedDirection={translationDirection}
             resolvedDirection={resolvedDirection}
             isDetecting={
-              isListening && translationDirection === "auto" && !resolvedDirection
+              sessionStatus === "live" &&
+              translationDirection === "auto" &&
+              !resolvedDirection
             }
-            disabled={isListening}
+            disabled={settingsLocked}
             onDirectionChange={setTranslationDirection}
           />
 
@@ -97,7 +79,7 @@ export default function OperatorLivePage() {
             <AudioInputSourceCard
               selectedSource={audioInputSource}
               selectedDeviceId={micDeviceId}
-              disabled={isListening}
+              disabled={settingsLocked}
               onSourceChange={(source) => {
                 void setAudioInputSource(source);
               }}
@@ -106,7 +88,7 @@ export default function OperatorLivePage() {
 
             <AudioOutputDeviceCard
               selectedDeviceId={outputDeviceId}
-              disabled={isListening}
+              disabled={settingsLocked}
               onDeviceChange={setOutputDeviceId}
               outputLanguageLabel={outputLanguageLabel}
             />
@@ -122,23 +104,33 @@ export default function OperatorLivePage() {
           directionLabel={formatAudioTranslationDirectionLabel(
             translationDirection,
             translationDirection === "auto" ? resolvedDirection : null,
-            isListening && translationDirection === "auto" && !resolvedDirection
+            sessionStatus === "live" &&
+              translationDirection === "auto" &&
+              !resolvedDirection
           )}
           inputSourceLabel={audioInputSourceLabel}
           inputDeviceLabel={inputDeviceLabel}
           outputDeviceLabel={outputDeviceLabel}
-          isRouting={isLive && isTranslating}
+          isRouting={sessionStatus === "live" && isTranslating}
         />
 
         <AudioTranslationStatusCard
-          isLive={isLive}
-          isListening={isListening}
+          status={sessionStatus}
           seconds={seconds}
-          onToggleLive={handleToggleLive}
+          autoReconnectsUsed={autoReconnectsUsed}
+          error={translationError}
+          onStart={() => {
+            setSeconds(0);
+            void startListening("user");
+          }}
+          onStop={() => {
+            setSeconds(0);
+            stopListening();
+          }}
         />
 
         <AudioMonitorCard
-          isListening={isListening}
+          status={sessionStatus}
           isTranslating={isTranslating}
           inputLevel={inputLevel}
           inputPeak={inputPeak}
@@ -149,13 +141,6 @@ export default function OperatorLivePage() {
           outputLanguageLabel={outputLanguageLabel}
           micError={micError}
           translationError={translationError}
-          onStartListening={() => {
-            void handleStartListening();
-          }}
-          onStopListening={stopListening}
-          onRestartListening={() => {
-            void restartListening();
-          }}
         />
       </div>
     </main>

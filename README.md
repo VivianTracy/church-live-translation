@@ -4,6 +4,8 @@ Live speech-to-speech translation for wireless headsets (for example Retekess TT
 
 > Making bilingual worship accessible without requiring a dedicated interpreter.
 
+This software is licensed under the [MIT License](./LICENSE).
+
 ## How it works
 
 One volunteer runs the operator page on the church computer in **Chrome or Edge**. Firefox cannot send translated audio to a chosen speaker.
@@ -25,7 +27,7 @@ Streaming audio or mic → Chrome (/operator-live)
 
 **Auto** starts translating immediately (last used direction, or Chinese → English). It only changes direction after clear Chinese or English speech, so a short Bible verse or “Amen” does not flip the headsets.
 
-`http://localhost:3000/` opens `/operator-live`.
+`http://localhost:3000/` opens `/operator-live`. The local server listens on `127.0.0.1` only.
 
 Church computer install: [`church-setup/README.md`](./church-setup/README.md)
 
@@ -66,5 +68,5 @@ Do not commit `.env.local`.
 ## Design principles
 
 - Fit existing church AV. Do not replace OBS or the mixer.
-- One volunteer, few steps.
+- One volunteer, one Start translation button.
 - Reliability over cleverness. Optimize for Sunday morning.

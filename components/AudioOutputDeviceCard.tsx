@@ -50,7 +50,9 @@ export function AudioOutputDeviceCard({
   };
 
   useEffect(() => {
-    void refreshDevices();
+    void Promise.resolve().then(() => refreshDevices());
+    // Load the device list once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChange = (deviceId: string) => {

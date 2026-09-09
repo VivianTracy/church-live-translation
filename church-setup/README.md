@@ -102,7 +102,7 @@ npm run start
 1. **Translation direction** — Auto, or lock Chinese → English / English → Chinese
 2. **Audio in** — Streaming (ClearClick / BlackHole / CABLE Output) or Microphone
 3. **Audio out** — jack or USB dongle to the **TT125-TX MIC** port
-4. **Go live** → **Start audio input**
+4. **Start translation** — wait until the status says **Live**
 
 ---
 

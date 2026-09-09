@@ -1,6 +1,13 @@
 import { startAudioLevelMonitor } from "@/lib/audioLevelMonitor";
 import { getTranslationMicrophoneStream } from "@/lib/microphoneStream";
 import { OPENAI_TRANSLATION_CALLS_URL } from "@/lib/openaiModels";
+import {
+  createTranslationSessionResources,
+  stopTranslationSessionResources,
+} from "@/lib/translationSessionResources";
+
+/** Brief Wi-Fi blips can report disconnected before ICE recovers. */
+const DISCONNECT_GRACE_MS = 1500;
 
 type RealtimeTranslationEvent = {
   type?: string;
@@ -52,13 +59,13 @@ type ConnectOptions = {
   deviceId?: string;
   outputDeviceId?: string;
   outputLanguage?: "en" | "zh";
-  onListeningChange: (isListening: boolean) => void;
   onTranslatingChange: (isTranslating: boolean) => void;
   onInputLevels: (level: number, peak: number) => void;
   onOutputLevels: (level: number, peak: number) => void;
   onInputTranscript?: (delta: string) => void;
   onFirstOutputAudio?: () => void;
   onError: (message: string) => void;
+  onConnectionLost: (reason: string) => void;
 };
 
 function buildOutputLanguageUpdate(language: "en" | "zh"): string {
@@ -101,25 +108,6 @@ async function applyAudioOutputDevice(
   await audio.setSinkId(deviceId);
 }
 
-function stopPlaybackElement(audio: HTMLAudioElement): void {
-  audio.pause();
-  audio.currentTime = 0;
-  audio.srcObject = null;
-  audio.removeAttribute("src");
-  audio.load();
-  audio.remove();
-}
-
-function stopPeerConnectionTracks(peerConnection: RTCPeerConnection): void {
-  for (const receiver of peerConnection.getReceivers()) {
-    receiver.track.stop();
-  }
-
-  for (const sender of peerConnection.getSenders()) {
-    sender.track?.stop();
-  }
-}
-
 function createPlaybackElement(): HTMLAudioElement {
   const audio = document.createElement("audio");
   audio.autoplay = true;
@@ -143,250 +131,16 @@ async function playRoutedAudio(
 export async function connectOpenAIAudioTranslation(
   options: ConnectOptions
 ): Promise<AudioTranslationConnection> {
-  const sessionResponse = await fetch("/api/openai/audio-translation-session", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      outputLanguage: options.outputLanguage ?? "en",
-    }),
-  });
-
-  const sessionData = (await sessionResponse.json()) as {
-    clientSecret?: string;
-    model?: string;
-    error?: string;
-  };
-
-  if (!sessionResponse.ok || !sessionData.clientSecret) {
-    throw new Error(
-      sessionData.error ?? "Could not create OpenAI audio translation session."
-    );
-  }
-
-  const mic = await getTranslationMicrophoneStream(options.deviceId);
-
-  const inputContext = new AudioContext();
-
-  if (inputContext.state === "suspended") {
-    await inputContext.resume();
-  }
-
-  const inputSource = inputContext.createMediaStreamSource(mic.stream);
-  const inputAnalyser = inputContext.createAnalyser();
-  inputAnalyser.fftSize = 2048;
-  inputSource.connect(inputAnalyser);
-
-  const stopInputMonitor = startAudioLevelMonitor(
-    inputAnalyser,
-    options.onInputLevels
-  );
-
-  const peerConnection = new RTCPeerConnection();
-  const events = peerConnection.createDataChannel("oai-events");
-
-  const transmitterAudio = createPlaybackElement();
-
-  let monitorContext: AudioContext | null = null;
-  let outputAnalyser: AnalyserNode | null = null;
-  let stopOutputMonitor: (() => void) | null = null;
+  const resources = createTranslationSessionResources();
+  let stopped = false;
+  let connectionLostNotified = false;
   let outputDeviceId = options.outputDeviceId ?? "";
   let outputLanguage = options.outputLanguage ?? "en";
   let pendingOutputLanguage: "en" | "zh" | null = null;
   let hasReceivedOutput = false;
-  let stopped = false;
   let attachGeneration = 0;
   let activeOutputTrackId: string | null = null;
-
-  const sendOutputLanguageUpdate = (language: "en" | "zh") => {
-    if (stopped) {
-      return;
-    }
-
-    if (events.readyState === "open") {
-      events.send(buildOutputLanguageUpdate(language));
-      return;
-    }
-
-    pendingOutputLanguage = language;
-  };
-
-  const teardownOutputMonitor = () => {
-    stopOutputMonitor?.();
-    stopOutputMonitor = null;
-    outputAnalyser = null;
-    void monitorContext?.close();
-    monitorContext = null;
-  };
-
-  const attachTranslatedStream = async (outputStream: MediaStream) => {
-    if (stopped) {
-      return;
-    }
-
-    const generation = ++attachGeneration;
-
-    try {
-      await playRoutedAudio(transmitterAudio, outputStream, outputDeviceId);
-    } catch (error) {
-      if (generation === attachGeneration && !stopped) {
-        options.onError(
-          error instanceof Error
-            ? error.message
-            : "Failed to play translated audio."
-        );
-      }
-      return;
-    }
-
-    if (generation !== attachGeneration || stopped) {
-      return;
-    }
-
-    teardownOutputMonitor();
-
-    try {
-      monitorContext = new AudioContext();
-
-      if (monitorContext.state === "suspended") {
-        await monitorContext.resume();
-      }
-
-      const outputSource = monitorContext.createMediaStreamSource(outputStream);
-      outputAnalyser = monitorContext.createAnalyser();
-      outputAnalyser.fftSize = 2048;
-      outputSource.connect(outputAnalyser);
-    } catch {
-      outputAnalyser = null;
-    }
-
-    if (generation !== attachGeneration || stopped) {
-      return;
-    }
-
-    if (outputAnalyser) {
-      stopOutputMonitor = startAudioLevelMonitor(
-        outputAnalyser,
-        options.onOutputLevels
-      );
-    }
-
-    if (!hasReceivedOutput) {
-      hasReceivedOutput = true;
-      options.onTranslatingChange(true);
-      options.onFirstOutputAudio?.();
-    }
-  };
-
-  for (const track of mic.stream.getAudioTracks()) {
-    peerConnection.addTrack(track, mic.stream);
-  }
-
-  peerConnection.ontrack = (event) => {
-    if (stopped || event.track.kind !== "audio") {
-      return;
-    }
-
-    if (activeOutputTrackId === event.track.id) {
-      return;
-    }
-
-    activeOutputTrackId = event.track.id;
-
-    const outputStream = event.streams[0] ?? new MediaStream([event.track]);
-
-    void attachTranslatedStream(outputStream);
-  };
-
-  events.onopen = () => {
-    if (stopped || !pendingOutputLanguage) {
-      return;
-    }
-
-    const language = pendingOutputLanguage;
-    pendingOutputLanguage = null;
-    sendOutputLanguageUpdate(language);
-  };
-
-  events.onmessage = ({ data }) => {
-    if (stopped) {
-      return;
-    }
-
-    let event: RealtimeTranslationEvent;
-
-    try {
-      event = JSON.parse(data as string) as RealtimeTranslationEvent;
-    } catch {
-      return;
-    }
-
-    if (event.type === "session.output_transcript.delta") {
-      if (!hasReceivedOutput) {
-        hasReceivedOutput = true;
-        options.onTranslatingChange(true);
-        options.onFirstOutputAudio?.();
-      }
-
-      return;
-    }
-
-    if (isInputTranscriptEvent(event.type)) {
-      const text = readTranscriptText(event);
-
-      if (text) {
-        options.onInputTranscript?.(text);
-      }
-
-      return;
-    }
-
-    if (event.type === "error" || event.type?.includes("error")) {
-      options.onError(formatTranslationError(event));
-    }
-  };
-
-  peerConnection.onconnectionstatechange = () => {
-    if (stopped) {
-      return;
-    }
-
-    if (
-      peerConnection.connectionState === "failed" ||
-      peerConnection.connectionState === "disconnected"
-    ) {
-      options.onError(
-        `Translation connection ${peerConnection.connectionState}.`
-      );
-    }
-  };
-
-  const offer = await peerConnection.createOffer();
-  await peerConnection.setLocalDescription(offer);
-
-  const sdpResponse = await fetch(OPENAI_TRANSLATION_CALLS_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${sessionData.clientSecret}`,
-      "Content-Type": "application/sdp",
-    },
-    body: offer.sdp,
-  });
-
-  if (!sdpResponse.ok) {
-    throw new Error(
-      (await sdpResponse.text()) ||
-        "OpenAI audio translation call failed to connect."
-    );
-  }
-
-  await peerConnection.setRemoteDescription({
-    type: "answer",
-    sdp: await sdpResponse.text(),
-  });
-
-  options.onListeningChange(true);
+  let events: RTCDataChannel | null = null;
 
   const cleanup = () => {
     if (stopped) {
@@ -396,45 +150,313 @@ export async function connectOpenAIAudioTranslation(
     stopped = true;
     attachGeneration += 1;
     activeOutputTrackId = null;
-    stopInputMonitor();
-    teardownOutputMonitor();
-    stopPlaybackElement(transmitterAudio);
-    stopPeerConnectionTracks(peerConnection);
-    peerConnection.close();
-    mic.stream.getTracks().forEach((track) => track.stop());
-    void inputContext.close();
-    options.onListeningChange(false);
+    stopTranslationSessionResources(resources);
     options.onTranslatingChange(false);
   };
 
-  return {
-    updateOutputLanguage(language: "en" | "zh") {
-      if (stopped || language === outputLanguage) {
+  const notifyConnectionLost = (state: string) => {
+    if (stopped || connectionLostNotified) {
+      return;
+    }
+
+    connectionLostNotified = true;
+    options.onConnectionLost(`Translation connection ${state}.`);
+  };
+
+  try {
+    const sessionResponse = await fetch("/api/openai/audio-translation-session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        outputLanguage: options.outputLanguage ?? "en",
+      }),
+    });
+
+    const sessionData = (await sessionResponse.json()) as {
+      clientSecret?: string;
+      model?: string;
+      error?: string;
+    };
+
+    if (!sessionResponse.ok || !sessionData.clientSecret) {
+      throw new Error(
+        sessionData.error ?? "Could not create OpenAI audio translation session."
+      );
+    }
+
+    const mic = await getTranslationMicrophoneStream(options.deviceId);
+    resources.micStream = mic.stream;
+
+    const inputContext = new AudioContext();
+    resources.inputContext = inputContext;
+
+    if (inputContext.state === "suspended") {
+      await inputContext.resume();
+    }
+
+    const inputSource = inputContext.createMediaStreamSource(mic.stream);
+    const inputAnalyser = inputContext.createAnalyser();
+    inputAnalyser.fftSize = 2048;
+    inputSource.connect(inputAnalyser);
+
+    resources.stopInputMonitor = startAudioLevelMonitor(
+      inputAnalyser,
+      options.onInputLevels
+    );
+
+    const peerConnection = new RTCPeerConnection();
+    resources.peerConnection = peerConnection;
+    events = peerConnection.createDataChannel("oai-events");
+
+    const transmitterAudio = createPlaybackElement();
+    resources.transmitterAudio = transmitterAudio;
+
+    const sendOutputLanguageUpdate = (language: "en" | "zh") => {
+      if (stopped) {
         return;
       }
 
-      outputLanguage = language;
-      sendOutputLanguageUpdate(language);
-    },
+      if (events?.readyState === "open") {
+        events.send(buildOutputLanguageUpdate(language));
+        return;
+      }
 
-    async setOutputDeviceId(deviceId: string) {
-      outputDeviceId = deviceId;
+      pendingOutputLanguage = language;
+    };
+
+    const teardownOutputMonitor = () => {
+      resources.stopOutputMonitor?.();
+      resources.stopOutputMonitor = null;
+      void resources.monitorContext?.close();
+      resources.monitorContext = null;
+    };
+
+    const attachTranslatedStream = async (outputStream: MediaStream) => {
+      if (stopped) {
+        return;
+      }
+
+      const generation = ++attachGeneration;
 
       try {
-        await applyAudioOutputDevice(transmitterAudio, deviceId);
-
-        if (transmitterAudio.srcObject) {
-          await transmitterAudio.play();
-        }
+        await playRoutedAudio(transmitterAudio, outputStream, outputDeviceId);
       } catch (error) {
-        options.onError(
-          error instanceof Error
-            ? error.message
-            : "Failed to route translated audio to the transmitter output."
-        );
+        if (generation === attachGeneration && !stopped) {
+          options.onError(
+            error instanceof Error
+              ? error.message
+              : "Failed to play translated audio."
+          );
+        }
+        return;
       }
-    },
 
-    stop: cleanup,
-  };
+      if (generation !== attachGeneration || stopped) {
+        return;
+      }
+
+      teardownOutputMonitor();
+
+      try {
+        const monitorContext = new AudioContext();
+        resources.monitorContext = monitorContext;
+
+        if (monitorContext.state === "suspended") {
+          await monitorContext.resume();
+        }
+
+        const outputSource = monitorContext.createMediaStreamSource(outputStream);
+        const outputAnalyser = monitorContext.createAnalyser();
+        outputAnalyser.fftSize = 2048;
+        outputSource.connect(outputAnalyser);
+
+        if (generation !== attachGeneration || stopped) {
+          return;
+        }
+
+        resources.stopOutputMonitor = startAudioLevelMonitor(
+          outputAnalyser,
+          options.onOutputLevels
+        );
+      } catch {
+        resources.monitorContext = null;
+      }
+
+      if (generation !== attachGeneration || stopped) {
+        return;
+      }
+
+      if (!hasReceivedOutput) {
+        hasReceivedOutput = true;
+        options.onTranslatingChange(true);
+        options.onFirstOutputAudio?.();
+      }
+    };
+
+    for (const track of mic.stream.getAudioTracks()) {
+      peerConnection.addTrack(track, mic.stream);
+    }
+
+    peerConnection.ontrack = (event) => {
+      if (stopped || event.track.kind !== "audio") {
+        return;
+      }
+
+      if (activeOutputTrackId === event.track.id) {
+        return;
+      }
+
+      activeOutputTrackId = event.track.id;
+
+      const outputStream = event.streams[0] ?? new MediaStream([event.track]);
+
+      void attachTranslatedStream(outputStream);
+    };
+
+    events.onopen = () => {
+      if (stopped || !pendingOutputLanguage) {
+        return;
+      }
+
+      const language = pendingOutputLanguage;
+      pendingOutputLanguage = null;
+      sendOutputLanguageUpdate(language);
+    };
+
+    events.onmessage = ({ data }) => {
+      if (stopped) {
+        return;
+      }
+
+      let event: RealtimeTranslationEvent;
+
+      try {
+        event = JSON.parse(data as string) as RealtimeTranslationEvent;
+      } catch {
+        return;
+      }
+
+      if (event.type === "session.output_transcript.delta") {
+        if (!hasReceivedOutput) {
+          hasReceivedOutput = true;
+          options.onTranslatingChange(true);
+          options.onFirstOutputAudio?.();
+        }
+
+        return;
+      }
+
+      if (isInputTranscriptEvent(event.type)) {
+        const text = readTranscriptText(event);
+
+        if (text) {
+          options.onInputTranscript?.(text);
+        }
+
+        return;
+      }
+
+      if (event.type === "error" || event.type?.includes("error")) {
+        options.onError(formatTranslationError(event));
+      }
+    };
+
+    peerConnection.onconnectionstatechange = () => {
+      if (stopped) {
+        return;
+      }
+
+      const state = peerConnection.connectionState;
+
+      if (resources.disconnectTimer) {
+        clearTimeout(resources.disconnectTimer);
+        resources.disconnectTimer = null;
+      }
+
+      if (state === "connected" || state === "connecting") {
+        return;
+      }
+
+      if (state === "failed") {
+        notifyConnectionLost(state);
+        return;
+      }
+
+      if (state === "disconnected") {
+        resources.disconnectTimer = setTimeout(() => {
+          resources.disconnectTimer = null;
+
+          if (stopped) {
+            return;
+          }
+
+          const current = peerConnection.connectionState;
+
+          if (current === "disconnected" || current === "failed") {
+            notifyConnectionLost(current);
+          }
+        }, DISCONNECT_GRACE_MS);
+      }
+    };
+
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+
+    const sdpResponse = await fetch(OPENAI_TRANSLATION_CALLS_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${sessionData.clientSecret}`,
+        "Content-Type": "application/sdp",
+      },
+      body: offer.sdp,
+    });
+
+    if (!sdpResponse.ok) {
+      throw new Error(
+        (await sdpResponse.text()) ||
+          "OpenAI audio translation call failed to connect."
+      );
+    }
+
+    await peerConnection.setRemoteDescription({
+      type: "answer",
+      sdp: await sdpResponse.text(),
+    });
+
+    return {
+      updateOutputLanguage(language: "en" | "zh") {
+        if (stopped || language === outputLanguage) {
+          return;
+        }
+
+        outputLanguage = language;
+        sendOutputLanguageUpdate(language);
+      },
+
+      async setOutputDeviceId(deviceId: string) {
+        outputDeviceId = deviceId;
+
+        try {
+          await applyAudioOutputDevice(transmitterAudio, deviceId);
+
+          if (transmitterAudio.srcObject) {
+            await transmitterAudio.play();
+          }
+        } catch (error) {
+          options.onError(
+            error instanceof Error
+              ? error.message
+              : "Failed to route translated audio to the transmitter output."
+          );
+        }
+      },
+
+      stop: cleanup,
+    };
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
 }

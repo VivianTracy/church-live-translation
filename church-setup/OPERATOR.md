@@ -79,16 +79,17 @@ npm run start
 1. **翻译方向** — 一般选 Auto。也可以锁定「中文 → 英文」或「英文 → 中文」。
 2. **音频输入 Audio in** — 讲台音频选 Streaming（ClearClick / X32 / BlackHole / VB-Cable）；用麦克风则选 Microphone。第一次点 **Allow access & refresh** 允许麦克风权限。
 3. **音频输出 Audio out** — 选接到 TT125 的那个输出口（耳机孔或 USB 声卡）。
-4. 点 **Start translation**（开始翻译）。
-5. 点 **Start audio input**（开始音频输入）。
+4. 点 **Start translation**（开始翻译）。等到状态变成 **Live**。
 
 输入和输出电平条应该会动。会众耳机里应能听到翻译。
 
-长休息时点 **Stop audio input**，再点 **Stop translation**，以节省费用。讲道开始再重新打开。
+如果状态变成 **Failed**，点 **Reconnect**。程序也会在网络短暂断开时自动重试两次。
+
+长休息时点 **Stop translation**，以节省费用。讲道开始再重新打开。
 
 ### 5. 敬拜结束后
 
-1. 网页上点 **Stop audio input**，再点 **Stop translation**。
+1. 网页上点 **Stop translation**。
 2. 回到终端窗口，按 **Ctrl + C** 停止程序。
 3. 可以关掉终端。
 
@@ -101,6 +102,7 @@ npm run start
 | 浏览器没打开 | 用 Chrome 打开 http://localhost:3000/operator-live |
 | 输入列表是空的 | 点 **Allow access & refresh**，并允许 Chrome 使用麦克风。 |
 | 耳机没声音 | 确认 Audio out 选对了，线插在 TT125 的 MIC 口，接收器已开机。 |
+| 画面显示 Failed | 点 **Reconnect**。若仍失败，检查网络和 `.env.local` 里的密钥。 |
 | Auto 方向不对 | 先停翻译，再选固定方向（中文 → 英文，或英文 → 中文），然后重新开始。 |
 
 ---
@@ -172,16 +174,17 @@ Confirm a 3.5 mm cable runs from the PC audio out to the TT125 transmitter **MIC
 1. **Translation direction** — Auto is fine for most services. Or lock Chinese → English / English → Chinese.
 2. **Audio in** — Streaming for the pulpit feed (ClearClick / X32 / BlackHole / VB-Cable), or Microphone for a room mic. On the first visit, click **Allow access & refresh** and allow the microphone prompt.
 3. **Audio out** — the jack or USB dongle that feeds the TT125.
-4. Click **Start translation**.
-5. Click **Start audio input**.
+4. Click **Start translation**. Wait until the status says **Live**.
 
 The level meters should move. Headsets should hear the translation.
 
-During a long break, click **Stop audio input**, then **Stop translation**, to save cost. Start them again when preaching resumes.
+If the status says **Failed**, click **Reconnect**. The app also retries twice by itself if the network drops briefly.
+
+During a long break, click **Stop translation** to save cost. Start again when preaching resumes.
 
 ### 5. After the service
 
-1. On the page, click **Stop audio input**, then **Stop translation**.
+1. On the page, click **Stop translation**.
 2. Click the terminal window and press **Ctrl + C**.
 3. You can close the terminal.
 
@@ -194,4 +197,5 @@ During a long break, click **Stop audio input**, then **Stop translation**, to s
 | Browser did not open | Open Chrome to http://localhost:3000/operator-live |
 | Empty input list | Click **Allow access & refresh** and allow Chrome microphone access. |
 | Silent headsets | Check Audio out, the cable on the TT125 **MIC** port, and that receivers are on. |
+| Status says Failed | Click **Reconnect**. If it still fails, check the network and the API key in `.env.local`. |
 | Auto picked the wrong direction | Stop translation, lock Chinese → English or English → Chinese, then start again. |

@@ -28,10 +28,13 @@ import {
   loadStoredAudioOutputDeviceId,
   saveStoredAudioOutputDeviceId,
 } from "@/lib/audioOutputDeviceStorage";
+import { listMicrophoneDevices } from "@/lib/microphoneDeviceStorage";
 import {
-  listMicrophoneDevices,
-  requestMicrophonePermission,
-} from "@/lib/microphoneDeviceStorage";
+  INITIAL_OPERATOR_SESSION_STATE,
+  isOperatorSessionLocked,
+  reduceOperatorSession,
+  type OperatorSessionState,
+} from "@/lib/operatorSessionState";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type AudioLevels = {
@@ -58,7 +61,9 @@ function deviceLabel(deviceId: string, devices: MediaDeviceInfo[], fallback: str
 }
 
 export function useAudioTranslationOperator() {
-  const [isListening, setIsListening] = useState(false);
+  const [session, setSession] = useState<OperatorSessionState>(
+    INITIAL_OPERATOR_SESSION_STATE
+  );
   const [isTranslating, setIsTranslating] = useState(false);
   const [micDeviceId, setMicDeviceIdState] = useState("");
   const [outputDeviceId, setOutputDeviceIdState] = useState("");
@@ -69,14 +74,18 @@ export function useAudioTranslationOperator() {
   const [audioInputSource, setAudioInputSourceState] =
     useState<AudioInputSource>("obs-streaming");
   const [inputDeviceLabel, setInputDeviceLabel] = useState("");
-  const [outputDeviceLabel, setOutputDeviceLabel] = useState("");
+  const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([]);
   const [micError, setMicError] = useState("");
-  const [translationError, setTranslationError] = useState("");
-  const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [levels, setLevels] = useState<AudioLevels>(INITIAL_LEVELS);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
 
   const connectionRef = useRef<AudioTranslationConnection | null>(null);
   const startingRef = useRef(false);
+  const sessionRef = useRef(session);
+  const startListeningRef = useRef<(reason?: "user" | "reconnect") => Promise<boolean>>(
+    async () => false
+  );
+  const sessionGenerationRef = useRef(0);
   const micDeviceIdRef = useRef("");
   const outputDeviceIdRef = useRef("");
   const translationDirectionRef = useRef<AudioTranslationDirection>("auto");
@@ -93,6 +102,21 @@ export function useAudioTranslationOperator() {
     translationDirection,
     translationDirection === "auto" ? resolvedDirection : null
   );
+  const settingsLocked = isOperatorSessionLocked(session.status);
+  const outputDeviceLabel = deviceLabel(
+    outputDeviceId,
+    outputDevices,
+    outputDeviceId ? "Selected output" : "Not selected"
+  );
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
+  const applySession = useCallback((next: OperatorSessionState) => {
+    sessionRef.current = next;
+    setSession(next);
+  }, []);
 
   const applyResolvedInputDevice = useCallback(
     (source: AudioInputSource, deviceId: string, label: string) => {
@@ -125,25 +149,38 @@ export function useAudioTranslationOperator() {
   );
 
   useEffect(() => {
-    const storedOutputId = loadStoredAudioOutputDeviceId();
-    const storedDirection = loadStoredAudioTranslationDirection();
-    const storedInputSource = loadStoredAudioInputSource();
+    let cancelled = false;
 
-    outputDeviceIdRef.current = storedOutputId;
-    translationDirectionRef.current = storedDirection;
-    audioInputSourceRef.current = storedInputSource;
-    setOutputDeviceIdState(storedOutputId);
-    setTranslationDirectionState(storedDirection);
-    setAudioInputSourceState(storedInputSource);
+    void Promise.resolve().then(() => {
+      if (cancelled) {
+        return;
+      }
 
-    void syncInputDeviceForSource(
-      storedInputSource,
-      loadStoredInputDeviceId(storedInputSource)
-    );
+      const storedOutputId = loadStoredAudioOutputDeviceId();
+      const storedDirection = loadStoredAudioTranslationDirection();
+      const storedInputSource = loadStoredAudioInputSource();
+
+      outputDeviceIdRef.current = storedOutputId;
+      translationDirectionRef.current = storedDirection;
+      audioInputSourceRef.current = storedInputSource;
+      setOutputDeviceIdState(storedOutputId);
+      setTranslationDirectionState(storedDirection);
+      setAudioInputSourceState(storedInputSource);
+
+      void syncInputDeviceForSource(
+        storedInputSource,
+        loadStoredInputDeviceId(storedInputSource)
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [syncInputDeviceForSource]);
 
   useEffect(() => {
     return () => {
+      sessionGenerationRef.current += 1;
       connectionRef.current?.stop();
       connectionRef.current = null;
     };
@@ -151,7 +188,6 @@ export function useAudioTranslationOperator() {
 
   useEffect(() => {
     if (!navigator.mediaDevices?.enumerateDevices) {
-      setOutputDeviceLabel("");
       return;
     }
 
@@ -162,13 +198,7 @@ export function useAudioTranslationOperator() {
         return;
       }
 
-      setOutputDeviceLabel(
-        deviceLabel(
-          outputDeviceId,
-          devices,
-          outputDeviceId ? "Selected output" : "Not selected"
-        )
-      );
+      setOutputDevices(devices);
     });
 
     return () => {
@@ -177,12 +207,12 @@ export function useAudioTranslationOperator() {
   }, [outputDeviceId]);
 
   useEffect(() => {
-    if (!isListening || !connectionRef.current) {
+    if (session.status !== "live" || !connectionRef.current) {
       return;
     }
 
     void connectionRef.current.setOutputDeviceId(outputDeviceId);
-  }, [isListening, outputDeviceId]);
+  }, [outputDeviceId, session.status]);
 
   const resetLanguageDetection = useCallback(() => {
     transcriptBufferRef.current = "";
@@ -191,7 +221,7 @@ export function useAudioTranslationOperator() {
     setResolvedDirection(null);
   }, []);
 
-  const resetSessionState = useCallback(() => {
+  const resetSessionMeters = useCallback(() => {
     setLevels(INITIAL_LEVELS);
     setLatencyMs(null);
     sessionStartedAtRef.current = null;
@@ -233,126 +263,196 @@ export function useAudioTranslationOperator() {
     [applyDetectedDirection]
   );
 
-  const stopListening = useCallback(() => {
+  const tearDownConnection = useCallback(() => {
     connectionRef.current?.stop();
     connectionRef.current = null;
     startingRef.current = false;
-    setIsListening(false);
     setIsTranslating(false);
-    resetSessionState();
-  }, [resetSessionState]);
+    resetSessionMeters();
+  }, [resetSessionMeters]);
 
-  const startListening = useCallback(async () => {
-    if (connectionRef.current || startingRef.current) {
-      return Boolean(connectionRef.current);
-    }
+  const startListening = useCallback(
+    async (reason: "user" | "reconnect" = "user"): Promise<boolean> => {
+      if (connectionRef.current || startingRef.current) {
+        return Boolean(connectionRef.current);
+      }
 
-    startingRef.current = true;
-    setMicError("");
-    setTranslationError("");
-    resetSessionState();
+      startingRef.current = true;
 
-    try {
-      const startedAt = Date.now();
-      sessionStartedAtRef.current = startedAt;
+      if (reason === "user") {
+        applySession(reduceOperatorSession(sessionRef.current, { type: "start" }));
+      }
+      setMicError("");
+      resetSessionMeters();
 
-      const resolvedInput = await syncInputDeviceForSource(
-        audioInputSourceRef.current,
-        micDeviceIdRef.current
-      );
+      const generation = sessionGenerationRef.current;
 
-      if (resolvedInput.error || !resolvedInput.deviceId) {
-        throw new Error(
-          resolvedInput.error ??
-            "No input device is configured for the selected audio source."
+      try {
+        const startedAt = Date.now();
+        sessionStartedAtRef.current = startedAt;
+
+        const resolvedInput = await syncInputDeviceForSource(
+          audioInputSourceRef.current,
+          micDeviceIdRef.current
         );
+
+        if (resolvedInput.error || !resolvedInput.deviceId) {
+          throw new Error(
+            resolvedInput.error ??
+              "No input device is configured for the selected audio source."
+          );
+        }
+
+        const startingDirection =
+          translationDirectionRef.current === "auto"
+            ? loadStoredAutoResolvedDirection()
+            : translationDirectionRef.current;
+        const startingOutputLanguage =
+          getAudioTranslationDirectionConfig(startingDirection).outputLanguage;
+
+        sessionOutputLanguageRef.current = startingOutputLanguage;
+        transcriptBufferRef.current = "";
+
+        if (translationDirectionRef.current === "auto") {
+          languageLockedRef.current = false;
+          resolvedDirectionRef.current = startingDirection;
+          setResolvedDirection(startingDirection);
+        } else {
+          languageLockedRef.current = true;
+          resolvedDirectionRef.current = null;
+          setResolvedDirection(null);
+        }
+
+        const connection = await connectOpenAIAudioTranslation({
+          deviceId: resolvedInput.deviceId,
+          outputDeviceId: outputDeviceIdRef.current || undefined,
+          outputLanguage: startingOutputLanguage,
+          onTranslatingChange: setIsTranslating,
+          onInputLevels: (inputLevel, inputPeak) => {
+            setLevels((current) => ({
+              ...current,
+              inputLevel,
+              inputPeak,
+            }));
+          },
+          onOutputLevels: (outputLevel, outputPeak) => {
+            setLevels((current) => ({
+              ...current,
+              outputLevel,
+              outputPeak,
+            }));
+          },
+          onInputTranscript: handleInputTranscript,
+          onFirstOutputAudio: () => {
+            if (sessionStartedAtRef.current !== null) {
+              setLatencyMs(Date.now() - sessionStartedAtRef.current);
+            }
+          },
+          onError: (message) => {
+            setMicError("");
+            applySession({
+              ...sessionRef.current,
+              error: message,
+            });
+          },
+          onConnectionLost: (lostReason) => {
+            if (sessionGenerationRef.current !== generation) {
+              return;
+            }
+
+            const next = reduceOperatorSession(sessionRef.current, {
+              type: "connection-lost",
+              reason: lostReason,
+            });
+            applySession(next);
+            tearDownConnection();
+
+            if (next.status === "reconnecting") {
+              void startListeningRef.current("reconnect");
+            }
+          },
+        });
+
+        if (sessionGenerationRef.current !== generation) {
+          connection.stop();
+          startingRef.current = false;
+          return false;
+        }
+
+        connectionRef.current = connection;
+        startingRef.current = false;
+        applySession(
+          reduceOperatorSession(sessionRef.current, { type: "connected" })
+        );
+        return true;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+
+        if (sessionGenerationRef.current !== generation) {
+          startingRef.current = false;
+          return false;
+        }
+
+        startingRef.current = false;
+        connectionRef.current = null;
+        setIsTranslating(false);
+        resetSessionMeters();
+
+        const next = reduceOperatorSession(sessionRef.current, {
+          type: "start-failed",
+          error: message,
+        });
+        applySession(next);
+
+        if (reason === "user") {
+          setMicError(message);
+        }
+
+        if (next.status === "reconnecting") {
+          return startListeningRef.current("reconnect");
+        }
+
+        return false;
       }
+    },
+    [
+      applySession,
+      handleInputTranscript,
+      resetSessionMeters,
+      syncInputDeviceForSource,
+      tearDownConnection,
+    ]
+  );
 
-      const startingDirection =
-        translationDirectionRef.current === "auto"
-          ? loadStoredAutoResolvedDirection()
-          : translationDirectionRef.current;
-      const startingOutputLanguage =
-        getAudioTranslationDirectionConfig(startingDirection).outputLanguage;
+  useEffect(() => {
+    startListeningRef.current = startListening;
+  }, [startListening]);
 
-      sessionOutputLanguageRef.current = startingOutputLanguage;
-      transcriptBufferRef.current = "";
-      // Auto starts translating immediately with the last known direction.
-      // Transcripts may later switch it; they must not block audio.
-      if (translationDirectionRef.current === "auto") {
-        languageLockedRef.current = false;
-        resolvedDirectionRef.current = startingDirection;
-        setResolvedDirection(startingDirection);
-      } else {
-        languageLockedRef.current = true;
-        resolvedDirectionRef.current = null;
-        setResolvedDirection(null);
-      }
-
-      connectionRef.current = await connectOpenAIAudioTranslation({
-        deviceId: resolvedInput.deviceId,
-        outputDeviceId: outputDeviceIdRef.current || undefined,
-        outputLanguage: startingOutputLanguage,
-        onListeningChange: setIsListening,
-        onTranslatingChange: setIsTranslating,
-        onInputLevels: (inputLevel, inputPeak) => {
-          setLevels((current) => ({
-            ...current,
-            inputLevel,
-            inputPeak,
-          }));
-        },
-        onOutputLevels: (outputLevel, outputPeak) => {
-          setLevels((current) => ({
-            ...current,
-            outputLevel,
-            outputPeak,
-          }));
-        },
-        onInputTranscript: handleInputTranscript,
-        onFirstOutputAudio: () => {
-          if (sessionStartedAtRef.current !== null) {
-            setLatencyMs(Date.now() - sessionStartedAtRef.current);
-          }
-        },
-        onError: (message) => {
-          setTranslationError(message);
-        },
-      });
-
-      startingRef.current = false;
-      return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setMicError(message);
-      setIsListening(false);
-      setIsTranslating(false);
-      connectionRef.current = null;
-      startingRef.current = false;
-      resetSessionState();
-      return false;
-    }
-  }, [handleInputTranscript, resetSessionState, syncInputDeviceForSource]);
+  const stopListening = useCallback(() => {
+    sessionGenerationRef.current += 1;
+    tearDownConnection();
+    setMicError("");
+    applySession(reduceOperatorSession(sessionRef.current, { type: "stop" }));
+  }, [applySession, tearDownConnection]);
 
   const restartListening = useCallback(async () => {
     stopListening();
-    return startListening();
+    return startListening("user");
   }, [startListening, stopListening]);
 
-  const setMicDeviceId = useCallback(
-    (deviceId: string) => {
-      const source = audioInputSourceRef.current;
-      micDeviceIdRef.current = deviceId;
-      setMicDeviceIdState(deviceId);
-      saveStoredInputDeviceId(source, deviceId);
+  const setMicDeviceId = useCallback((deviceId: string) => {
+    const source = audioInputSourceRef.current;
+    micDeviceIdRef.current = deviceId;
+    setMicDeviceIdState(deviceId);
+    saveStoredInputDeviceId(source, deviceId);
 
-      void listMicrophoneDevices().then((devices) => {
-        const match = devices.find((device) => device.deviceId === deviceId);
-        setInputDeviceLabel(match?.label || (deviceId ? "Selected input" : "Not selected"));
-      });
-    },
-    []
-  );
+    void listMicrophoneDevices().then((devices) => {
+      const match = devices.find((device) => device.deviceId === deviceId);
+      setInputDeviceLabel(
+        match?.label || (deviceId ? "Selected input" : "Not selected")
+      );
+    });
+  }, []);
 
   const setOutputDeviceId = useCallback((deviceId: string) => {
     outputDeviceIdRef.current = deviceId;
@@ -360,16 +460,19 @@ export function useAudioTranslationOperator() {
     saveStoredAudioOutputDeviceId(deviceId);
   }, []);
 
-  const setTranslationDirection = useCallback((direction: AudioTranslationDirection) => {
-    translationDirectionRef.current = direction;
-    setTranslationDirectionState(direction);
-    saveStoredAudioTranslationDirection(direction);
-    resetLanguageDetection();
-  }, [resetLanguageDetection]);
+  const setTranslationDirection = useCallback(
+    (direction: AudioTranslationDirection) => {
+      translationDirectionRef.current = direction;
+      setTranslationDirectionState(direction);
+      saveStoredAudioTranslationDirection(direction);
+      resetLanguageDetection();
+    },
+    [resetLanguageDetection]
+  );
 
   const setAudioInputSource = useCallback(
     async (source: AudioInputSource) => {
-      if (isListening) {
+      if (settingsLocked) {
         return;
       }
 
@@ -388,7 +491,7 @@ export function useAudioTranslationOperator() {
         setMicError("");
       }
     },
-    [isListening, syncInputDeviceForSource]
+    [settingsLocked, syncInputDeviceForSource]
   );
 
   return {
@@ -403,7 +506,9 @@ export function useAudioTranslationOperator() {
     inputLanguageLabel: directionConfig.inputLanguageLabel,
     outputLanguageLabel: directionConfig.outputLanguageLabel,
     channelSummary: directionConfig.channelSummary,
-    isListening,
+    sessionStatus: session.status,
+    autoReconnectsUsed: session.autoReconnectsUsed,
+    settingsLocked,
     isTranslating,
     micDeviceId,
     setMicDeviceId,
@@ -411,7 +516,7 @@ export function useAudioTranslationOperator() {
     setOutputDeviceId,
     outputDeviceLabel,
     micError,
-    translationError,
+    translationError: session.error,
     latencyMs,
     inputLevel: levels.inputLevel,
     inputPeak: levels.inputPeak,
