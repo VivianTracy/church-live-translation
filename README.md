@@ -29,20 +29,11 @@ Streaming audio or mic → Chrome (/operator-live)
 
 Church computer install: [`church-setup/README.md`](./church-setup/README.md)
 
-## Sunday (church PC)
+## Sunday / 主日
 
-`.env.local` in the project root must contain `OPENAI_API_KEY`.
+Daily operator steps (Chinese and English), including how to open Terminal or Command Prompt:
 
-```bash
-npm run build
-npm run start
-```
-
-`npm run start` waits until the app is ready, then opens Chrome (or Edge) to the operator page.
-
-Then: choose direction → audio in → audio out → **Start translation** → **Start audio input**.
-
-Stop translation during long breaks to save cost.
+**[`church-setup/OPERATOR.md`](./church-setup/OPERATOR.md)**
 
 ## Local development
 

@@ -2,6 +2,10 @@
 
 Install on the church computer (Mac or Windows) for live audio translation to wireless headsets.
 
+每周主日操作（中英对照）：[`OPERATOR.md`](./OPERATOR.md)
+
+Sunday operator steps (Chinese and English): [`OPERATOR.md`](./OPERATOR.md)
+
 ## What the app detects automatically
 
 On **Chrome** or **Edge**, the operator page uses the browser’s built-in device APIs. You do not need to edit config files for audio devices.
