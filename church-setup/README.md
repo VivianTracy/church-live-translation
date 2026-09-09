@@ -11,7 +11,7 @@ On **Chrome** or **Edge**, the operator page uses the browser’s built-in devic
 | **Audio input (Streaming)** | Lists system audio inputs (ClearClick, BlackHole, Default, etc.). Prefers **ClearClick / X32** when connected, then BlackHole 2ch / VB-Cable. |
 | **Audio input (Microphone)** | Lists physical microphones and excludes virtual cables. |
 | **Audio output** | Lists speakers and USB audio devices. Last choice is remembered. |
-| **Translation direction** | Auto listens for Chinese or English and translates the other way. Manual Chinese → English and English → Chinese remain as overrides. |
+| **Translation direction** | Auto starts translating immediately (last used direction, or Chinese → English). It may switch after clear Chinese or English speech. Manual Chinese → English and English → Chinese remain as overrides. |
 
 **First visit:** click **Allow access & refresh** on Audio in so the browser can show real device names.
 
