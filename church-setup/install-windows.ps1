@@ -28,16 +28,13 @@ if (-not (Test-Path $EnvFile)) {
   Write-Host ".env.local already exists — skipped."
 }
 
-$TranscriptsDir = Join-Path $RootDir "transcripts"
-New-Item -ItemType Directory -Force -Path $TranscriptsDir | Out-Null
-
 Write-Host ""
 Write-Host "Windows setup complete."
 Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  1. Install VB-Audio Virtual Cable (if using OBS audio): https://vb-audio.com/Cable/"
 Write-Host "  2. Edit .env.local with your OPENAI_API_KEY"
-Write-Host "  3. npm run dev   (or: npm run build && npm run start for production)"
-Write-Host "  4. Open http://localhost:3000/operator-live in Chrome or Edge"
+Write-Host "  3. npm run build"
+Write-Host "  4. npm run start   (opens Chrome to /operator-live)"
 Write-Host "  5. Click Allow access & refresh — input/output devices are detected automatically"
 Write-Host "  6. Full Windows guide: church-setup/README.md"

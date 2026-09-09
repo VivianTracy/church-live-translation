@@ -91,7 +91,7 @@ npm run build
 npm run start
 ```
 
-Open **http://localhost:3000/operator-live**.
+`npm run start` waits until the app is ready, then opens Chrome (or Edge) to **http://localhost:3000/operator-live**.
 
 ### 6. Configure operator-live
 

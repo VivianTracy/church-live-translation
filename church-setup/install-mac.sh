@@ -26,15 +26,12 @@ else
   echo ".env.local already exists — skipped."
 fi
 
-mkdir -p transcripts
-
 echo
 echo "Mac setup complete."
 echo
 echo "Next steps:"
 echo "  1. Install BlackHole 2ch: https://existential.audio/blackhole/"
-echo "  2. Edit .env.local with API keys"
-echo "  3. npm run dev"
-echo "  4. Open http://localhost:3000/operator-live"
-echo "  5. See church-setup/obs/browser-source.md for OBS"
-echo "  6. Read church-setup/README-SUNDAY.md before Sunday"
+echo "  2. Edit .env.local with OPENAI_API_KEY"
+echo "  3. npm run build"
+echo "  4. npm run start   (opens Chrome to /operator-live)"
+echo "  5. See church-setup/README.md"
