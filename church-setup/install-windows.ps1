@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $RootDir = Split-Path -Parent $PSScriptRoot
 
-Write-Host "Church Caption — Windows setup"
+Write-Host "Church Translation — Windows setup"
 Write-Host "Project: $RootDir"
 Write-Host ""
 
@@ -23,7 +23,7 @@ $ExampleFile = Join-Path $RootDir "church-setup/env.example"
 
 if (-not (Test-Path $EnvFile)) {
   Copy-Item $ExampleFile $EnvFile
-  Write-Host "Created .env.local from church-setup/env.example — add your API keys."
+  Write-Host "Created .env.local from church-setup/env.example — add OPENAI_API_KEY."
 } else {
   Write-Host ".env.local already exists — skipped."
 }

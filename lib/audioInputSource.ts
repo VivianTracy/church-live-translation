@@ -27,11 +27,6 @@ export function isBoardFeedDevice(label: string): boolean {
   return BOARD_FEED_PATTERN.test(label);
 }
 
-/** @deprecated Use isBoardFeedDevice — kept for existing imports. */
-export function isMixerUsbDevice(label: string): boolean {
-  return isBoardFeedDevice(label);
-}
-
 export function isVirtualCableDevice(label: string): boolean {
   // Board feeds are real USB interfaces, not software loopbacks.
   if (isBoardFeedDevice(label)) {

@@ -24,18 +24,13 @@
 .DS_Store
 *.pem
 
-# AV replay test audio (issue #24) — regenerate with npm run extract:av-replay-audio
-/fixtures/audio/*.wav
-/fixtures/audio/*.webm
-/public/test-audio/*.wav
-
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
 
 # vercel
@@ -44,6 +39,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# local sermon transcripts (Phase A)
-/transcripts/

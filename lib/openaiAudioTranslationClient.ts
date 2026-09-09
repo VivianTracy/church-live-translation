@@ -1,5 +1,5 @@
 import { startAudioLevelMonitor } from "@/lib/audioLevelMonitor";
-import { getCaptionMicrophoneStream } from "@/lib/microphoneStream";
+import { getTranslationMicrophoneStream } from "@/lib/microphoneStream";
 import { OPENAI_TRANSLATION_CALLS_URL } from "@/lib/openaiModels";
 
 type RealtimeTranslationEvent = {
@@ -134,7 +134,7 @@ export async function connectOpenAIAudioTranslation(
     );
   }
 
-  const mic = await getCaptionMicrophoneStream(options.deviceId);
+  const mic = await getTranslationMicrophoneStream(options.deviceId);
 
   const inputContext = new AudioContext();
 

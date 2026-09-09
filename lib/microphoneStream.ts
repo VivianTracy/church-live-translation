@@ -1,5 +1,5 @@
-/** Mic constraints for live caption capture (incl. BlackHole / OBS loopback). */
-export const CAPTION_MIC_CONSTRAINTS: MediaTrackConstraints = {
+/** Mic constraints for live translation (incl. BlackHole / OBS loopback). */
+export const TRANSLATION_MIC_CONSTRAINTS: MediaTrackConstraints = {
   echoCancellation: false,
   noiseSuppression: false,
   autoGainControl: false,
@@ -14,11 +14,11 @@ export type MicrophoneStreamInfo = {
   readyState: MediaStreamTrackState;
 };
 
-export async function getCaptionMicrophoneStream(
+export async function getTranslationMicrophoneStream(
   deviceId?: string
 ): Promise<MicrophoneStreamInfo> {
   const audio: MediaTrackConstraints = {
-    ...CAPTION_MIC_CONSTRAINTS,
+    ...TRANSLATION_MIC_CONSTRAINTS,
     ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
   };
 
