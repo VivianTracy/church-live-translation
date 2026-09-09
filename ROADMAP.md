@@ -1,17 +1,6 @@
-## Phase 1
+# Roadmap
 
-- [x] Admin page
-- [x] Audience page
-- [ ] Browser microphone
-- [ ] Live subtitles
-
-## Phase 2
-
-- [x] QR Code
-- [x] Glossary
+- [x] Live Chinese ↔ English audio to wireless headsets
+- [x] Auto-detect sermon language
 - [ ] Scripture detection
-
-## Phase 3
-
-- [ ] YouTube Live
-- [ ] AI summary
+- [ ] Sermon archive

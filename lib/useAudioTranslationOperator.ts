@@ -276,10 +276,18 @@ export function useAudioTranslationOperator() {
         getAudioTranslationDirectionConfig(startingDirection).outputLanguage;
 
       sessionOutputLanguageRef.current = startingOutputLanguage;
-      languageLockedRef.current = translationDirectionRef.current !== "auto";
       transcriptBufferRef.current = "";
-      resolvedDirectionRef.current = null;
-      setResolvedDirection(null);
+      // Auto starts translating immediately with the last known direction.
+      // Transcripts may later switch it; they must not block audio.
+      if (translationDirectionRef.current === "auto") {
+        languageLockedRef.current = false;
+        resolvedDirectionRef.current = startingDirection;
+        setResolvedDirection(startingDirection);
+      } else {
+        languageLockedRef.current = true;
+        resolvedDirectionRef.current = null;
+        setResolvedDirection(null);
+      }
 
       connectionRef.current = await connectOpenAIAudioTranslation({
         deviceId: resolvedInput.deviceId,

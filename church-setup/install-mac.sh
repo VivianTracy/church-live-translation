@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "Church Caption — Mac setup"
+echo "Church Translation — Mac setup"
 echo "Project: $ROOT_DIR"
 echo
 
@@ -21,20 +21,17 @@ npm install
 
 if [[ ! -f .env.local ]]; then
   cp church-setup/env.example .env.local
-  echo "Created .env.local from church-setup/env.example — add your API keys."
+  echo "Created .env.local from church-setup/env.example — add OPENAI_API_KEY."
 else
   echo ".env.local already exists — skipped."
 fi
-
-mkdir -p transcripts
 
 echo
 echo "Mac setup complete."
 echo
 echo "Next steps:"
 echo "  1. Install BlackHole 2ch: https://existential.audio/blackhole/"
-echo "  2. Edit .env.local with API keys"
-echo "  3. npm run dev"
-echo "  4. Open http://localhost:3000/operator-caption"
-echo "  5. See church-setup/obs/browser-source.md for OBS"
-echo "  6. Read church-setup/README-SUNDAY.md before Sunday"
+echo "  2. Edit .env.local with OPENAI_API_KEY"
+echo "  3. npm run build"
+echo "  4. npm run start   (opens Chrome to /operator-live)"
+echo "  5. Daily use (Chinese / English): church-setup/OPERATOR.md"

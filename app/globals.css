@@ -24,21 +24,3 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
-
-html.overlay-page,
-body.overlay-page {
-  background: transparent !important;
-}
-
-.rolling-caption-viewport {
-  transition: height 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.rolling-caption-lines-track {
-  will-change: transform;
-  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.rolling-caption-line {
-  transition: font-size 0.2s ease-out;
-}

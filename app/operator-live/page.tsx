@@ -86,7 +86,9 @@ export default function OperatorLivePage() {
           <TranslationDirectionCard
             selectedDirection={translationDirection}
             resolvedDirection={resolvedDirection}
-            isDetecting={isListening && translationDirection === "auto"}
+            isDetecting={
+              isListening && translationDirection === "auto" && !resolvedDirection
+            }
             disabled={isListening}
             onDirectionChange={setTranslationDirection}
           />
@@ -120,7 +122,7 @@ export default function OperatorLivePage() {
           directionLabel={formatAudioTranslationDirectionLabel(
             translationDirection,
             translationDirection === "auto" ? resolvedDirection : null,
-            isListening && translationDirection === "auto"
+            isListening && translationDirection === "auto" && !resolvedDirection
           )}
           inputSourceLabel={audioInputSourceLabel}
           inputDeviceLabel={inputDeviceLabel}

@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-echo "Church Caption setup"
+echo "Church Translation setup"
 echo "Choose your streaming computer OS:"
 echo "  1) Mac"
 echo "  2) Windows"

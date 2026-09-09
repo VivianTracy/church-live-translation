@@ -1,17 +1,15 @@
-# Church Caption
+# Church Translation
 
 ## Mission
 
-Help churches remove language barriers during worship through simple, reliable AI-powered captions.
+Help churches remove language barriers during worship through simple, reliable live audio translation.
 
-## MVP Scope
+## Scope
 
-Version 1 only supports:
-
-- Chinese sermon
-- English captions
+- Chinese or English sermon audio
+- Translated audio on wireless headsets
 - One operator
-- English captions on the YouTube stream via OBS overlay
+- Chrome or Edge on the church computer
 
 ## Principles
 
@@ -35,18 +33,7 @@ Avoid:
 
 - Premature optimization
 - Extra language options
-- Features not required for Version 1
-
-## Future Vision
-
-After the MVP succeeds, this platform may expand to:
-
-- Scripture recognition
-- Bible verse display
-- Sermon summaries
-- Small group discussion questions
-- Church sermon archive
-- Multi-language support
+- Features not required for live headset translation
 
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know

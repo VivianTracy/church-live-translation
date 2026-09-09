@@ -1,5 +1,3 @@
-import { CURRENT_SERVICE } from "@/lib/service";
-
 export function ChurchTranslationHeader() {
   return (
     <header className="text-center space-y-2">
@@ -12,7 +10,6 @@ export function ChurchTranslationHeader() {
       <p className="text-lg text-slate-600">
         Live audio to wireless headsets
       </p>
-      <p className="text-sm text-slate-500">{CURRENT_SERVICE.churchName}</p>
     </header>
   );
 }
