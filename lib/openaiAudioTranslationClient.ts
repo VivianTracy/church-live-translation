@@ -1,6 +1,7 @@
 import { startAudioLevelMonitor } from "@/lib/audioLevelMonitor";
 import { clampAudioOutputVolume } from "@/lib/audioOutputVolumeStorage";
 import { getTranslationMicrophoneStream } from "@/lib/microphoneStream";
+import { startAudioNodePcmUploader } from "@/lib/pcmAudioCapture";
 import { OPENAI_TRANSLATION_CALLS_URL } from "@/lib/openaiModels";
 import {
   createTranslationSessionResources,
@@ -67,6 +68,7 @@ type ConnectOptions = {
   onOutputLevels: (level: number, peak: number) => void;
   onInputTranscript?: (delta: string) => void;
   onFirstOutputAudio?: () => void;
+  onWavChunk?: (wavBase64: string) => void;
   onError: (message: string) => void;
   onConnectionLost: (reason: string) => void;
 };
@@ -232,6 +234,8 @@ export async function connectOpenAIAudioTranslation(
     };
 
     const teardownOutputMonitor = () => {
+      resources.stopPcmUpload?.();
+      resources.stopPcmUpload = null;
       resources.stopOutputMonitor?.();
       resources.stopOutputMonitor = null;
       void resources.monitorContext?.close();
@@ -286,6 +290,15 @@ export async function connectOpenAIAudioTranslation(
           outputAnalyser,
           options.onOutputLevels
         );
+
+        if (options.onWavChunk) {
+          resources.stopPcmUpload = startAudioNodePcmUploader(
+            monitorContext,
+            outputSource,
+            600,
+            options.onWavChunk
+          );
+        }
       } catch {
         resources.monitorContext = null;
       }

@@ -11,6 +11,7 @@ describe("stopTranslationSessionResources", () => {
     const micStop = vi.fn();
     const inputMonitorStop = vi.fn();
     const outputMonitorStop = vi.fn();
+    const pcmUploadStop = vi.fn();
     const peerClose = vi.fn();
     const inputClose = vi.fn();
     const monitorClose = vi.fn();
@@ -38,12 +39,14 @@ describe("stopTranslationSessionResources", () => {
     resources.transmitterAudio = audio;
     resources.monitorContext = { close: monitorClose };
     resources.stopOutputMonitor = outputMonitorStop;
+    resources.stopPcmUpload = pcmUploadStop;
     resources.disconnectTimer = disconnectTimer;
 
     stopTranslationSessionResources(resources);
 
     expect(inputMonitorStop).toHaveBeenCalledTimes(1);
     expect(outputMonitorStop).toHaveBeenCalledTimes(1);
+    expect(pcmUploadStop).toHaveBeenCalledTimes(1);
     expect(audio.pause).toHaveBeenCalledTimes(1);
     expect(audio.remove).toHaveBeenCalledTimes(1);
     expect(receiverStop).toHaveBeenCalledTimes(1);
