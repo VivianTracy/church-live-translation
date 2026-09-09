@@ -28,6 +28,12 @@ import {
   loadStoredAudioOutputDeviceId,
   saveStoredAudioOutputDeviceId,
 } from "@/lib/audioOutputDeviceStorage";
+import {
+  DEFAULT_AUDIO_OUTPUT_VOLUME,
+  clampAudioOutputVolume,
+  loadStoredAudioOutputVolume,
+  saveStoredAudioOutputVolume,
+} from "@/lib/audioOutputVolumeStorage";
 import { listMicrophoneDevices } from "@/lib/microphoneDeviceStorage";
 import {
   INITIAL_OPERATOR_SESSION_STATE,
@@ -67,6 +73,9 @@ export function useAudioTranslationOperator() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [micDeviceId, setMicDeviceIdState] = useState("");
   const [outputDeviceId, setOutputDeviceIdState] = useState("");
+  const [outputVolume, setOutputVolumeState] = useState(
+    DEFAULT_AUDIO_OUTPUT_VOLUME
+  );
   const [translationDirection, setTranslationDirectionState] =
     useState<AudioTranslationDirection>("auto");
   const [resolvedDirection, setResolvedDirection] =
@@ -88,6 +97,7 @@ export function useAudioTranslationOperator() {
   const sessionGenerationRef = useRef(0);
   const micDeviceIdRef = useRef("");
   const outputDeviceIdRef = useRef("");
+  const outputVolumeRef = useRef(DEFAULT_AUDIO_OUTPUT_VOLUME);
   const translationDirectionRef = useRef<AudioTranslationDirection>("auto");
   const resolvedDirectionRef = useRef<ResolvedAudioTranslationDirection | null>(
     null
@@ -157,13 +167,16 @@ export function useAudioTranslationOperator() {
       }
 
       const storedOutputId = loadStoredAudioOutputDeviceId();
+      const storedOutputVolume = loadStoredAudioOutputVolume();
       const storedDirection = loadStoredAudioTranslationDirection();
       const storedInputSource = loadStoredAudioInputSource();
 
       outputDeviceIdRef.current = storedOutputId;
+      outputVolumeRef.current = storedOutputVolume;
       translationDirectionRef.current = storedDirection;
       audioInputSourceRef.current = storedInputSource;
       setOutputDeviceIdState(storedOutputId);
+      setOutputVolumeState(storedOutputVolume);
       setTranslationDirectionState(storedDirection);
       setAudioInputSourceState(storedInputSource);
 
@@ -213,6 +226,14 @@ export function useAudioTranslationOperator() {
 
     void connectionRef.current.setOutputDeviceId(outputDeviceId);
   }, [outputDeviceId, session.status]);
+
+  useEffect(() => {
+    if (session.status !== "live" || !connectionRef.current) {
+      return;
+    }
+
+    connectionRef.current.setOutputVolume(outputVolume);
+  }, [outputVolume, session.status]);
 
   const resetLanguageDetection = useCallback(() => {
     transcriptBufferRef.current = "";
@@ -326,6 +347,7 @@ export function useAudioTranslationOperator() {
         const connection = await connectOpenAIAudioTranslation({
           deviceId: resolvedInput.deviceId,
           outputDeviceId: outputDeviceIdRef.current || undefined,
+          outputVolume: outputVolumeRef.current,
           outputLanguage: startingOutputLanguage,
           onTranslatingChange: setIsTranslating,
           onInputLevels: (inputLevel, inputPeak) => {
@@ -460,6 +482,14 @@ export function useAudioTranslationOperator() {
     saveStoredAudioOutputDeviceId(deviceId);
   }, []);
 
+  const setOutputVolume = useCallback((volume: number) => {
+    const nextVolume = clampAudioOutputVolume(volume);
+    outputVolumeRef.current = nextVolume;
+    setOutputVolumeState(nextVolume);
+    saveStoredAudioOutputVolume(nextVolume);
+    connectionRef.current?.setOutputVolume(nextVolume);
+  }, []);
+
   const setTranslationDirection = useCallback(
     (direction: AudioTranslationDirection) => {
       translationDirectionRef.current = direction;
@@ -514,6 +544,8 @@ export function useAudioTranslationOperator() {
     setMicDeviceId,
     outputDeviceId,
     setOutputDeviceId,
+    outputVolume,
+    setOutputVolume,
     outputDeviceLabel,
     micError,
     translationError: session.error,

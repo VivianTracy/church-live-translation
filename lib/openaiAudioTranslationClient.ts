@@ -1,4 +1,5 @@
 import { startAudioLevelMonitor } from "@/lib/audioLevelMonitor";
+import { clampAudioOutputVolume } from "@/lib/audioOutputVolumeStorage";
 import { getTranslationMicrophoneStream } from "@/lib/microphoneStream";
 import { OPENAI_TRANSLATION_CALLS_URL } from "@/lib/openaiModels";
 import {
@@ -52,12 +53,14 @@ function isInputTranscriptEvent(type: string | undefined): boolean {
 export type AudioTranslationConnection = {
   stop: () => void;
   setOutputDeviceId: (deviceId: string) => Promise<void>;
+  setOutputVolume: (volume: number) => void;
   updateOutputLanguage: (language: "en" | "zh") => void;
 };
 
 type ConnectOptions = {
   deviceId?: string;
   outputDeviceId?: string;
+  outputVolume?: number;
   outputLanguage?: "en" | "zh";
   onTranslatingChange: (isTranslating: boolean) => void;
   onInputLevels: (level: number, peak: number) => void;
@@ -108,9 +111,10 @@ async function applyAudioOutputDevice(
   await audio.setSinkId(deviceId);
 }
 
-function createPlaybackElement(): HTMLAudioElement {
+function createPlaybackElement(volume: number): HTMLAudioElement {
   const audio = document.createElement("audio");
   audio.autoplay = true;
+  audio.volume = volume;
   audio.setAttribute("playsinline", "true");
   audio.setAttribute("webkit-playsinline", "true");
   audio.style.display = "none";
@@ -135,6 +139,7 @@ export async function connectOpenAIAudioTranslation(
   let stopped = false;
   let connectionLostNotified = false;
   let outputDeviceId = options.outputDeviceId ?? "";
+  let outputVolume = clampAudioOutputVolume(options.outputVolume ?? 1);
   let outputLanguage = options.outputLanguage ?? "en";
   let pendingOutputLanguage: "en" | "zh" | null = null;
   let hasReceivedOutput = false;
@@ -210,7 +215,7 @@ export async function connectOpenAIAudioTranslation(
     resources.peerConnection = peerConnection;
     events = peerConnection.createDataChannel("oai-events");
 
-    const transmitterAudio = createPlaybackElement();
+    const transmitterAudio = createPlaybackElement(outputVolume);
     resources.transmitterAudio = transmitterAudio;
 
     const sendOutputLanguageUpdate = (language: "en" | "zh") => {
@@ -241,6 +246,7 @@ export async function connectOpenAIAudioTranslation(
       const generation = ++attachGeneration;
 
       try {
+        transmitterAudio.volume = outputVolume;
         await playRoutedAudio(transmitterAudio, outputStream, outputDeviceId);
       } catch (error) {
         if (generation === attachGeneration && !stopped) {
@@ -450,6 +456,14 @@ export async function connectOpenAIAudioTranslation(
               ? error.message
               : "Failed to route translated audio to the transmitter output."
           );
+        }
+      },
+
+      setOutputVolume(volume: number) {
+        outputVolume = clampAudioOutputVolume(volume);
+
+        if (!stopped) {
+          transmitterAudio.volume = outputVolume;
         }
       },
 

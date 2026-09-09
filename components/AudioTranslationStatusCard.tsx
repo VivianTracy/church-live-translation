@@ -120,7 +120,7 @@ export function AudioTranslationStatusCard({
           className={`w-full rounded-2xl px-6 py-5 text-xl font-bold text-white transition ${
             status === "failed"
               ? "bg-amber-600 hover:bg-amber-700"
-              : "bg-violet-600 hover:bg-violet-700"
+              : "bg-emerald-600 hover:bg-emerald-700"
           }`}
         >
           {status === "failed" ? "Reconnect" : "Start translation"}

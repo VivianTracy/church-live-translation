@@ -25,6 +25,8 @@ export default function OperatorLivePage() {
     inputDeviceLabel,
     outputDeviceId,
     setOutputDeviceId,
+    outputVolume,
+    setOutputVolume,
     translationDirection,
     resolvedDirection,
     setTranslationDirection,
@@ -88,15 +90,18 @@ export default function OperatorLivePage() {
 
             <AudioOutputDeviceCard
               selectedDeviceId={outputDeviceId}
+              outputVolume={outputVolume}
               disabled={settingsLocked}
               onDeviceChange={setOutputDeviceId}
+              onVolumeChange={setOutputVolume}
               outputLanguageLabel={outputLanguageLabel}
             />
           </div>
 
           <p className="text-xs text-slate-500 border-t border-slate-200 pt-4">
-            Stop translation before changing settings. Connect a 3.5 mm cable from
-            audio out to the TT125-TX MIC port.
+            Stop translation before changing devices or direction. Volume can
+            be adjusted anytime. Connect a 3.5 mm cable from audio out to the
+            TT125-TX MIC port.
           </p>
         </section>
 
