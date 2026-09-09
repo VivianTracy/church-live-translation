@@ -7,13 +7,9 @@ import { AudioTranslationStatusCard } from "@/components/AudioTranslationStatusC
 import { ChurchTranslationHeader } from "@/components/ChurchTranslationHeader";
 import { TranslationDirectionCard } from "@/components/TranslationDirectionCard";
 import { TranslationSetupSummary } from "@/components/TranslationSetupSummary";
+import { formatAudioTranslationDirectionLabel } from "@/lib/audioTranslationDirection";
 import { useAudioTranslationOperator } from "@/lib/useAudioTranslationOperator";
 import { useEffect, useState } from "react";
-
-const DIRECTION_LABELS = {
-  "zh-to-en": "Chinese → English",
-  "en-to-zh": "English → Chinese",
-} as const;
 
 export default function OperatorLivePage() {
   const [isLive, setIsLive] = useState(false);
@@ -31,6 +27,7 @@ export default function OperatorLivePage() {
     outputDeviceId,
     setOutputDeviceId,
     translationDirection,
+    resolvedDirection,
     setTranslationDirection,
     outputDeviceLabel,
     inputLanguageLabel,
@@ -88,6 +85,8 @@ export default function OperatorLivePage() {
         <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 space-y-8">
           <TranslationDirectionCard
             selectedDirection={translationDirection}
+            resolvedDirection={resolvedDirection}
+            isDetecting={isListening && translationDirection === "auto"}
             disabled={isListening}
             onDirectionChange={setTranslationDirection}
           />
@@ -118,7 +117,11 @@ export default function OperatorLivePage() {
         </section>
 
         <TranslationSetupSummary
-          directionLabel={DIRECTION_LABELS[translationDirection]}
+          directionLabel={formatAudioTranslationDirectionLabel(
+            translationDirection,
+            translationDirection === "auto" ? resolvedDirection : null,
+            isListening && translationDirection === "auto"
+          )}
           inputSourceLabel={audioInputSourceLabel}
           inputDeviceLabel={inputDeviceLabel}
           outputDeviceLabel={outputDeviceLabel}

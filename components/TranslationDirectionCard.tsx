@@ -1,25 +1,27 @@
 "use client";
 
 import {
+  AUDIO_TRANSLATION_DIRECTION_LABELS,
+  formatAudioTranslationDirectionLabel,
   loadStoredAudioTranslationDirection,
   saveStoredAudioTranslationDirection,
   type AudioTranslationDirection,
+  type ResolvedAudioTranslationDirection,
 } from "@/lib/audioTranslationDirection";
 import { useEffect } from "react";
 
-const DIRECTION_LABELS: Record<AudioTranslationDirection, string> = {
-  "zh-to-en": "Chinese → English",
-  "en-to-zh": "English → Chinese",
-};
-
 type TranslationDirectionCardProps = {
   selectedDirection: AudioTranslationDirection;
+  resolvedDirection?: ResolvedAudioTranslationDirection | null;
+  isDetecting?: boolean;
   disabled?: boolean;
   onDirectionChange: (direction: AudioTranslationDirection) => void;
 };
 
 export function TranslationDirectionCard({
   selectedDirection,
+  resolvedDirection = null,
+  isDetecting = false,
   disabled = false,
   onDirectionChange,
 }: TranslationDirectionCardProps) {
@@ -45,7 +47,8 @@ export function TranslationDirectionCard({
           1. Translation direction
         </h2>
         <p className="text-sm text-slate-600">
-          What language goes in, and what listeners hear on the headsets.
+          Auto listens for Chinese or English, then translates the other way.
+          Choose a fixed direction if you already know.
         </p>
       </div>
 
@@ -57,13 +60,29 @@ export function TranslationDirectionCard({
         }
         className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
       >
+        <option value="auto">Auto (detect Chinese or English)</option>
         <option value="zh-to-en">Chinese in → English out</option>
         <option value="en-to-zh">English in → Chinese out</option>
       </select>
 
       <p className="text-xs text-slate-500">
-        Selected: {DIRECTION_LABELS[selectedDirection]}
+        Selected:{" "}
+        {formatAudioTranslationDirectionLabel(
+          selectedDirection,
+          selectedDirection === "auto" ? resolvedDirection : null,
+          isDetecting
+        )}
       </p>
+
+      {selectedDirection === "auto" ? (
+        <p className="text-xs text-slate-500">
+          Auto locks after the first clear speech so a Bible verse or Amen does
+          not flip the headsets.{" "}
+          {AUDIO_TRANSLATION_DIRECTION_LABELS["zh-to-en"]} and{" "}
+          {AUDIO_TRANSLATION_DIRECTION_LABELS["en-to-zh"]} stay available as a
+          manual override.
+        </p>
+      ) : null}
     </div>
   );
 }
