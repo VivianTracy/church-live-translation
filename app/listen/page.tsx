@@ -12,6 +12,8 @@ import {
 } from "@/types/translationListen";
 import { useEffect, useRef, useState } from "react";
 
+const LATEST_AUDIO_SEQUENCE = Number.MAX_SAFE_INTEGER;
+
 export default function ListenPage() {
   const [state, setState] = useState(EMPTY_TRANSLATION_LISTEN_STATE);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -26,7 +28,7 @@ export default function ListenPage() {
     const loadState = async () => {
       try {
         const listenState = await loadTranslationListenState();
-        const payload = await fetchTranslationAudioAfter(0);
+        const payload = await fetchTranslationAudioAfter(LATEST_AUDIO_SEQUENCE);
         const isLive = isTranslationSessionLive(listenState, payload.meta);
 
         setState({
@@ -55,8 +57,15 @@ export default function ListenPage() {
     }
 
     let cancelled = false;
+    let polling = false;
 
     const pollAudio = async () => {
+      if (polling) {
+        return;
+      }
+
+      polling = true;
+
       try {
         const payload = await fetchTranslationAudioAfter(lastSeqRef.current);
 
@@ -91,6 +100,8 @@ export default function ListenPage() {
             error instanceof Error ? error.message : "Could not load audio."
           );
         }
+      } finally {
+        polling = false;
       }
     };
 
@@ -115,11 +126,10 @@ export default function ListenPage() {
     }
   }, [state.isLive, isPlaying]);
 
-  const handleStartListening = () => {
+  const handleStartListening = async () => {
     unlockedAudioRef.current = unlockMobileAudioPlayback();
     setPlaybackError("");
     setChunksReceived(0);
-    lastSeqRef.current = 0;
     playerRef.current?.reset(unlockedAudioRef.current);
     playerRef.current ??= new TranslationAudioChunkPlayer(
       unlockedAudioRef.current
@@ -127,7 +137,22 @@ export default function ListenPage() {
     playerRef.current.onError = (message) => {
       setPlaybackError(message);
     };
-    setIsPlaying(true);
+
+    try {
+      // Start Web Audio while this click still counts as a user gesture on iOS.
+      await playerRef.current.prepare();
+
+      // Join the live edge instead of replaying Redis's retained audio history.
+      const payload = await fetchTranslationAudioAfter(LATEST_AUDIO_SEQUENCE);
+      lastSeqRef.current = payload.meta.latestSeq;
+      setIsPlaying(true);
+    } catch (error) {
+      setPlaybackError(
+        error instanceof Error
+          ? error.message
+          : "Could not start audio on this phone."
+      );
+    }
   };
 
   return (
@@ -154,7 +179,9 @@ export default function ListenPage() {
 
         <button
           type="button"
-          onClick={handleStartListening}
+          onClick={() => {
+            void handleStartListening();
+          }}
           disabled={!state.isLive || isPlaying}
           className={`rounded-2xl px-8 py-6 text-2xl font-bold ${
             !state.isLive || isPlaying
