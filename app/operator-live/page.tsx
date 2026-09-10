@@ -284,8 +284,9 @@ export default function OperatorLivePage() {
         {sessionStatus === "live" && isTranslating && chunksUploaded === 0 ? (
           <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
             Translation is playing locally, but no chunks have reached the phone
-            relay yet. If this stays at 0, check{" "}
-            <span className="font-mono">NEXT_PUBLIC_AUDIENCE_URL</span>.
+            relay yet. If this stays at 0, check that{" "}
+            <span className="font-mono">https://church-caption.vercel.app</span>{" "}
+            is online.
           </p>
         ) : null}
       </div>

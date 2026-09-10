@@ -1,6 +1,20 @@
 import { getTranslationRelayApiUrl } from "@/lib/translationRelayUrl";
 import type { TranslationListenState } from "@/types/translationListen";
 
+async function fetchTranslationRelay(
+  input: string,
+  init?: RequestInit
+): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Could not reach the phone relay (${message}). Headset translation still works.`
+    );
+  }
+}
+
 async function readApiError(response: Response, fallback: string): Promise<string> {
   try {
     const body = (await response.json()) as { error?: string };
@@ -18,7 +32,7 @@ async function readApiError(response: Response, fallback: string): Promise<strin
 export async function saveTranslationListenState(
   state: TranslationListenState
 ): Promise<void> {
-  const response = await fetch(
+  const response = await fetchTranslationRelay(
     getTranslationRelayApiUrl("/api/translation-listen-state"),
     {
       method: "POST",
@@ -37,7 +51,7 @@ export async function saveTranslationListenState(
 }
 
 export async function loadTranslationListenState(): Promise<TranslationListenState> {
-  const response = await fetch("/api/translation-listen-state", {
+  const response = await fetchTranslationRelay("/api/translation-listen-state", {
     cache: "no-store",
   });
 
@@ -63,7 +77,7 @@ export async function loadTranslationRelayStatus(): Promise<{
   isLive: boolean;
   updatedAt: number;
 }> {
-  const response = await fetch(
+  const response = await fetchTranslationRelay(
     getTranslationRelayApiUrl("/api/translation-listen-state"),
     {
       cache: "no-store",

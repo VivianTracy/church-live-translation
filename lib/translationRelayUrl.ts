@@ -18,21 +18,7 @@ export function isLocalDevHostname(hostname: string): boolean {
 }
 
 export function getTranslationRelayApiUrl(path: string): string {
-  const relayOrigin = getTranslationRelayOrigin();
-
-  if (!relayOrigin) {
-    return path;
-  }
-
-  if (typeof window !== "undefined") {
-    const currentOrigin = window.location.origin.replace(/\/$/, "");
-
-    if (relayOrigin === currentOrigin) {
-      return path;
-    }
-  }
-
-  return `${relayOrigin}${path}`;
+  return path;
 }
 
 export function isUsingRemoteTranslationRelay(): boolean {

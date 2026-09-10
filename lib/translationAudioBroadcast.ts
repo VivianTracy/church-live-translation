@@ -39,7 +39,12 @@ export function uploadTranslationWavChunk(
       onUploaded?.();
     })
     .catch((error) => {
-      onError(error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      onError(
+        message === "Failed to fetch"
+          ? "Could not reach the phone relay. Headset translation still works."
+          : message
+      );
     });
 }
 

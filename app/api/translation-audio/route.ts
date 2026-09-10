@@ -8,6 +8,10 @@ import {
   translationRelayJsonResponse,
   translationRelayOptionsResponse,
 } from "@/lib/translationRelayCors";
+import {
+  proxyTranslationRelay,
+  shouldProxyTranslationRelay,
+} from "@/lib/translationRelayProxy";
 import { NextRequest } from "next/server";
 
 function errorResponse(request: NextRequest, error: unknown, fallback: string) {
@@ -22,6 +26,10 @@ export async function OPTIONS(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    if (shouldProxyTranslationRelay(request)) {
+      return await proxyTranslationRelay(request);
+    }
+
     const afterParam = request.nextUrl.searchParams.get("after");
 
     if (afterParam !== null) {
@@ -50,6 +58,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    if (shouldProxyTranslationRelay(request)) {
+      return await proxyTranslationRelay(request);
+    }
+
     const body = (await request.json()) as {
       mimeType?: string;
       data?: string;

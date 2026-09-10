@@ -1,4 +1,5 @@
 import { getTranslationListenUrl } from "@/lib/audienceUrl";
+import { shouldProxyTranslationRelay } from "@/lib/translationRelayProxy";
 import {
   getTranslationRelayApiUrl,
   isLocalDevHostname,
@@ -28,12 +29,34 @@ describe("audience listen URL", () => {
     );
   });
 
-  it("sends operator relay calls to the deployed audience URL", () => {
+  it("keeps operator relay calls on the same origin", () => {
     vi.stubEnv("NEXT_PUBLIC_AUDIENCE_URL", "https://church-caption.vercel.app");
 
     expect(getTranslationRelayApiUrl("/api/translation-listen-state")).toBe(
-      "https://church-caption.vercel.app/api/translation-listen-state"
+      "/api/translation-listen-state"
     );
+  });
+
+  it("proxies the church computer to the deployed phone page", () => {
+    vi.stubEnv("NEXT_PUBLIC_AUDIENCE_URL", "https://church-caption.vercel.app");
+
+    expect(
+      shouldProxyTranslationRelay(
+        new Request("http://127.0.0.1:3000/api/translation-listen-state")
+      )
+    ).toBe(true);
+    expect(
+      shouldProxyTranslationRelay(
+        new Request("https://church-caption.vercel.app/api/translation-listen-state")
+      )
+    ).toBe(false);
+    expect(
+      shouldProxyTranslationRelay(
+        new Request("http://127.0.0.1:3000/api/translation-listen-state", {
+          headers: { "x-translation-relay-proxy": "1" },
+        })
+      )
+    ).toBe(false);
   });
 
   it("treats localhost hostnames as local operator", () => {

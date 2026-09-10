@@ -1,17 +1,12 @@
 import { NextResponse } from "next/server";
 
 export function applyTranslationRelayCors(
-  request: Request,
+  _request: Request,
   response: NextResponse
 ): NextResponse {
-  const origin = request.headers.get("Origin");
-
-  if (origin) {
-    response.headers.set("Access-Control-Allow-Origin", origin);
-    response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    response.headers.set("Access-Control-Allow-Headers", "Content-Type");
-    response.headers.append("Vary", "Origin");
-  }
+  response.headers.set("Access-Control-Allow-Origin", "*");
+  response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  response.headers.set("Access-Control-Allow-Headers", "Content-Type");
 
   return response;
 }
