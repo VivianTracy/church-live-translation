@@ -1,10 +1,12 @@
 # Church Translation — Installation Guide
 
-Install on the church computer (Mac or Windows) for live audio translation to wireless headsets.
+Install on the church computer (Mac or Windows) for live audio translation to wireless headsets. Optional phone listening uses a Vercel site and Upstash Redis.
 
 每周主日操作（中英对照）：[`OPERATOR.md`](./OPERATOR.md)
 
 Sunday operator steps (Chinese and English): [`OPERATOR.md`](./OPERATOR.md)
+
+Phone listeners (Vercel + Redis) are a **one-time** setup below. Volunteers do not do this on Sunday.
 
 ## What the app detects automatically
 
@@ -27,9 +29,11 @@ On **Chrome** or **Edge**, the operator page uses the browser’s built-in devic
 
 1. Clone this repository to the church computer.
 2. Run the installer for your OS (below).
-3. Copy `church-setup/env.example` to `.env.local` and add `OPENAI_API_KEY`.
-4. Install a virtual audio cable if you route audio through OBS.
-5. Open **http://localhost:3000/operator-live** and confirm devices appear.
+3. Copy `church-setup/env.example` to `.env.local`.
+4. Add `OPENAI_API_KEY` and `NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app`.
+5. Install a virtual audio cable if you route audio through OBS.
+6. Open **http://127.0.0.1:3000/operator-live** and confirm devices appear.
+7. If people will listen on phones, finish **Phone listeners (Vercel + Redis)** once.
 
 ---
 
@@ -69,7 +73,10 @@ Edit `.env.local` in the project root:
 
 ```env
 OPENAI_API_KEY=sk-...
+NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app
 ```
+
+Do not add Redis keys on the church computer unless a teammate asks you to. Redis belongs on Vercel.
 
 ### 4. Install VB-Audio Virtual Cable (OBS audio only)
 
@@ -116,6 +123,8 @@ chmod +x install-mac.sh
 
 Requires Node.js 20+ and **BlackHole 2ch** for OBS virtual audio (https://existential.audio/blackhole/).
 
+Edit `.env.local` with `OPENAI_API_KEY` and `NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app`.
+
 OBS monitoring device: **BlackHole 2ch**. In operator-live Audio in, select **BlackHole 2ch**.
 
 ---
@@ -130,3 +139,145 @@ OBS monitoring device: **BlackHole 2ch**. In operator-live Audio in, select **Bl
 | No output devices | Use Chrome or Edge (not Firefox). Click **Refresh list** under Audio out. |
 | Translation silent on headsets | Audio out must be the jack or dongle feeding the TT125-TX. |
 | `OPENAI_API_KEY` error | `.env.local` in project root; restart `npm run dev` after editing. |
+| Phone QR missing or local | Set `NEXT_PUBLIC_AUDIENCE_URL` in `.env.local` and restart. |
+| Phone relay “Failed to fetch” | Restart the local app on this branch. The operator should call local `/api` only. |
+| Phones stay on WAITING | Vercel Redis is missing or the last deploy cannot see the env vars. See below. |
+
+---
+
+## Phone listeners (Vercel + Redis)
+
+This is a one-time setup by someone who can sign in to GitHub, Vercel, and Upstash. After it works, the QR code on the operator page stays the same every Sunday.
+
+Headset translation still works if this section is skipped. Phones will not hear audio.
+
+### What each computer does
+
+| Place | Job |
+|---|---|
+| Church computer | Runs `/operator-live`, talks to OpenAI, plays headset audio |
+| Vercel site | Hosts `/listen` and stores short audio chunks |
+| Phones | Open `https://church-caption.vercel.app/listen` and tap **Tap to Listen** |
+
+The OpenAI key stays on the church computer. Do not add it to Vercel.
+
+Until this work is merged to `main`, point Vercel Production at the **`feature/browser-listener`** branch.
+
+### 1. Vercel project
+
+1. Sign in at [https://vercel.com](https://vercel.com) with the church GitHub account.
+2. Import **`VivianTracy/church-live-translation`** (or your fork).
+3. Framework preset: **Next.js**. Leave the build command as `next build`.
+4. Production branch: **`feature/browser-listener`** until this is on `main`.
+5. Deploy. The public URL should be **`https://church-caption.vercel.app`**.
+
+If the project name is different, use that hostname everywhere you see `church-caption.vercel.app`.
+
+### 2. Upstash Redis
+
+Phones and the church computer share audio through Redis. Use the **REST** API, not a TCP `rediss://` URL.
+
+**From the Vercel dashboard (easiest)**
+
+1. Open the project → **Storage** (or **Marketplace**).
+2. Create **Upstash Redis**.
+3. After it is connected, open the database and copy:
+   - **UPSTASH_REDIS_REST_URL** — starts with `https://` and ends with `.upstash.io`
+   - **UPSTASH_REDIS_REST_TOKEN** — a long token
+
+**From [https://console.upstash.com](https://console.upstash.com)**
+
+1. Create a Redis database (the free tier is enough for Sunday listening).
+2. Open the database → **REST API** / **Details**.
+3. Copy the **Endpoint** (`https://....upstash.io`) and **Token**.
+
+Do **not** copy:
+
+- `REDIS_URL` or any `rediss://...` value
+- A name such as `UPSTASH_REST_API_URL` (that name is not used)
+- Quote marks around the URL or token
+
+If Vercel also created old **KV** names (`KV_REST_API_URL` / `KV_REST_API_TOKEN`), leave them unused unless they are the only working REST pair. Prefer the Upstash names. An old KV host that no longer resolves will break phones.
+
+### 3. Environment variables on Vercel
+
+In the Vercel project → **Settings** → **Environment Variables**, add these for **Production**:
+
+| Name | Value |
+|---|---|
+| `UPSTASH_REDIS_REST_URL` | `https://….upstash.io` (no quotes) |
+| `UPSTASH_REDIS_REST_TOKEN` | token only (no quotes) |
+| `NEXT_PUBLIC_AUDIENCE_URL` | `https://church-caption.vercel.app` |
+
+Do **not** add `OPENAI_API_KEY` here.
+
+Then:
+
+1. Open **Deployments**.
+2. Open the latest Production deployment → **Redeploy**.
+3. Uncheck **Use existing Build Cache**.
+4. Redeploy. Env changes do not apply until this finishes.
+
+### 4. Check that Vercel can see Redis
+
+On a laptop (not required to be the church computer):
+
+```bash
+curl -sS https://church-caption.vercel.app/api/translation-listen-state
+```
+
+You want JSON like:
+
+```json
+{"isLive":false,"updatedAt":0,"relayConfigured":true}
+```
+
+| Result | Meaning |
+|---|---|
+| `"relayConfigured":true` | Redis keys are live. Continue. |
+| `"relayConfigured":false` | Env vars are missing on the running deploy. Recheck names, then Redeploy without cache. |
+| HTML login page | Vercel **Deployment Protection** is on. Turn off Vercel Authentication for this project so phones and the church computer can reach `/listen`. |
+| Browser error on `/listen` | Confirm the Production URL and that the latest deployment succeeded. |
+
+Also open **https://church-caption.vercel.app/listen**. You should see **WAITING** and **Tap to Listen** (the button stays disabled until the operator is live).
+
+### 5. Church computer env for the QR
+
+On the church computer, `.env.local` needs:
+
+```env
+OPENAI_API_KEY=sk-...
+NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app
+```
+
+Restart after editing:
+
+```bash
+npm run build
+npm run start
+```
+
+The operator page should show a green note: **Phone QR points to https://church-caption.vercel.app/listen.**
+
+The QR never changes. Print it or leave it on the operator screen. People can use mobile data.
+
+### 6. Test once before Sunday
+
+1. Start translation on the church computer until status is **Live**.
+2. On a phone (Safari or Chrome), open the QR URL or type `https://church-caption.vercel.app/listen`.
+3. When the page says **LIVE**, tap **Tap to Listen**. iPhones need that tap before sound plays.
+4. On the operator page, **Phone relay active** should start counting chunks.
+5. The phone should say **Receiving live translation audio.**
+
+If headsets have sound but phones do not, Redis or the Vercel deploy is the problem, not OpenAI.
+
+### Phone troubleshooting
+
+| Problem | What to check |
+|---|---|
+| Operator shows Failed to fetch | Use this branch and restart `npm run start`. The page should call local `/api`, not Vercel from the browser. |
+| `relayConfigured` is false | Vercel env names, no quotes, then Redeploy **without** build cache. |
+| Redis / `fetch failed` on Vercel | URL must be `https://….upstash.io`. Delete unused `REDIS_URL`. Prefer Upstash names over a dead `KV_REST_API_*` host. |
+| Phones hear choppy old audio | Confirm the deployed site includes the current listener playback code on this branch. |
+| iPhone is silent | The listener must tap **Tap to Listen** after the page says LIVE. Use headphones. |
+| QR points at localhost | `NEXT_PUBLIC_AUDIENCE_URL` is missing on the church computer. Restart after adding it. |

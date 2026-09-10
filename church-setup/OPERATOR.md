@@ -83,6 +83,8 @@ npm run start
 
 输入和输出电平条应该会动。会众耳机里应能听到翻译。
 
+手机收听：屏幕上的二维码是固定的（`https://church-caption.vercel.app/listen`）。会众扫码后，等页面显示 **LIVE**，再点 **Tap to Listen**。手机可以用自己的流量，不必连教会 Wi‑Fi。iPhone 必须先点一下才能出声。
+
 如果状态变成 **Failed**，点 **Reconnect**。程序也会在网络短暂断开时自动重试两次。
 
 长休息时点 **Stop translation**，以节省费用。讲道开始再重新打开。
@@ -104,6 +106,8 @@ npm run start
 | 耳机没声音 | 确认 Audio out 选对了，线插在 TT125 的 MIC 口，接收器已开机。 |
 | 画面显示 Failed | 点 **Reconnect**。若仍失败，检查网络和 `.env.local` 里的密钥。 |
 | Auto 方向不对 | 先停翻译，再选固定方向（中文 → 英文，或英文 → 中文），然后重新开始。 |
+| 手机一直 WAITING | 先确认电脑上已经 Live。若耳机有声音、手机没有，请同工检查 Vercel / Redis（见安装说明）。 |
+| 手机没声音 | 等 LIVE 后再点 **Tap to Listen**。建议戴耳机。 |
 
 ---
 
@@ -178,6 +182,8 @@ Confirm a 3.5 mm cable runs from the PC audio out to the TT125 transmitter **MIC
 
 The level meters should move. Headsets should hear the translation.
 
+Phone listeners: the QR on the page stays the same (`https://church-caption.vercel.app/listen`). People scan it, wait until the page says **LIVE**, then tap **Tap to Listen**. Phones can use mobile data. iPhones need that tap before sound plays.
+
 If the status says **Failed**, click **Reconnect**. The app also retries twice by itself if the network drops briefly.
 
 During a long break, click **Stop translation** to save cost. Start again when preaching resumes.
@@ -199,3 +205,5 @@ During a long break, click **Stop translation** to save cost. Start again when p
 | Silent headsets | Check Audio out, the cable on the TT125 **MIC** port, and that receivers are on. |
 | Status says Failed | Click **Reconnect**. If it still fails, check the network and the API key in `.env.local`. |
 | Auto picked the wrong direction | Stop translation, lock Chinese → English or English → Chinese, then start again. |
+| Phone stays on WAITING | Confirm the computer is Live. If headsets work but phones do not, a teammate should check Vercel / Redis in the install guide. |
+| Phone is silent | Wait for LIVE, then tap **Tap to Listen**. Headphones help. |
