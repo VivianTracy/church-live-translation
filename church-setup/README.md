@@ -23,6 +23,25 @@ On **Chrome** or **Edge**, the operator page uses the browser’s built-in devic
 
 ---
 
+## Wireless headsets
+
+The app plays translated audio out of the church computer. A 3.5 mm cable carries that audio into the transmitter. Test this cable path first, before buying a full set of receivers.
+
+| Package | What to buy | Why |
+|---|---|---|
+| **Small-church starter** | Retekess **TT125**: **one** transmitter and a few receivers | TT125 can work. Buy the smallest kit first and test with a direct cable from the computer. Add receivers only after Sunday audio is reliable. |
+| **Recommended standard** | Retekess **TT116** transmitter plus the receivers you need | The TT116 transmitter has an explicit **3.5 mm line / microphone** input, a substantially stronger advertised range, and is designed more like a permanent church interpretation system. |
+
+**First test (either kit)**
+
+1. Connect a 3.5 mm cable from the computer headphone jack or USB audio dongle to the transmitter input (TT125 **MIC** port, or TT116 line / mic input).
+2. Start translation on `/operator-live` and set **Audio out** to that jack or dongle.
+3. Confirm one receiver hears the translation before you buy more packs.
+
+Do not run the first test through a mixer, Bluetooth, or church Wi‑Fi. The computer must talk to the transmitter by cable.
+
+---
+
 ## Quick start
 
 1. Clone this repository to the church computer.
@@ -101,7 +120,7 @@ npm run start
 
 1. **Translation direction** — Auto, or lock Chinese → English / English → Chinese
 2. **Audio in** — Streaming (ClearClick / BlackHole / CABLE Output) or Microphone
-3. **Audio out** — jack or USB dongle to the **TT125-TX MIC** port
+3. **Audio out** — jack or USB dongle to the transmitter input (TT125 **MIC**, or TT116 line / mic)
 4. **Start translation** — wait until the status says **Live**
 
 ---
@@ -128,5 +147,5 @@ OBS monitoring device: **BlackHole 2ch**. In operator-live Audio in, select **Bl
 | No VB-Cable in the list | Install VB-Cable, reboot, confirm OBS monitoring uses **CABLE Input**, then refresh. |
 | Wrong input after switching Streaming ↔ Mic | Stop translation first. Each mode remembers its own device. |
 | No output devices | Use Chrome or Edge (not Firefox). Click **Refresh list** under Audio out. |
-| Translation silent on headsets | Audio out must be the jack or dongle feeding the TT125-TX. |
+| Translation silent on headsets | Audio out must be the jack or dongle feeding the transmitter 3.5 mm input. |
 | `OPENAI_API_KEY` error | `.env.local` in project root; restart `npm run dev` after editing. |
