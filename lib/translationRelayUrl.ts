@@ -18,9 +18,21 @@ export function isLocalDevHostname(hostname: string): boolean {
 }
 
 export function getTranslationRelayApiUrl(path: string): string {
-  // Operator writes go to this computer's Next server, which uses the
-  // local Redis/KV env. Phones read from the deployed /listen page.
-  return path;
+  const relayOrigin = getTranslationRelayOrigin();
+
+  if (!relayOrigin) {
+    return path;
+  }
+
+  if (typeof window !== "undefined") {
+    const currentOrigin = window.location.origin.replace(/\/$/, "");
+
+    if (relayOrigin === currentOrigin) {
+      return path;
+    }
+  }
+
+  return `${relayOrigin}${path}`;
 }
 
 export function isUsingRemoteTranslationRelay(): boolean {

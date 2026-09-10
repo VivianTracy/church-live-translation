@@ -105,9 +105,13 @@ export default function ListenPage() {
 
   useEffect(() => {
     if (!state.isLive && isPlaying) {
-      playerRef.current?.stop();
-      setIsPlaying(false);
-      lastSeqRef.current = 0;
+      const timer = window.setTimeout(() => {
+        playerRef.current?.stop();
+        setIsPlaying(false);
+        lastSeqRef.current = 0;
+      }, 0);
+
+      return () => window.clearTimeout(timer);
     }
   }, [state.isLive, isPlaying]);
 

@@ -67,11 +67,14 @@ export default function OperatorLivePage() {
   } = useAudioTranslationOperator();
 
   useEffect(() => {
-    setRelayOrigin(getTranslationRelayOrigin());
-    setUsingRemoteRelay(isUsingRemoteTranslationRelay());
-    setShowMissingRelayConfig(
-      isLocalDevHostname(window.location.hostname) && !getTranslationRelayOrigin()
-    );
+    const timer = window.setTimeout(() => {
+      setRelayOrigin(getTranslationRelayOrigin());
+      setUsingRemoteRelay(isUsingRemoteTranslationRelay());
+      setShowMissingRelayConfig(
+        isLocalDevHostname(window.location.hostname) &&
+          !getTranslationRelayOrigin()
+      );
+    }, 0);
 
     void loadTranslationRelayStatus()
       .then((status) => {
@@ -86,6 +89,8 @@ export default function OperatorLivePage() {
             : "Phone relay status unavailable. Headset audio still works."
         );
       });
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   const markAudienceLive = useCallback(() => {
@@ -211,10 +216,11 @@ export default function OperatorLivePage() {
 
         {relayReady === false ? (
           <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
-            The deployed listener is missing Redis/KV. Headset translation still
-            works. Add <span className="font-mono">KV_REST_API_URL</span> and{" "}
-            <span className="font-mono">KV_REST_API_TOKEN</span> on Vercel for
-            phones.
+            Vercel has the keys in Settings, but the running deploy cannot see
+            them yet. Headset translation still works. Open{" "}
+            <span className="font-medium">Deployments</span>, click{" "}
+            <span className="font-medium">Redeploy</span>, and uncheck{" "}
+            <span className="font-medium">Use existing Build Cache</span>.
           </p>
         ) : null}
 

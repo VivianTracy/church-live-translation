@@ -1,5 +1,8 @@
 import { getTranslationListenUrl } from "@/lib/audienceUrl";
-import { isLocalDevHostname } from "@/lib/translationRelayUrl";
+import {
+  getTranslationRelayApiUrl,
+  isLocalDevHostname,
+} from "@/lib/translationRelayUrl";
 import { isTranslationSessionLive } from "@/types/translationListen";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -22,6 +25,14 @@ describe("audience listen URL", () => {
 
     expect(getTranslationListenUrl("http://localhost:3000")).toBe(
       "http://localhost:3000/listen"
+    );
+  });
+
+  it("sends operator relay calls to the deployed audience URL", () => {
+    vi.stubEnv("NEXT_PUBLIC_AUDIENCE_URL", "https://church-caption.vercel.app");
+
+    expect(getTranslationRelayApiUrl("/api/translation-listen-state")).toBe(
+      "https://church-caption.vercel.app/api/translation-listen-state"
     );
   });
 

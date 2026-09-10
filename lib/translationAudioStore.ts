@@ -15,16 +15,39 @@ const MAX_STORED_CHUNKS = 48;
 let localMeta: TranslationAudioMeta = { ...EMPTY_TRANSLATION_AUDIO_META };
 let localChunks: TranslationAudioChunk[] = [];
 
-function parseChunk(raw: unknown): TranslationAudioChunk | null {
-  if (!raw || typeof raw !== "string") {
+export function parseTranslationAudioChunk(
+  raw: unknown
+): TranslationAudioChunk | null {
+  if (!raw) {
     return null;
   }
 
+  let value: unknown = raw;
+
   try {
-    return JSON.parse(raw) as TranslationAudioChunk;
+    if (typeof raw === "string") {
+      value = JSON.parse(raw);
+    }
   } catch {
     return null;
   }
+
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const chunk = value as Partial<TranslationAudioChunk>;
+
+  if (
+    typeof chunk.seq !== "number" ||
+    typeof chunk.mimeType !== "string" ||
+    typeof chunk.data !== "string" ||
+    typeof chunk.createdAt !== "number"
+  ) {
+    return null;
+  }
+
+  return chunk as TranslationAudioChunk;
 }
 
 function requireRedis() {
@@ -46,9 +69,15 @@ export async function getTranslationAudioMeta(): Promise<TranslationAudioMeta> {
     return localMeta;
   }
 
-  const meta = await requireRedis().get<TranslationAudioMeta>(META_KEY);
-
-  return meta ?? EMPTY_TRANSLATION_AUDIO_META;
+  try {
+    const meta = await requireRedis().get<TranslationAudioMeta>(META_KEY);
+    return meta ?? EMPTY_TRANSLATION_AUDIO_META;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Could not reach Upstash Redis (${message}). On Vercel, use the REST URL and REST token, then Redeploy.`
+    );
+  }
 }
 
 export async function setTranslationListenLive(isLive: boolean): Promise<void> {
@@ -168,9 +197,9 @@ export async function getTranslationAudioChunksAfter(
     };
   }
 
-  const rawChunks = await requireRedis().lrange<string>(CHUNKS_KEY, 0, -1);
+  const rawChunks = await requireRedis().lrange<unknown>(CHUNKS_KEY, 0, -1);
   const chunks = rawChunks
-    .map(parseChunk)
+    .map(parseTranslationAudioChunk)
     .filter((chunk): chunk is TranslationAudioChunk => chunk !== null)
     .filter((chunk) => chunk.seq > afterSeq);
 
