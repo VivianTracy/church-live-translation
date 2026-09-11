@@ -114,7 +114,7 @@ export function TranslationAudienceCard() {
         <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
           Local listener link shown. For a permanent phone QR, set{" "}
           <span className="font-mono">NEXT_PUBLIC_AUDIENCE_URL</span> to{" "}
-          <span className="font-mono">https://church-caption.vercel.app</span>{" "}
+          <span className="font-mono">https://church-translate.vercel.app</span>{" "}
           in <span className="font-mono">.env.local</span> and restart.
         </p>
       ) : null}

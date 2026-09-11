@@ -89,7 +89,7 @@ Add these for **Production**:
 | `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase `anon` key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase `service_role` key |
-| `NEXT_PUBLIC_AUDIENCE_URL` | `https://church-caption.vercel.app` |
+| `NEXT_PUBLIC_AUDIENCE_URL` | `https://church-translate.vercel.app` |
 | `UPSTASH_REDIS_REST_URL` | Phone audio |
 | `UPSTASH_REDIS_REST_TOKEN` | Phone audio |
 
@@ -97,7 +97,7 @@ Redeploy without build cache after saving.
 
 ## Check
 
-1. Open `https://church-caption.vercel.app/login`.
+1. Open `https://church-translate.vercel.app/login`.
 2. Sign in as the operator.
 3. You should land on `/operator-live` and see the church name.
 4. `/listen` stays public. Phones do not sign in.

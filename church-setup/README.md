@@ -49,7 +49,7 @@ Do not run the first test through a mixer, Bluetooth, or church Wi‑Fi. The com
 ## Quick start
 
 1. Finish **Church login (Supabase)** and **Phone listeners (Vercel + Redis)** once.
-2. On Sunday, open Chrome to `https://church-caption.vercel.app/login` and sign in.
+2. On Sunday, open Chrome to `https://church-translate.vercel.app/login` and sign in.
 3. Confirm audio devices on `/operator-live`, then start translation.
 4. Local install below is only for development, or a computer that is not using church login yet.
 
@@ -93,7 +93,7 @@ Edit `.env.local` in the project root. For the public site, see [`SUPABASE.md`](
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app
+NEXT_PUBLIC_AUDIENCE_URL=https://church-translate.vercel.app
 ```
 
 Do not add Redis keys on the church computer unless a teammate asks you to. Redis belongs on Vercel.
@@ -143,7 +143,7 @@ chmod +x install-mac.sh
 
 Requires Node.js 20+ and **BlackHole 2ch** for OBS virtual audio (https://existential.audio/blackhole/).
 
-Edit `.env.local` with the Supabase keys from [`SUPABASE.md`](./SUPABASE.md) and `NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app`.
+Edit `.env.local` with the Supabase keys from [`SUPABASE.md`](./SUPABASE.md) and `NEXT_PUBLIC_AUDIENCE_URL=https://church-translate.vercel.app`.
 
 OBS monitoring device: **BlackHole 2ch**. In operator-live Audio in, select **BlackHole 2ch**.
 
@@ -177,7 +177,7 @@ Headset translation still works if this section is skipped. Phones will not hear
 |---|---|
 | Church computer | Opens the Vercel operator page, signs in, plays headset audio |
 | Vercel site | Hosts `/login`, `/operator-live`, `/listen`, and the session API |
-| Phones | Open `https://church-caption.vercel.app/listen` and tap **Tap to Listen** |
+| Phones | Open `https://church-translate.vercel.app/listen` and tap **Tap to Listen** |
 
 The OpenAI key is stored in Supabase Vault. Do not add `OPENAI_API_KEY` to Vercel.
 
@@ -191,9 +191,9 @@ Church login: [`SUPABASE.md`](./SUPABASE.md)
 2. Import **`VivianTracy/church-live-translation`** (or your fork).
 3. Framework preset: **Next.js**. Leave the build command as `next build`.
 4. Production branch: **`feature/public-church-login`** until this is on `main`.
-5. Deploy. The public URL should be **`https://church-caption.vercel.app`**.
+5. Deploy. The public URL should be **`https://church-translate.vercel.app`**.
 
-If the project name is different, use that hostname everywhere you see `church-caption.vercel.app`.
+If the project name is different, use that hostname everywhere you see `church-translate.vercel.app`.
 
 ### 2. Upstash Redis
 
@@ -229,7 +229,7 @@ In the Vercel project → **Settings** → **Environment Variables**, add these 
 |---|---|
 | `UPSTASH_REDIS_REST_URL` | `https://….upstash.io` (no quotes) |
 | `UPSTASH_REDIS_REST_TOKEN` | token only (no quotes) |
-| `NEXT_PUBLIC_AUDIENCE_URL` | `https://church-caption.vercel.app` |
+| `NEXT_PUBLIC_AUDIENCE_URL` | `https://church-translate.vercel.app` |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase `anon` key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase `service_role` key |
@@ -248,7 +248,7 @@ Then:
 On a laptop (not required to be the church computer):
 
 ```bash
-curl -sS https://church-caption.vercel.app/api/translation-listen-state
+curl -sS https://church-translate.vercel.app/api/translation-listen-state
 ```
 
 You want JSON like:
@@ -264,7 +264,7 @@ You want JSON like:
 | HTML login page | Vercel **Deployment Protection** is on. Turn off Vercel Authentication for this project so phones and the church computer can reach `/listen`. |
 | Browser error on `/listen` | Confirm the Production URL and that the latest deployment succeeded. |
 
-Also open **https://church-caption.vercel.app/listen**. You should see **WAITING** and **Tap to Listen** (the button stays disabled until the operator is live).
+Also open **https://church-translate.vercel.app/listen**. You should see **WAITING** and **Tap to Listen** (the button stays disabled until the operator is live).
 
 ### 5. Church computer env for the QR
 
@@ -274,7 +274,7 @@ On the church computer, `.env.local` needs:
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app
+NEXT_PUBLIC_AUDIENCE_URL=https://church-translate.vercel.app
 ```
 
 Restart after editing:
@@ -284,14 +284,14 @@ npm run build
 npm run start
 ```
 
-The operator page should show a green note: **Phone QR points to https://church-caption.vercel.app/listen.**
+The operator page should show a green note: **Phone QR points to https://church-translate.vercel.app/listen.**
 
 The QR never changes. Print it or leave it on the operator screen. People can use mobile data.
 
 ### 6. Test once before Sunday
 
 1. Start translation on the church computer until status is **Live**.
-2. On a phone (Safari or Chrome), open the QR URL or type `https://church-caption.vercel.app/listen`.
+2. On a phone (Safari or Chrome), open the QR URL or type `https://church-translate.vercel.app/listen`.
 3. When the page says **LIVE**, tap **Tap to Listen**. iPhones need that tap before sound plays.
 4. On the operator page, **Phone relay active** should start counting chunks.
 5. The phone should say **Receiving live translation audio.**
