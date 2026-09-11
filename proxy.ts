@@ -11,7 +11,11 @@ function isProtectedOperatorPage(pathname: string): boolean {
 }
 
 function isPublicAuthPage(pathname: string): boolean {
-  return pathname === "/login" || pathname === "/register";
+  return (
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/forgot-password"
+  );
 }
 
 function copyCookies(from: NextResponse, to: NextResponse) {

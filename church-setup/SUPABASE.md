@@ -10,6 +10,10 @@ The OpenAI key is stored in **Supabase Vault**. Public tables keep only church a
 2. Create a project for this church app.
 3. Open **Authentication** → **Providers** and keep **Email** enabled.
 4. Keep **Allow new users to sign up** **off**. Churches register at `/register` in this app, not through the Supabase sign-up form.
+5. Open **Authentication** → **URL Configuration**. Set Site URL to `https://church-translation.vercel.app`. Add Redirect URLs:
+   - `https://church-translation.vercel.app/**`
+   - `http://127.0.0.1:3000/**`
+   Password reset emails open `/auth/callback`, then `/reset-password`.
 
 ## 2. Run the migration
 

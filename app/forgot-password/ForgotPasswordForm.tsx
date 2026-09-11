@@ -1,18 +1,12 @@
 "use client";
 
+import { parseOperatorEmail } from "@/lib/churchRegister";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-function safeNextPath(value: string | null): string {
-  return value && value.startsWith("/") ? value : "/operator-live";
-}
-
-export function LoginForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+export function ForgotPasswordForm() {
   const [error, setError] = useState("");
+  const [sent, setSent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -21,28 +15,44 @@ export function LoginForm() {
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
-    const email = String(formData.get("email") ?? "").trim();
-    const password = String(formData.get("password") ?? "");
+    const email = parseOperatorEmail(formData.get("email"));
+
+    if (!email) {
+      setError("Enter a valid operator email.");
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const supabase = createSupabaseBrowserClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         email,
-        password,
-      });
+        {
+          redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+        }
+      );
 
-      if (signInError) {
-        setError("Could not sign in. Check the email and password.");
+      if (resetError) {
+        console.error("Password reset email error:", resetError);
+        setError("Could not send a reset email. Try again later.");
         return;
       }
 
-      router.replace(safeNextPath(searchParams.get("next")));
-      router.refresh();
+      setSent(true);
     } catch {
       setError("Church sign-in is not configured on this computer.");
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (sent) {
+    return (
+      <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200">
+        If that email is registered, we sent a reset link. Check the inbox, then
+        choose a new password.
+      </p>
+    );
   }
 
   return (
@@ -58,26 +68,6 @@ export function LoginForm() {
         />
       </label>
 
-      <label className="block space-y-2">
-        <span className="text-sm font-medium text-slate-700">Password</span>
-        <input
-          type="password"
-          name="password"
-          autoComplete="current-password"
-          required
-          className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none ring-emerald-600 focus:ring-2"
-        />
-      </label>
-
-      <p>
-        <Link
-          href="/forgot-password"
-          className="text-sm font-medium text-emerald-800 hover:underline"
-        >
-          Forgot password?
-        </Link>
-      </p>
-
       {error ? (
         <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
           {error}
@@ -89,7 +79,7 @@ export function LoginForm() {
         disabled={isSubmitting}
         className="w-full rounded-2xl bg-emerald-700 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
       >
-        {isSubmitting ? "Signing in…" : "Sign in"}
+        {isSubmitting ? "Sending…" : "Send reset link"}
       </button>
     </form>
   );

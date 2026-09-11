@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  MIN_CHURCH_PASSWORD_LENGTH,
+  parseOperatorPassword,
+} from "@/lib/churchRegister";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useState } from "react";
 
 type ChurchAccountCardProps = {
@@ -14,8 +19,11 @@ export function ChurchAccountCard({
   onChurchNameChange,
 }: ChurchAccountCardProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [name, setName] = useState(churchName);
   const [openaiApiKey, setOpenaiApiKey] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -30,6 +38,9 @@ export function ChurchAccountCard({
   function cancelEditing() {
     setName(churchName);
     setOpenaiApiKey("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setIsResettingPassword(false);
     setError("");
     setSaved("");
     setIsEditing(false);
@@ -51,43 +62,81 @@ export function ChurchAccountCard({
       body.openaiApiKey = openaiApiKey.trim();
     }
 
-    if (!body.churchName && !body.openaiApiKey) {
-      setError("Change the church name or enter a new OpenAI key.");
+    const passwordEntered = newPassword.length > 0 || confirmPassword.length > 0;
+    const wantsPasswordReset = isResettingPassword && passwordEntered;
+
+    if (!body.churchName && !body.openaiApiKey && !wantsPasswordReset) {
+      setError(
+        isResettingPassword
+          ? "Enter a new password."
+          : "Change the church name, enter a new OpenAI key, or reset the password."
+      );
       setIsSaving(false);
       return;
     }
 
     try {
-      const response = await fetch("/api/operator/church", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-      const result = (await response.json()) as {
-        error?: string;
-        churchName?: string;
-        keyLastFour?: string;
-      };
+      if (wantsPasswordReset) {
+        const password = parseOperatorPassword(newPassword);
 
-      if (!response.ok) {
-        setError(result.error ?? "Could not save church settings.");
-        return;
+        if (!password) {
+          setError(
+            `Choose a password of at least ${MIN_CHURCH_PASSWORD_LENGTH} characters.`
+          );
+          return;
+        }
+
+        if (newPassword !== confirmPassword) {
+          setError("The new passwords do not match.");
+          return;
+        }
+
+        const supabase = createSupabaseBrowserClient();
+        const { error: passwordError } = await supabase.auth.updateUser({
+          password,
+        });
+
+        if (passwordError) {
+          setError("Could not reset the password. Try again.");
+          return;
+        }
       }
 
-      if (result.churchName) {
-        onChurchNameChange?.(result.churchName);
-        setName(result.churchName);
-      }
+      if (body.churchName || body.openaiApiKey) {
+        const response = await fetch("/api/operator/church", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+        const result = (await response.json()) as {
+          error?: string;
+          churchName?: string;
+          keyLastFour?: string;
+        };
 
-      if (result.keyLastFour) {
-        setShownLastFour(result.keyLastFour);
+        if (!response.ok) {
+          setError(result.error ?? "Could not save church settings.");
+          return;
+        }
+
+        if (result.churchName) {
+          onChurchNameChange?.(result.churchName);
+          setName(result.churchName);
+        }
+
+        if (result.keyLastFour) {
+          setShownLastFour(result.keyLastFour);
+        }
       }
 
       setOpenaiApiKey("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setIsResettingPassword(false);
       setIsEditing(false);
-      setSaved("Saved.");
+      setSaved(wantsPasswordReset ? "Password reset." : "Saved.");
     } catch {
       setError("Could not save church settings.");
     } finally {
@@ -125,6 +174,48 @@ export function ChurchAccountCard({
               className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none ring-emerald-600 focus:ring-2"
             />
           </label>
+
+          {isResettingPassword ? (
+            <div className="space-y-4">
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-700">
+                  New password
+                </span>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  autoComplete="new-password"
+                  minLength={MIN_CHURCH_PASSWORD_LENGTH}
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none ring-emerald-600 focus:ring-2"
+                />
+              </label>
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Confirm new password
+                </span>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  autoComplete="new-password"
+                  minLength={MIN_CHURCH_PASSWORD_LENGTH}
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none ring-emerald-600 focus:ring-2"
+                />
+              </label>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                setIsResettingPassword(true);
+              }}
+              className="text-sm font-medium text-emerald-800 hover:underline"
+            >
+              Reset password
+            </button>
+          )}
 
           {error ? (
             <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
