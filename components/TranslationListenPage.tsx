@@ -14,6 +14,8 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 const LATEST_AUDIO_SEQUENCE = Number.MAX_SAFE_INTEGER;
+const LIVE_CATCHUP_CHUNKS = 4;
+const STOP_AFTER_NOT_LIVE_MS = 4000;
 
 type TranslationListenPageProps = {
   churchSlug: string;
@@ -139,15 +141,17 @@ export function TranslationListenPage({
   }, [isPlaying, parsedSlug]);
 
   useEffect(() => {
-    if (!state.isLive && isPlaying) {
-      const timer = window.setTimeout(() => {
-        playerRef.current?.stop();
-        setIsPlaying(false);
-        lastSeqRef.current = 0;
-      }, 0);
-
-      return () => window.clearTimeout(timer);
+    if (state.isLive || !isPlaying) {
+      return;
     }
+
+    const timer = window.setTimeout(() => {
+      playerRef.current?.stop();
+      setIsPlaying(false);
+      lastSeqRef.current = 0;
+    }, STOP_AFTER_NOT_LIVE_MS);
+
+    return () => window.clearTimeout(timer);
   }, [state.isLive, isPlaying]);
 
   const handleStartListening = async () => {
@@ -175,7 +179,10 @@ export function TranslationListenPage({
         parsedSlug,
         LATEST_AUDIO_SEQUENCE
       );
-      lastSeqRef.current = payload.meta.latestSeq;
+      lastSeqRef.current = Math.max(
+        0,
+        payload.meta.latestSeq - LIVE_CATCHUP_CHUNKS
+      );
       setIsPlaying(true);
     } catch (error) {
       setPlaybackError(

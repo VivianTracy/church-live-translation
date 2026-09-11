@@ -322,7 +322,7 @@ export async function connectOpenAIAudioTranslation(
           resources.stopPcmUpload = startAudioNodePcmUploader(
             monitorContext,
             outputSource,
-            600,
+            800,
             options.onWavChunk
           );
         }

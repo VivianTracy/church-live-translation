@@ -12,27 +12,24 @@ function base64ToBytes(base64: string): Uint8Array {
   return bytes;
 }
 
-function wavHasAudibleAudio(base64: string): boolean {
-  const bytes = base64ToBytes(base64);
+function createPlaybackAudioContext(): AudioContext {
+  const AudioContextCtor =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext;
 
-  if (bytes.length <= 44) {
-    return false;
+  if (!AudioContextCtor) {
+    throw new Error("This phone cannot play live audio.");
   }
 
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const lastIndex = bytes.length - 1;
-
-  for (let index = 44; index < lastIndex; index += 2) {
-    if (Math.abs(view.getInt16(index, true)) > 80) {
-      return true;
-    }
-  }
-
-  return false;
+  return new AudioContextCtor();
 }
 
 const SILENT_WAV_DATA_URL =
   "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+const PLAYBACK_BUFFER_SECONDS = 1.5;
+const UNDERRUN_PREROLL_SECONDS = 0.2;
+const PLAYBACK_GAIN = 1.8;
 
 export function unlockMobileAudioPlayback(): HTMLAudioElement {
   const audio = new Audio(SILENT_WAV_DATA_URL);
@@ -49,6 +46,10 @@ export class TranslationAudioChunkPlayer {
   private queue: TranslationAudioChunk[] = [];
   private processing = false;
   private stopped = false;
+  private context: AudioContext | null = null;
+  private gain: GainNode | null = null;
+  private nextStartTime = 0;
+  private activeSources = new Set<AudioBufferSourceNode>();
   private audio: HTMLAudioElement;
   private activeUrl = "";
   chunksPlayed = 0;
@@ -67,20 +68,38 @@ export class TranslationAudioChunkPlayer {
   async prepare(): Promise<void> {
     this.audio.muted = false;
     this.audio.volume = 1;
-
     try {
       await this.audio.play();
     } catch {
-      // The later chunk play() still uses this same unlocked element.
+      // Web Audio can still start from this same tap.
     }
+
+    if (!this.context) {
+      this.context = createPlaybackAudioContext();
+      this.gain = this.context.createGain();
+      this.gain.gain.value = PLAYBACK_GAIN;
+      this.gain.connect(this.context.destination);
+    }
+
+    if (this.context.state === "suspended") {
+      await this.context.resume();
+    }
+
+    if (this.context.state !== "running" || !this.gain) {
+      throw new Error("This phone did not allow audio playback. Tap again.");
+    }
+
+    const silent = this.context.createBuffer(1, 1, this.context.sampleRate);
+    const source = this.context.createBufferSource();
+    source.buffer = silent;
+    source.connect(this.gain);
+    source.start(0);
+
+    this.nextStartTime = this.context.currentTime + PLAYBACK_BUFFER_SECONDS;
   }
 
   enqueue(chunk: TranslationAudioChunk): void {
     if (this.stopped) {
-      return;
-    }
-
-    if (chunk.mimeType === "audio/wav" && !wavHasAudibleAudio(chunk.data)) {
       return;
     }
 
@@ -103,7 +122,11 @@ export class TranslationAudioChunkPlayer {
       }
 
       try {
-        await this.playChunk(chunk);
+        if (chunk.mimeType === "audio/wav") {
+          await this.scheduleWavChunk(chunk.data);
+        } else {
+          await this.playLegacyChunk(chunk);
+        }
         this.chunksPlayed += 1;
         this.lastError = "";
       } catch (error) {
@@ -116,11 +139,41 @@ export class TranslationAudioChunkPlayer {
     this.processing = false;
   }
 
-  private playChunk(chunk: TranslationAudioChunk): Promise<void> {
+  private async scheduleWavChunk(base64: string): Promise<void> {
+    if (!this.context || !this.gain || this.context.state !== "running") {
+      throw new Error("Phone audio is paused. Tap Listen again.");
+    }
+
+    const bytes = base64ToBytes(base64);
+    const arrayBuffer = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength
+    ) as ArrayBuffer;
+    const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+    const source = this.context.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(this.gain);
+
+    const now = this.context.currentTime;
+
+    if (this.nextStartTime < now) {
+      this.nextStartTime = now + UNDERRUN_PREROLL_SECONDS;
+    }
+
+    this.activeSources.add(source);
+    source.onended = () => {
+      this.activeSources.delete(source);
+      source.disconnect();
+    };
+    source.start(this.nextStartTime);
+    this.nextStartTime += audioBuffer.duration;
+  }
+
+  private playLegacyChunk(chunk: TranslationAudioChunk): Promise<void> {
     const bytes = base64ToBytes(chunk.data);
     const copy = new Uint8Array(bytes.byteLength);
     copy.set(bytes);
-    const blob = new Blob([copy], { type: chunk.mimeType || "audio/wav" });
+    const blob = new Blob([copy], { type: chunk.mimeType });
     const url = URL.createObjectURL(blob);
 
     if (this.activeUrl) {
@@ -159,6 +212,15 @@ export class TranslationAudioChunkPlayer {
     this.stopped = true;
     this.queue = [];
     this.processing = false;
+    this.activeSources.forEach((source) => {
+      source.stop();
+      source.disconnect();
+    });
+    this.activeSources.clear();
+    void this.context?.close();
+    this.context = null;
+    this.gain = null;
+    this.nextStartTime = 0;
     this.audio.pause();
     this.audio.removeAttribute("src");
     this.audio.load();
