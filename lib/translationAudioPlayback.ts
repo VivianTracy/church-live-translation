@@ -41,7 +41,6 @@ export function unlockMobileAudioPlayback(): HTMLAudioElement {
   audio.volume = 1;
   audio.setAttribute("playsinline", "true");
   audio.setAttribute("webkit-playsinline", "true");
-  audio.playsInline = true;
   void audio.play().catch(() => undefined);
   return audio;
 }
@@ -63,7 +62,6 @@ export class TranslationAudioChunkPlayer {
     this.audio.volume = 1;
     this.audio.setAttribute("playsinline", "true");
     this.audio.setAttribute("webkit-playsinline", "true");
-    this.audio.playsInline = true;
   }
 
   async prepare(): Promise<void> {
@@ -184,7 +182,6 @@ export class TranslationAudioChunkPlayer {
       this.audio.volume = 1;
       this.audio.setAttribute("playsinline", "true");
       this.audio.setAttribute("webkit-playsinline", "true");
-      this.audio.playsInline = true;
     }
   }
 }
