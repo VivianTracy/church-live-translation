@@ -3,24 +3,29 @@ import {
   OPENAI_AUDIO_TRANSLATION_MODEL,
   OPENAI_TRANSCRIPTION_MODEL,
 } from "@/lib/openaiModels";
+import { createOpenAITranslationClientSecret } from "@/lib/openaiServer";
 import {
-  createOpenAITranslationClientSecret,
-  getOpenAIApiKey,
-} from "@/lib/openaiServer";
+  authorizeAudioTranslationSession,
+  recordAuthorizedTranslationSession,
+  resolveOutputLanguage,
+} from "@/lib/audioTranslationSession";
 
 type AudioTranslationSessionRequest = {
   outputLanguage?: string;
 };
 
-function resolveOutputLanguage(value: string | undefined): "en" | "zh" {
-  return value === "zh" ? "zh" : "en";
-}
-
 export async function POST(request: Request) {
-  if (!getOpenAIApiKey()) {
+  const authorized = await authorizeAudioTranslationSession();
+
+  if (!authorized.ok) {
+    const headers =
+      authorized.status === 429 && authorized.retryAfterSeconds
+        ? { "Retry-After": String(authorized.retryAfterSeconds) }
+        : undefined;
+
     return NextResponse.json(
-      { error: "OPENAI_API_KEY is not configured" },
-      { status: 500 }
+      { error: authorized.error },
+      { status: authorized.status, headers }
     );
   }
 
@@ -28,18 +33,26 @@ export async function POST(request: Request) {
   const outputLanguage = resolveOutputLanguage(body.outputLanguage);
 
   try {
-    const secret = await createOpenAITranslationClientSecret({
-      model: OPENAI_AUDIO_TRANSLATION_MODEL,
-      audio: {
-        input: {
-          transcription: {
-            model: OPENAI_TRANSCRIPTION_MODEL,
+    const secret = await createOpenAITranslationClientSecret(
+      {
+        model: OPENAI_AUDIO_TRANSLATION_MODEL,
+        audio: {
+          input: {
+            transcription: {
+              model: OPENAI_TRANSCRIPTION_MODEL,
+            },
+          },
+          output: {
+            language: outputLanguage,
           },
         },
-        output: {
-          language: outputLanguage,
-        },
       },
+      authorized.apiKey
+    );
+
+    await recordAuthorizedTranslationSession({
+      operator: authorized.operator,
+      outputLanguage,
     });
 
     return NextResponse.json({

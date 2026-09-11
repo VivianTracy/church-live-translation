@@ -21,7 +21,7 @@ npm install
 
 if [[ ! -f .env.local ]]; then
   cp church-setup/env.example .env.local
-  echo "Created .env.local from church-setup/env.example — add OPENAI_API_KEY."
+  echo "Created .env.local from church-setup/env.example — add the Supabase keys."
 else
   echo ".env.local already exists — skipped."
 fi
@@ -31,8 +31,8 @@ echo "Mac setup complete."
 echo
 echo "Next steps:"
 echo "  1. Install BlackHole 2ch: https://existential.audio/blackhole/"
-echo "  2. Edit .env.local with OPENAI_API_KEY and NEXT_PUBLIC_AUDIENCE_URL"
+echo "  2. Edit .env.local with the Supabase keys (church-setup/SUPABASE.md)"
 echo "  3. npm run build"
-echo "  4. npm run start   (opens Chrome to /operator-live)"
+echo "  4. npm run start   (opens Chrome to /operator-live; sign in)"
 echo "  5. Daily use (Chinese / English): church-setup/OPERATOR.md"
-echo "  6. Phone listeners (Vercel + Redis): church-setup/README.md"
+echo "  6. Public site (Vercel + Supabase + Redis): church-setup/README.md"

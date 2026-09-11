@@ -15,12 +15,13 @@ export function requireOpenAIApiKey(): string {
 }
 
 export async function createOpenAITranslationClientSecret(
-  session: Record<string, unknown>
+  session: Record<string, unknown>,
+  apiKey = requireOpenAIApiKey()
 ): Promise<{ value: string; expiresAt: number }> {
   const response = await fetch(OPENAI_TRANSLATION_CLIENT_SECRETS_URL, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${requireOpenAIApiKey()}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ session }),

@@ -173,6 +173,7 @@ export async function connectOpenAIAudioTranslation(
   try {
     const sessionResponse = await fetch("/api/openai/audio-translation-session", {
       method: "POST",
+      credentials: "same-origin",
       headers: {
         "Content-Type": "application/json",
       },

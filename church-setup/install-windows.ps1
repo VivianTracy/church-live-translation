@@ -23,7 +23,7 @@ $ExampleFile = Join-Path $RootDir "church-setup/env.example"
 
 if (-not (Test-Path $EnvFile)) {
   Copy-Item $ExampleFile $EnvFile
-  Write-Host "Created .env.local from church-setup/env.example — add OPENAI_API_KEY."
+  Write-Host "Created .env.local from church-setup/env.example — add the Supabase keys."
 } else {
   Write-Host ".env.local already exists — skipped."
 }
@@ -33,9 +33,9 @@ Write-Host "Windows setup complete."
 Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  1. Install VB-Audio Virtual Cable (if using OBS audio): https://vb-audio.com/Cable/"
-Write-Host "  2. Edit .env.local with OPENAI_API_KEY and NEXT_PUBLIC_AUDIENCE_URL"
+Write-Host "  2. Edit .env.local with the Supabase keys (church-setup/SUPABASE.md)"
 Write-Host "  3. npm run build"
-Write-Host "  4. npm run start   (opens Chrome to /operator-live)"
+Write-Host "  4. npm run start   (opens Chrome to /operator-live; sign in)"
 Write-Host "  5. Click Allow access & refresh — input/output devices are detected automatically"
 Write-Host "  6. Daily use (Chinese / English): church-setup/OPERATOR.md"
-Write-Host "  7. Phone listeners (Vercel + Redis): church-setup/README.md"
+Write-Host "  7. Public site (Vercel + Supabase + Redis): church-setup/README.md"

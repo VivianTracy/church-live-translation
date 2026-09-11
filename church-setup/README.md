@@ -1,6 +1,8 @@
 # Church Translation — Installation Guide
 
-Install on the church computer (Mac or Windows) for live audio translation to wireless headsets. Optional phone listening uses a Vercel site and Upstash Redis.
+Sunday operators open the Vercel site, sign in, and start translation on the church computer in Chrome or Edge. Phone listening uses the same site and Upstash Redis.
+
+Church login (one-time): [`SUPABASE.md`](./SUPABASE.md)
 
 每周主日操作（中英对照）：[`OPERATOR.md`](./OPERATOR.md)
 
@@ -46,13 +48,10 @@ Do not run the first test through a mixer, Bluetooth, or church Wi‑Fi. The com
 
 ## Quick start
 
-1. Clone this repository to the church computer.
-2. Run the installer for your OS (below).
-3. Copy `church-setup/env.example` to `.env.local`.
-4. Add `OPENAI_API_KEY` and `NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app`.
-5. Install a virtual audio cable if you route audio through OBS.
-6. Open **http://127.0.0.1:3000/operator-live** and confirm devices appear.
-7. If people will listen on phones, finish **Phone listeners (Vercel + Redis)** once.
+1. Finish **Church login (Supabase)** and **Phone listeners (Vercel + Redis)** once.
+2. On Sunday, open Chrome to `https://church-caption.vercel.app/login` and sign in.
+3. Confirm audio devices on `/operator-live`, then start translation.
+4. Local install below is only for development, or a computer that is not using church login yet.
 
 ---
 
@@ -66,7 +65,7 @@ Do not run the first test through a mixer, Bluetooth, or church Wi‑Fi. The com
 | **Node.js 20 LTS or newer** | https://nodejs.org |
 | **Google Chrome or Microsoft Edge** | Required for device listing and audio routing |
 | **VB-Audio Virtual Cable** | Only if audio comes from OBS — https://vb-audio.com/Cable/ |
-| **OpenAI API key** | Set in `.env.local` |
+| **OpenAI API key** | Encrypted in Supabase for the public site. Local fallback only if church login is not configured. |
 
 ### 1. Install Node.js
 
@@ -86,12 +85,15 @@ powershell -ExecutionPolicy Bypass -File install-windows.ps1
 
 This runs `npm install` and creates `.env.local` from `env.example` if missing.
 
-### 3. Add your API key
+### 3. Add church login keys
 
-Edit `.env.local` in the project root:
+Edit `.env.local` in the project root. For the public site, see [`SUPABASE.md`](./SUPABASE.md). Do not put `OPENAI_API_KEY` on Vercel.
 
 ```env
-OPENAI_API_KEY=sk-...
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+CHURCH_SECRET_ENCRYPTION_KEY=
 NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app
 ```
 
@@ -142,7 +144,7 @@ chmod +x install-mac.sh
 
 Requires Node.js 20+ and **BlackHole 2ch** for OBS virtual audio (https://existential.audio/blackhole/).
 
-Edit `.env.local` with `OPENAI_API_KEY` and `NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app`.
+Edit `.env.local` with the Supabase keys from [`SUPABASE.md`](./SUPABASE.md) and `NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app`.
 
 OBS monitoring device: **BlackHole 2ch**. In operator-live Audio in, select **BlackHole 2ch**.
 
@@ -157,7 +159,7 @@ OBS monitoring device: **BlackHole 2ch**. In operator-live Audio in, select **Bl
 | Wrong input after switching Streaming ↔ Mic | Stop translation first. Each mode remembers its own device. |
 | No output devices | Use Chrome or Edge (not Firefox). Click **Refresh list** under Audio out. |
 | Translation silent on headsets | Audio out must be the jack or dongle feeding the transmitter 3.5 mm input. |
-| `OPENAI_API_KEY` error | `.env.local` in project root; restart `npm run dev` after editing. |
+| Sign-in error | Confirm the operator exists in Supabase and is in `church_operators`. |
 | Phone QR missing or local | Set `NEXT_PUBLIC_AUDIENCE_URL` in `.env.local` and restart. |
 | Phone relay “Failed to fetch” | Restart the local app on this branch. The operator should call local `/api` only. |
 | Phones stay on WAITING | Vercel Redis is missing or the last deploy cannot see the env vars. See below. |
@@ -174,20 +176,22 @@ Headset translation still works if this section is skipped. Phones will not hear
 
 | Place | Job |
 |---|---|
-| Church computer | Runs `/operator-live`, talks to OpenAI, plays headset audio |
-| Vercel site | Hosts `/listen` and stores short audio chunks |
+| Church computer | Opens the Vercel operator page, signs in, plays headset audio |
+| Vercel site | Hosts `/login`, `/operator-live`, `/listen`, and the session API |
 | Phones | Open `https://church-caption.vercel.app/listen` and tap **Tap to Listen** |
 
-The OpenAI key stays on the church computer. Do not add it to Vercel.
+The OpenAI key is stored encrypted in Supabase. Do not add `OPENAI_API_KEY` to Vercel.
 
-Until this work is merged to `main`, point Vercel Production at the **`feature/browser-listener`** branch.
+Until this work is merged to `main`, point Vercel Production at the **`feature/public-church-login`** branch.
+
+Church login: [`SUPABASE.md`](./SUPABASE.md)
 
 ### 1. Vercel project
 
 1. Sign in at [https://vercel.com](https://vercel.com) with the church GitHub account.
 2. Import **`VivianTracy/church-live-translation`** (or your fork).
 3. Framework preset: **Next.js**. Leave the build command as `next build`.
-4. Production branch: **`feature/browser-listener`** until this is on `main`.
+4. Production branch: **`feature/public-church-login`** until this is on `main`.
 5. Deploy. The public URL should be **`https://church-caption.vercel.app`**.
 
 If the project name is different, use that hostname everywhere you see `church-caption.vercel.app`.
@@ -227,8 +231,12 @@ In the Vercel project → **Settings** → **Environment Variables**, add these 
 | `UPSTASH_REDIS_REST_URL` | `https://….upstash.io` (no quotes) |
 | `UPSTASH_REDIS_REST_TOKEN` | token only (no quotes) |
 | `NEXT_PUBLIC_AUDIENCE_URL` | `https://church-caption.vercel.app` |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase `anon` key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase `service_role` key |
+| `CHURCH_SECRET_ENCRYPTION_KEY` | 64-character hex secret |
 
-Do **not** add `OPENAI_API_KEY` here.
+Do **not** add `OPENAI_API_KEY` here. See [`SUPABASE.md`](./SUPABASE.md).
 
 Then:
 
@@ -265,7 +273,10 @@ Also open **https://church-caption.vercel.app/listen**. You should see **WAITING
 On the church computer, `.env.local` needs:
 
 ```env
-OPENAI_API_KEY=sk-...
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+CHURCH_SECRET_ENCRYPTION_KEY=
 NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app
 ```
 

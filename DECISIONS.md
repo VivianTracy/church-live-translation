@@ -1,5 +1,11 @@
 # Decisions
 
+## 2026-09-10
+
+Public Vercel operator uses Supabase church login. The session endpoint identifies the signed-in user’s church, requires an authorized operator, decrypts that church’s OpenAI key, and returns only a temporary Realtime credential. Session creates are rate-limited and recorded.
+
+**Reason:** The OpenAI key must not live in the browser or as a shared Vercel env var once the operator page is on the public internet.
+
 ## 2026-09-09
 
 Reliable single-church operator: one **Start translation** button, explicit Off / Connecting / Live / Reconnecting / Failed status, two automatic reconnects, and `next start` bound to `127.0.0.1`.

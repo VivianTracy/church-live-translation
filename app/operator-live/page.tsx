@@ -21,10 +21,20 @@ import {
   isUsingRemoteTranslationRelay,
 } from "@/lib/translationRelayUrl";
 import { useAudioTranslationOperator } from "@/lib/useAudioTranslationOperator";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+type OperatorAccount = {
+  mode: "local" | "church";
+  churchName: string | null;
+  email: string | null;
+};
+
 export default function OperatorLivePage() {
+  const router = useRouter();
   const [seconds, setSeconds] = useState(0);
+  const [account, setAccount] = useState<OperatorAccount | null>(null);
+  const [accountError, setAccountError] = useState("");
   const [relayError, setRelayError] = useState("");
   const [relayReady, setRelayReady] = useState<boolean | null>(null);
   const [showMissingRelayConfig, setShowMissingRelayConfig] = useState(false);
@@ -65,6 +75,42 @@ export default function OperatorLivePage() {
     startListening,
     stopListening,
   } = useAudioTranslationOperator();
+
+  useEffect(() => {
+    void fetch("/api/operator/me", { cache: "no-store" })
+      .then(async (response) => {
+        if (response.status === 401) {
+          router.replace("/login?next=/operator-live");
+          return;
+        }
+
+        const body = (await response.json()) as OperatorAccount & {
+          error?: string;
+        };
+
+        if (response.status === 403) {
+          setAccountError(
+            body.error ?? "This account is not an authorized church operator."
+          );
+          return;
+        }
+
+        if (!response.ok) {
+          setAccountError(body.error ?? "Could not confirm church sign-in.");
+          return;
+        }
+
+        setAccount({
+          mode: body.mode,
+          churchName: body.churchName,
+          email: body.email,
+        });
+        setAccountError("");
+      })
+      .catch(() => {
+        setAccountError("Could not confirm church sign-in.");
+      });
+  }, [router]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -153,7 +199,17 @@ export default function OperatorLivePage() {
   return (
     <main className="min-h-screen bg-stone-50 px-6 py-10 text-slate-900">
       <div className="mx-auto max-w-2xl space-y-6">
-        <ChurchTranslationHeader />
+        <ChurchTranslationHeader
+          churchName={account?.churchName}
+          email={account?.email}
+          showSignOut={account?.mode === "church"}
+        />
+
+        {accountError ? (
+          <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
+            {accountError}
+          </p>
+        ) : null}
 
         <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 space-y-8">
           <TranslationDirectionCard

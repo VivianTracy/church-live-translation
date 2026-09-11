@@ -8,26 +8,26 @@ This software is licensed under the [MIT License](./LICENSE).
 
 ## How it works
 
-One volunteer runs the operator page on the church computer in **Chrome or Edge**. Firefox cannot send translated audio to a chosen speaker.
+One volunteer opens the operator page in **Chrome or Edge** and signs in. Firefox cannot send translated audio to a chosen speaker.
 
 ```text
 Streaming audio or mic → Chrome (/operator-live) on the church computer
+                              ↓  church sign-in
+                    temporary Realtime credential
                               ↓
                     gpt-realtime-translate
                               ↓
-        PC audio out → TT125-TX → wireless headsets
+        PC audio out → transmitter → wireless headsets
 
-                              ↓  WAV chunks (through the local /api, then Vercel)
+                              ↓  WAV chunks
                     Upstash Redis
                               ↓
         Phones scan a permanent QR → https://church-caption.vercel.app/listen
 ```
 
-Headsets stay on the church computer. They do not need Vercel.
+The public operator page is on Vercel. The volunteer signs in. The server finds that church, checks the operator, decrypts the church OpenAI key, and returns only a short-lived credential.
 
-Phones open the deployed `/listen` page. They can use mobile data. They do not need church Wi‑Fi, and they never see the OpenAI key.
-
-The operator browser talks only to `http://127.0.0.1:3000`. The local app forwards phone-audio requests to Vercel, so the church computer does not hit a browser “Failed to fetch” / CORS error.
+Phones open `/listen`. They do not sign in. They can use mobile data. They never see the OpenAI key.
 
 | Setting | What to use |
 |---|---|
@@ -39,9 +39,9 @@ The operator browser talks only to `http://127.0.0.1:3000`. The local app forwar
 
 **Auto** starts translating immediately (last used direction, or Chinese → English). It only changes direction after clear Chinese or English speech, so a short Bible verse or “Amen” does not flip the headsets.
 
-`http://localhost:3000/` opens `/operator-live`. The local server listens on `127.0.0.1` only, so the OpenAI session API is not on church Wi‑Fi.
+Sunday operators open the Vercel site, sign in, and start translation. Local `npm run start` is for development or a church computer that is not using church login yet.
 
-Church computer install, Vercel, and Redis: [`church-setup/README.md`](./church-setup/README.md)
+Church login, Vercel, and Redis: [`church-setup/README.md`](./church-setup/README.md) and [`church-setup/SUPABASE.md`](./church-setup/SUPABASE.md)
 
 ## Sunday / 主日
 
@@ -56,23 +56,27 @@ git clone https://github.com/VivianTracy/church-live-translation.git
 cd church-live-translation
 npm install
 cp church-setup/env.example .env.local
-# add OPENAI_API_KEY
+# add Supabase keys and CHURCH_SECRET_ENCRYPTION_KEY
 # add NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app
 npm run dev
 ```
 
-Open **http://127.0.0.1:3000/operator-live** in Chrome or Edge. `npm run dev` does not open the browser.
+Open **http://127.0.0.1:3000/login** in Chrome or Edge, then sign in. `npm run dev` does not open the browser.
 
 | Variable | Where | Required for |
 |---|---|---|
-| `OPENAI_API_KEY` | Church computer `.env.local` | Headset translation |
-| `NEXT_PUBLIC_AUDIENCE_URL` | Church computer and Vercel | Permanent phone QR |
-| `UPSTASH_REDIS_REST_URL` | Vercel only | Phone audio relay |
-| `UPSTASH_REDIS_REST_TOKEN` | Vercel only | Phone audio relay |
+| `NEXT_PUBLIC_SUPABASE_URL` | Vercel and local | Church sign-in |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Vercel and local | Church sign-in |
+| `SUPABASE_SERVICE_ROLE_KEY` | Vercel and local server | Church key + session log |
+| `CHURCH_SECRET_ENCRYPTION_KEY` | Vercel and local server | Decrypt the church OpenAI key |
+| `NEXT_PUBLIC_AUDIENCE_URL` | Vercel and local | Permanent phone QR |
+| `UPSTASH_REDIS_REST_URL` | Vercel | Phone audio relay |
+| `UPSTASH_REDIS_REST_TOKEN` | Vercel | Phone audio relay |
+| `OPENAI_API_KEY` | Local only, if Supabase is unset | Temporary local fallback |
 
 Do not commit `.env.local`. Do not put `OPENAI_API_KEY` on Vercel.
 
-Until phone listening is merged to `main`, deploy the Vercel Production branch from `feature/browser-listener`.
+Until this work is merged to `main`, deploy the Vercel Production branch from `feature/public-church-login`.
 
 ## Cost estimate
 
