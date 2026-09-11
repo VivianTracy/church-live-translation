@@ -83,8 +83,8 @@ export function TranslationUsageCard({ refreshKey }: TranslationUsageCardProps) 
         Translation used
       </h2>
       <p className="mt-1 text-sm text-slate-600">
-        Minutes this church has been translating. Older starts without a
-        duration are not counted. This is not the OpenAI dollar balance.
+        Minutes this church has been translating. This is not the OpenAI dollar
+        balance.
       </p>
 
       {error ? (
