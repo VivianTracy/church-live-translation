@@ -2,7 +2,7 @@ import { parseOperatorEmail } from "@/lib/churchRegister";
 
 const RESEND_EMAILS_URL = "https://api.resend.com/emails";
 const DEFAULT_CHURCH_EMAIL_FROM =
-  "Church Translation <beth.t@example.com>";
+  "Church Translation <onboarding@resend.dev>";
 
 export type SendChurchEmailInput = {
   to: string;
@@ -29,13 +29,7 @@ export function getChurchEmailFrom(): string {
 }
 
 export function churchEmailFromCandidates(): string[] {
-  return [
-    ...new Set(
-      [getChurchEmailFrom(), DEFAULT_CHURCH_EMAIL_FROM].filter(
-        (value): value is string => Boolean(value)
-      )
-    ),
-  ];
+  return [getChurchEmailFrom()];
 }
 
 export function isChurchEmailConfigured(): boolean {
@@ -50,6 +44,10 @@ export function readResendSendError(status: number, body: string): string {
     if (message) {
       if (message.toLowerCase().includes("testing emails")) {
         return "Resend can only email the account owner until a sending domain is verified.";
+      }
+
+      if (message.toLowerCase().includes("not verified")) {
+        return "The sending domain is not verified in Resend yet. Finish the DNS records at https://resend.com/domains, then try again.";
       }
 
       return message;

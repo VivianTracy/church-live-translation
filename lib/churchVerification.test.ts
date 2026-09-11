@@ -1,4 +1,8 @@
-import { isChurchEmailConfigured, readResendSendError } from "@/lib/churchEmail";
+import {
+  churchEmailFromCandidates,
+  isChurchEmailConfigured,
+  readResendSendError,
+} from "@/lib/churchEmail";
 import {
   buildChurchApprovedEmail,
   buildChurchReviewEmail,
@@ -115,5 +119,26 @@ describe("church verification emails", () => {
     expect(readResendSendError(401, "")).toBe(
       "Resend rejected the API key or from-address."
     );
+    expect(
+      readResendSendError(
+        403,
+        JSON.stringify({
+          message:
+            "The pvccc.org domain is not verified. Please, add and verify your domain on https://resend.com/domains.",
+        })
+      )
+    ).toBe(
+      "The sending domain is not verified in Resend yet. Finish the DNS records at https://resend.com/domains, then try again."
+    );
+  });
+
+  it("sends only from the configured from-address", () => {
+    vi.stubEnv(
+      "CHURCH_EMAIL_FROM",
+      "Church Translation <noreply@pvccc.org>"
+    );
+    expect(churchEmailFromCandidates()).toEqual([
+      "Church Translation <noreply@pvccc.org>",
+    ]);
   });
 });
