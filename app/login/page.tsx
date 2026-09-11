@@ -1,6 +1,7 @@
 import { LoginForm } from "@/app/login/LoginForm";
 import { ChurchTranslationHeader } from "@/components/ChurchTranslationHeader";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import Link from "next/link";
 import { Suspense } from "react";
 
 export default function LoginPage() {
@@ -33,6 +34,15 @@ export default function LoginPage() {
             </p>
           )}
         </section>
+
+        {isSupabaseConfigured() ? (
+          <p className="text-center text-sm text-slate-600">
+            New church?{" "}
+            <Link href="/register" className="font-medium text-emerald-800">
+              Register this church
+            </Link>
+          </p>
+        ) : null}
       </div>
     </main>
   );

@@ -4,6 +4,7 @@ import { AudioInputSourceCard } from "@/components/AudioInputSourceCard";
 import { AudioMonitorCard } from "@/components/AudioMonitorCard";
 import { AudioOutputDeviceCard } from "@/components/AudioOutputDeviceCard";
 import { AudioTranslationStatusCard } from "@/components/AudioTranslationStatusCard";
+import { ChurchAccountCard } from "@/components/ChurchAccountCard";
 import { ChurchTranslationHeader } from "@/components/ChurchTranslationHeader";
 import { TranslationAudienceCard } from "@/components/TranslationAudienceCard";
 import { TranslationDirectionCard } from "@/components/TranslationDirectionCard";
@@ -30,6 +31,7 @@ type OperatorAccount = {
   churchName: string | null;
   churchSlug: string;
   email: string | null;
+  keyLastFour: string | null;
 };
 
 export default function OperatorLivePage() {
@@ -109,6 +111,7 @@ export default function OperatorLivePage() {
           churchName: body.churchName,
           churchSlug: body.churchSlug || "local",
           email: body.email,
+          keyLastFour: body.keyLastFour ?? null,
         });
         setAccountError("");
       })
@@ -232,6 +235,19 @@ export default function OperatorLivePage() {
 
         {account?.mode === "church" ? (
           <TranslationUsageCard refreshKey={sessionStatus} />
+        ) : null}
+
+        {account?.mode === "church" && account.churchName && account.churchSlug ? (
+          <ChurchAccountCard
+            churchName={account.churchName}
+            churchSlug={account.churchSlug}
+            keyLastFour={account.keyLastFour}
+            onChurchNameChange={(churchName) => {
+              setAccount((current) =>
+                current ? { ...current, churchName } : current
+              );
+            }}
+          />
         ) : null}
 
         <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 space-y-8">

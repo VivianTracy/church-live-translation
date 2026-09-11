@@ -1,10 +1,11 @@
-import { LOCAL_LISTEN_CHURCH_SLUG } from "@/lib/churchSlug";
 import { NextResponse } from "next/server";
 import { requiresChurchLogin } from "@/lib/audioTranslationSessionMode";
 import {
+  getChurchOpenAIKeyLastFour,
   getChurchOperatorForUser,
   getSignedInUser,
 } from "@/lib/churchOperatorAccess";
+import { LOCAL_LISTEN_CHURCH_SLUG } from "@/lib/churchSlug";
 
 export async function GET() {
   if (!requiresChurchLogin()) {
@@ -13,6 +14,7 @@ export async function GET() {
       churchName: null,
       churchSlug: LOCAL_LISTEN_CHURCH_SLUG,
       email: null,
+      keyLastFour: null,
     });
   }
 
@@ -39,5 +41,6 @@ export async function GET() {
     churchName: operator.churchName,
     churchSlug: operator.churchSlug,
     email: operator.email,
+    keyLastFour: await getChurchOpenAIKeyLastFour(operator.churchId),
   });
 }

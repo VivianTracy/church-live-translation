@@ -9,7 +9,7 @@ The OpenAI key is stored in **Supabase Vault**. Public tables keep only church a
 1. Sign in at [https://supabase.com](https://supabase.com).
 2. Create a project for this church app.
 3. Open **Authentication** → **Providers** and keep **Email** enabled.
-4. Turn **off** public sign-ups. Invite operators yourself.
+4. Keep **Allow new users to sign up** **off**. Churches register at `/register` in this app, not through the Supabase sign-up form.
 
 ## 2. Run the migration
 
@@ -23,7 +23,9 @@ If church login is already set up, also run:
 
 [`supabase/migrations/20260911010000_translation_session_duration.sql`](../supabase/migrations/20260911010000_translation_session_duration.sql)
 
-That adds how many seconds each translation run lasted. Older rows stay empty and are not counted as minutes.
+[`supabase/migrations/20260911120000_register_church.sql`](../supabase/migrations/20260911120000_register_church.sql)
+
+The duration file records how long translation ran. The register file lets a church create itself at `/register` without SQL.
 
 If you already ran an older `schema.sql` that created `public.church_secrets`, this migration drops that public table. Store the key in Vault next.
 
@@ -40,6 +42,10 @@ From **Project Settings** → **API**, copy:
 Do not put `OPENAI_API_KEY` on Vercel. Do not put a church encryption secret in the app env. Vault holds the key.
 
 ## 4. Add a church and operator
+
+New churches should open `/register` and fill in the church name, listen slug, operator email, password, and OpenAI key. Keep Supabase public sign-up **off**.
+
+SQL below is only a fallback if `/register` is not deployed yet.
 
 1. In Supabase **Authentication** → **Users**, invite or create the operator email.
 2. Copy the user’s UUID.
@@ -59,6 +65,8 @@ values (
 ```
 
 ## 5. Store the OpenAI key in Vault
+
+`/register` and **This church** on the operator page do this for you. The SQL below is only a fallback.
 
 In **SQL Editor**, replace the key, church id, and last four characters:
 
@@ -103,7 +111,7 @@ Redeploy without build cache after saving.
 
 ## Check
 
-1. Open `https://church-translate.vercel.app/login`.
-2. Sign in as the operator.
-3. You should land on `/operator-live` and see the church name.
-4. Each church has a public `/listen/{slug}` page. Phones do not sign in.
+1. Open `/register` and create a church, or `/login` if the church already exists.
+2. You should land on `/operator-live` and see the church name.
+3. Each church has a public `/listen/{slug}` page. Phones do not sign in.
+4. Keep **Allow new users to sign up** off in Supabase. Registration is only `/register`.

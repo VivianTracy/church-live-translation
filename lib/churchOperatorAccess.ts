@@ -67,3 +67,18 @@ export async function getDecryptedChurchOpenAIApiKey(
 
   return data.trim();
 }
+
+export async function getChurchOpenAIKeyLastFour(
+  churchId: string
+): Promise<string | null> {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin.rpc("church_openai_key_last_four", {
+    p_church_id: churchId,
+  });
+
+  if (error || typeof data !== "string" || data.length !== 4) {
+    return null;
+  }
+
+  return data;
+}

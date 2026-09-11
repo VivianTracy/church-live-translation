@@ -15,9 +15,8 @@ Use **Google Chrome** or **Microsoft Edge**. Do not use Firefox.
 ### 1. 打开翻译网页并登录
 
 1. 打开 **Google Chrome** 或 **Microsoft Edge**。
-2. 打开 `https://church-translate.vercel.app/login`。
-3. 用本教会操作员的邮箱和密码登录。
-4. 登录后会进入操作页。
+2. 打开登录页。第一次使用本教会时，先点 **Register this church** 登记。之后打开登录页，用本教会操作员的邮箱和密码登录。
+3. 登录后会进入操作页。
 
 手机听众不用登录。他们扫描操作员屏幕上的二维码，打开本教会的收听页（例如 `/listen/pvccc`）。
 
@@ -70,9 +69,8 @@ Use **Google Chrome** or **Microsoft Edge**. Do not use Firefox.
 ### 1. Open the site and sign in
 
 1. Open **Google Chrome** or **Microsoft Edge**.
-2. Go to `https://church-translate.vercel.app/login`.
-3. Sign in with this church’s operator email and password.
-4. You should land on the operator page.
+2. Go to the login page. The first time for this church, click **Register this church**. After that, sign in with this church’s operator email and password.
+3. You should land on the operator page.
 
 Phone listeners do not sign in. They scan the QR on the operator screen, which opens this church’s listen page (for example `/listen/pvccc`).
 

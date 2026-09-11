@@ -10,6 +10,10 @@ function isProtectedOperatorPage(pathname: string): boolean {
   return pathname === "/" || pathname.startsWith("/operator-live");
 }
 
+function isPublicAuthPage(pathname: string): boolean {
+  return pathname === "/login" || pathname === "/register";
+}
+
 function copyCookies(from: NextResponse, to: NextResponse) {
   for (const cookie of from.cookies.getAll()) {
     to.cookies.set(cookie);
@@ -57,7 +61,7 @@ export async function proxy(request: NextRequest) {
     return copyCookies(supabaseResponse, NextResponse.redirect(loginUrl));
   }
 
-  if (pathname === "/login" && user) {
+  if (isPublicAuthPage(pathname) && user) {
     const nextPath = request.nextUrl.searchParams.get("next");
     const destination = request.nextUrl.clone();
     destination.pathname =
