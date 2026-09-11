@@ -44,6 +44,7 @@ export function TranslationListenPage({
   const lastSeqRef = useRef(0);
   const resyncRef = useRef(false);
   const notLiveCountRef = useRef(0);
+  const wasLiveRef = useRef(false);
   const playerRef = useRef<TranslationAudioChunkPlayer | null>(null);
   const unlockedAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -85,6 +86,7 @@ export function TranslationListenPage({
 
         if (isLive) {
           notLiveCountRef.current = 0;
+          wasLiveRef.current = true;
           writeLiveHint(parsedSlug, true);
           setState({
             isLive: true,
@@ -178,6 +180,7 @@ export function TranslationListenPage({
 
         if (payload.meta.isLive || payload.meta.latestSeq > 0) {
           notLiveCountRef.current = 0;
+          wasLiveRef.current = true;
           writeLiveHint(parsedSlug, true);
           setState({
             isLive: true,
@@ -249,7 +252,7 @@ export function TranslationListenPage({
   }, [isPlaying, parsedSlug]);
 
   useEffect(() => {
-    if (state.isLive || !isPlaying) {
+    if (!wasLiveRef.current || state.isLive || !isPlaying) {
       return;
     }
 
@@ -304,12 +307,8 @@ export function TranslationListenPage({
     }
   };
 
-  const listenDisabled = !parsedSlug || (!state.isLive && !isPlaying);
-  const listenLabel = playbackError
-    ? "Tap to Resume"
-    : isPlaying
-      ? "Listening…"
-      : "Tap to Listen";
+  const listenDisabled = !parsedSlug;
+  const listenLabel = isPlaying ? "Tap to restart sound" : "Tap to Listen";
 
   return (
     <main className="min-h-screen bg-stone-950 px-5 py-10 text-white">
@@ -375,8 +374,8 @@ export function TranslationListenPage({
         ) : null}
 
         <p className="text-xs text-zinc-500">
-          Keep this page open. If the sound stops after switching Wi‑Fi or data,
-          tap Listen again.
+          Keep this page open. Turn off Silent. If you hear nothing, tap the
+          green button again.
         </p>
       </div>
     </main>

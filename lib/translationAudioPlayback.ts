@@ -28,7 +28,7 @@ function createPlaybackAudioContext(): AudioContext {
 
 const SILENT_WAV_DATA_URL =
   "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
-const PLAYBACK_BUFFER_SECONDS = 1.5;
+const PLAYBACK_BUFFER_SECONDS = 0.8;
 const UNDERRUN_PREROLL_SECONDS = 0.2;
 const PLAYBACK_GAIN = 1.8;
 
@@ -49,6 +49,8 @@ export class TranslationAudioChunkPlayer {
   private stopped = false;
   private context: AudioContext | null = null;
   private gain: GainNode | null = null;
+  private mediaDestination: MediaStreamAudioDestinationNode | null = null;
+  private keepAlive: AudioBufferSourceNode | null = null;
   private nextStartTime = 0;
   private activeSources = new Set<AudioBufferSourceNode>();
   private audio: HTMLAudioElement;
@@ -69,32 +71,53 @@ export class TranslationAudioChunkPlayer {
   async prepare(): Promise<void> {
     this.audio.muted = false;
     this.audio.volume = 1;
-    this.audio.loop = true;
-    this.audio.src = SILENT_WAV_DATA_URL;
+    this.audio.loop = false;
+    this.audio.removeAttribute("src");
     try {
-      await this.audio.play();
+      this.audio.srcObject = null;
     } catch {
-      // Web Audio can still start from this same tap.
+      // Older phones may not support srcObject.
     }
 
     if (!this.context || this.context.state === "closed") {
       this.context = createPlaybackAudioContext();
       this.gain = this.context.createGain();
       this.gain.gain.value = PLAYBACK_GAIN;
-      this.gain.connect(this.context.destination);
+      this.mediaDestination = this.context.createMediaStreamDestination();
+      this.gain.connect(this.mediaDestination);
     }
 
     await this.resume();
 
-    if (this.context.state !== "running" || !this.gain) {
+    if (this.context.state !== "running" || !this.gain || !this.mediaDestination) {
       throw new Error("This phone did not allow audio playback. Tap again.");
     }
 
+    try {
+      this.keepAlive?.stop();
+    } catch {
+      // Already stopped.
+    }
+
     const silent = this.context.createBuffer(1, 1, this.context.sampleRate);
-    const source = this.context.createBufferSource();
-    source.buffer = silent;
-    source.connect(this.gain);
-    source.start(0);
+    this.keepAlive = this.context.createBufferSource();
+    this.keepAlive.buffer = silent;
+    this.keepAlive.loop = true;
+    this.keepAlive.connect(this.gain);
+    this.keepAlive.start(0);
+
+    this.audio.srcObject = this.mediaDestination.stream;
+
+    try {
+      await Promise.race([
+        this.audio.play(),
+        new Promise<void>((_, reject) => {
+          window.setTimeout(() => reject(new Error("play-timeout")), 800);
+        }),
+      ]);
+    } catch {
+      this.gain.connect(this.context.destination);
+    }
 
     this.nextStartTime = this.context.currentTime + PLAYBACK_BUFFER_SECONDS;
   }
@@ -104,14 +127,16 @@ export class TranslationAudioChunkPlayer {
       return;
     }
 
-    try {
-      await this.audio.play();
-    } catch {
-      // A later tap can unlock HTML audio again.
-    }
-
     if (this.context.state !== "running" && this.context.state !== "closed") {
       await this.context.resume();
+    }
+
+    try {
+      if (this.audio.srcObject) {
+        await this.audio.play();
+      }
+    } catch {
+      // A later tap can unlock HTML audio again.
     }
 
     if (this.context.state === "running" && this.nextStartTime < this.context.currentTime) {
@@ -236,6 +261,12 @@ export class TranslationAudioChunkPlayer {
     this.queue = [];
     this.processing = false;
     this.audio.loop = false;
+    try {
+      this.keepAlive?.stop();
+    } catch {
+      // Already stopped.
+    }
+    this.keepAlive = null;
     this.activeSources.forEach((source) => {
       source.stop();
       source.disconnect();
@@ -244,8 +275,10 @@ export class TranslationAudioChunkPlayer {
     void this.context?.close();
     this.context = null;
     this.gain = null;
+    this.mediaDestination = null;
     this.nextStartTime = 0;
     this.audio.pause();
+    this.audio.srcObject = null;
     this.audio.removeAttribute("src");
     this.audio.load();
 
