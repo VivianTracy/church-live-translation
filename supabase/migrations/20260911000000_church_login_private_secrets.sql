@@ -168,10 +168,27 @@ create table if not exists public.translation_session_events (
   church_id uuid not null references public.churches (id) on delete cascade,
   user_id uuid not null references auth.users (id) on delete cascade,
   output_language text not null,
+  duration_seconds integer,
   created_at timestamptz not null default now()
 );
 
+alter table public.translation_session_events
+  add column if not exists duration_seconds integer;
+
 alter table public.translation_session_events enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'translation_session_events_duration_non_negative'
+  ) then
+    alter table public.translation_session_events
+      add constraint translation_session_events_duration_non_negative
+      check (duration_seconds is null or duration_seconds >= 0);
+  end if;
+end
+$$;
 
 create index if not exists translation_session_events_church_created_idx
   on public.translation_session_events (church_id, created_at desc);

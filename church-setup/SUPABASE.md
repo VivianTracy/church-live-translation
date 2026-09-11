@@ -19,6 +19,12 @@ In **SQL Editor**, open and run the full contents of:
 
 Copy the SQL from that file. Do not type the file path into the editor.
 
+If church login is already set up, also run:
+
+[`supabase/migrations/20260911010000_translation_session_duration.sql`](../supabase/migrations/20260911010000_translation_session_duration.sql)
+
+That adds how many seconds each translation run lasted. Older rows stay empty and are not counted as minutes.
+
 If you already ran an older `schema.sql` that created `public.church_secrets`, this migration drops that public table. Store the key in Vault next.
 
 ## 3. Environment values

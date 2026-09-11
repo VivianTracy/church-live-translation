@@ -230,7 +230,9 @@ export default function OperatorLivePage() {
           </p>
         ) : null}
 
-        {account?.mode === "church" ? <TranslationUsageCard /> : null}
+        {account?.mode === "church" ? (
+          <TranslationUsageCard refreshKey={sessionStatus} />
+        ) : null}
 
         <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 space-y-8">
           <TranslationDirectionCard

@@ -69,6 +69,7 @@ type ConnectOptions = {
   onInputTranscript?: (delta: string) => void;
   onFirstOutputAudio?: () => void;
   onWavChunk?: (wavBase64: string) => void;
+  onSessionEvent?: (sessionEventId: string | null) => void;
   onError: (message: string) => void;
   onConnectionLost: (reason: string) => void;
 };
@@ -185,6 +186,7 @@ export async function connectOpenAIAudioTranslation(
     const sessionData = (await sessionResponse.json()) as {
       clientSecret?: string;
       model?: string;
+      sessionEventId?: string | null;
       error?: string;
     };
 
@@ -193,6 +195,8 @@ export async function connectOpenAIAudioTranslation(
         sessionData.error ?? "Could not create OpenAI audio translation session."
       );
     }
+
+    options.onSessionEvent?.(sessionData.sessionEventId ?? null);
 
     const mic = await getTranslationMicrophoneStream(options.deviceId);
     resources.micStream = mic.stream;

@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       authorized.apiKey
     );
 
-    await recordAuthorizedTranslationSession({
+    const sessionEventId = await recordAuthorizedTranslationSession({
       operator: authorized.operator,
       outputLanguage,
     });
@@ -60,6 +60,7 @@ export async function POST(request: Request) {
       expiresAt: secret.expiresAt,
       model: OPENAI_AUDIO_TRANSLATION_MODEL,
       outputLanguage,
+      sessionEventId,
     });
   } catch (error) {
     console.error("OpenAI audio translation session error:", error);

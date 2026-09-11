@@ -39,9 +39,11 @@ import {
 import { listMicrophoneDevices } from "@/lib/microphoneDeviceStorage";
 import { LOCAL_LISTEN_CHURCH_SLUG } from "@/lib/churchSlug";
 import { createTranslationWavUploader } from "@/lib/translationAudioBroadcast";
+import { reportTranslationSessionDuration } from "@/lib/translationSessionDuration";
 import {
   INITIAL_OPERATOR_SESSION_STATE,
   isOperatorSessionLocked,
+  isOperatorSessionTiming,
   reduceOperatorSession,
   type OperatorSessionState,
 } from "@/lib/operatorSessionState";
@@ -116,6 +118,7 @@ export function useAudioTranslationOperator(options?: { churchSlug?: string }) {
   const inputPeakRef = useRef(0);
   const audioInputSourceRef = useRef<AudioInputSource>("obs-streaming");
   const sessionStartedAtRef = useRef<number | null>(null);
+  const sessionEventIdRef = useRef<string | null>(null);
   const uploadWavChunkRef = useRef<((wavBase64: string) => void) | null>(null);
 
   const directionConfig = getAudioTranslationDirectionConfig(
@@ -253,13 +256,30 @@ export function useAudioTranslationOperator(options?: { churchSlug?: string }) {
     autoDirectionProbedRef.current = false;
   }, []);
 
+  const flushSessionDuration = useCallback((clearEvent = false) => {
+    const eventId = sessionEventIdRef.current;
+    const startedAt = sessionStartedAtRef.current;
+
+    if (eventId && startedAt !== null) {
+      reportTranslationSessionDuration(
+        eventId,
+        Math.max(0, Math.round((Date.now() - startedAt) / 1000))
+      );
+    }
+
+    if (clearEvent) {
+      sessionEventIdRef.current = null;
+    }
+  }, []);
+
   const resetSessionMeters = useCallback(() => {
+    flushSessionDuration(true);
     setLevels(INITIAL_LEVELS);
     setLatencyMs(null);
     setChunksUploaded(0);
     setAudienceBroadcastError("");
     sessionStartedAtRef.current = null;
-  }, []);
+  }, [flushSessionDuration]);
 
   const applyDetectedDirection = useCallback(
     (direction: ResolvedAudioTranslationDirection) => {
@@ -415,6 +435,11 @@ export function useAudioTranslationOperator(options?: { churchSlug?: string }) {
           onWavChunk: (wavBase64) => {
             uploadWavChunkRef.current?.(wavBase64);
           },
+          onSessionEvent: (sessionEventId) => {
+            if (sessionGenerationRef.current === generation) {
+              sessionEventIdRef.current = sessionEventId;
+            }
+          },
           onError: (message) => {
             setMicError("");
             applySession({
@@ -495,6 +520,27 @@ export function useAudioTranslationOperator(options?: { churchSlug?: string }) {
   useEffect(() => {
     startListeningRef.current = startListening;
   }, [startListening]);
+
+  useEffect(() => {
+    if (!isOperatorSessionTiming(session.status)) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      flushSessionDuration();
+    }, 15_000);
+
+    const onPageHide = () => {
+      flushSessionDuration();
+    };
+
+    window.addEventListener("pagehide", onPageHide);
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [flushSessionDuration, session.status]);
 
   useEffect(() => {
     if (

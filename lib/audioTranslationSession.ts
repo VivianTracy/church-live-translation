@@ -117,18 +117,19 @@ export async function authorizeAudioTranslationSession(): Promise<AudioTranslati
 export async function recordAuthorizedTranslationSession(input: {
   operator: ChurchOperatorContext | null;
   outputLanguage: "en" | "zh";
-}): Promise<void> {
+}): Promise<string | null> {
   if (!input.operator) {
-    return;
+    return null;
   }
 
   try {
-    await recordTranslationSessionEvent({
+    return await recordTranslationSessionEvent({
       churchId: input.operator.churchId,
       userId: input.operator.userId,
       outputLanguage: input.outputLanguage,
     });
   } catch (error) {
     console.error("Translation session audit error:", error);
+    return null;
   }
 }

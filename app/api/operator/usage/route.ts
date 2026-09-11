@@ -8,12 +8,17 @@ import { summarizeTranslationUsage } from "@/lib/translationUsage";
 import { resolveTimeZone } from "@/lib/zonedTime";
 import { NextRequest, NextResponse } from "next/server";
 
+type SessionEventRow = {
+  created_at: string;
+  duration_seconds?: number | null;
+};
+
 export async function GET(request: NextRequest) {
   if (!requiresChurchLogin()) {
     return NextResponse.json({
       mode: "local",
-      sessionsToday: 0,
-      sessionsThisMonth: 0,
+      minutesToday: 0,
+      minutesThisMonth: 0,
       lastStartedAt: null,
     });
   }
@@ -42,24 +47,39 @@ export async function GET(request: NextRequest) {
   monthStart.setUTCHours(0, 0, 0, 0);
   monthStart.setUTCDate(monthStart.getUTCDate() - 1);
 
-  const [{ data: monthEvents, error: monthError }, { data: latest, error: latestError }] =
-    await Promise.all([
-      admin
-        .from("translation_session_events")
-        .select("created_at")
-        .eq("church_id", operator.churchId)
-        .gte("created_at", monthStart.toISOString())
-        .order("created_at", { ascending: false }),
-      admin
-        .from("translation_session_events")
-        .select("created_at")
-        .eq("church_id", operator.churchId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-    ]);
+  const monthQuery = admin
+    .from("translation_session_events")
+    .select("created_at, duration_seconds")
+    .eq("church_id", operator.churchId)
+    .gte("created_at", monthStart.toISOString())
+    .order("created_at", { ascending: false });
+  const latestQuery = admin
+    .from("translation_session_events")
+    .select("created_at")
+    .eq("church_id", operator.churchId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  if (monthError || latestError) {
+  const [{ data: monthEvents, error: monthError }, { data: latest, error: latestError }] =
+    await Promise.all([monthQuery, latestQuery]);
+
+  let usageEvents: SessionEventRow[] | null = monthEvents;
+  let usageError = monthError;
+
+  if (usageError) {
+    const fallback = await admin
+      .from("translation_session_events")
+      .select("created_at")
+      .eq("church_id", operator.churchId)
+      .gte("created_at", monthStart.toISOString())
+      .order("created_at", { ascending: false });
+
+    usageEvents = fallback.data;
+    usageError = fallback.error;
+  }
+
+  if (usageError || latestError) {
     return NextResponse.json(
       { error: "Could not load church usage." },
       { status: 500 }
@@ -67,7 +87,11 @@ export async function GET(request: NextRequest) {
   }
 
   const summary = summarizeTranslationUsage(
-    (monthEvents ?? []).map((event) => ({ createdAt: event.created_at })),
+    (usageEvents ?? []).map((event) => ({
+      createdAt: event.created_at,
+      durationSeconds:
+        typeof event.duration_seconds === "number" ? event.duration_seconds : null,
+    })),
     new Date(),
     timeZone,
     latest?.created_at ?? null

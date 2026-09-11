@@ -1,14 +1,18 @@
 "use client";
 
-import { formatSessionCount } from "@/lib/translationUsage";
+import { formatMinutes } from "@/lib/translationUsage";
 import { useEffect, useState } from "react";
 
 type UsageResponse = {
   mode?: "local" | "church";
-  sessionsToday?: number;
-  sessionsThisMonth?: number;
+  minutesToday?: number;
+  minutesThisMonth?: number;
   lastStartedAt?: string | null;
   error?: string;
+};
+
+type TranslationUsageCardProps = {
+  refreshKey?: string;
 };
 
 function formatLastStarted(value: string): string {
@@ -24,7 +28,7 @@ function formatLastStarted(value: string): string {
   });
 }
 
-export function TranslationUsageCard() {
+export function TranslationUsageCard({ refreshKey }: TranslationUsageCardProps) {
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [error, setError] = useState("");
 
@@ -32,34 +36,42 @@ export function TranslationUsageCard() {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const controller = new AbortController();
 
-    void fetch(
-      `/api/operator/usage?timeZone=${encodeURIComponent(timeZone)}`,
-      { cache: "no-store", signal: controller.signal }
-    )
-      .then(async (response) => {
-        const body = (await response.json()) as UsageResponse;
+    const loadUsage = () => {
+      void fetch(
+        `/api/operator/usage?timeZone=${encodeURIComponent(timeZone)}`,
+        { cache: "no-store", signal: controller.signal }
+      )
+        .then(async (response) => {
+          const body = (await response.json()) as UsageResponse;
 
-        if (!response.ok) {
-          throw new Error(body.error ?? "Could not load church usage.");
-        }
+          if (!response.ok) {
+            throw new Error(body.error ?? "Could not load church usage.");
+          }
 
-        setUsage(body);
-        setError("");
-      })
-      .catch((loadError: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
+          setUsage(body);
+          setError("");
+        })
+        .catch((loadError: unknown) => {
+          if (controller.signal.aborted) {
+            return;
+          }
 
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : "Could not load church usage."
-        );
-      });
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Could not load church usage."
+          );
+        });
+    };
 
-    return () => controller.abort();
-  }, []);
+    loadUsage();
+    const timer = window.setInterval(loadUsage, 30_000);
+
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+    };
+  }, [refreshKey]);
 
   if (usage?.mode === "local") {
     return null;
@@ -71,8 +83,8 @@ export function TranslationUsageCard() {
         Translation used
       </h2>
       <p className="mt-1 text-sm text-slate-600">
-        Counted from this church’s start records. This is not the OpenAI dollar
-        balance.
+        Minutes this church has been translating. Older starts without a
+        duration are not counted. This is not the OpenAI dollar balance.
       </p>
 
       {error ? (
@@ -84,13 +96,13 @@ export function TranslationUsageCard() {
           <div>
             <dt className="text-xs text-slate-500">Today</dt>
             <dd className="font-medium text-slate-900">
-              {formatSessionCount(usage.sessionsToday ?? 0)}
+              {formatMinutes(usage.minutesToday ?? 0)}
             </dd>
           </div>
           <div>
             <dt className="text-xs text-slate-500">This month</dt>
             <dd className="font-medium text-slate-900">
-              {formatSessionCount(usage.sessionsThisMonth ?? 0)}
+              {formatMinutes(usage.minutesThisMonth ?? 0)}
             </dd>
           </div>
           <div>
