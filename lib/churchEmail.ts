@@ -31,7 +31,7 @@ export function getChurchEmailFrom(): string {
 export function churchEmailFromCandidates(): string[] {
   return [
     ...new Set(
-      [getChurchEmailFrom(), DEFAULT_CHURCH_EMAIL_FROM, "beth.t@example.com"].filter(
+      [getChurchEmailFrom(), DEFAULT_CHURCH_EMAIL_FROM].filter(
         (value): value is string => Boolean(value)
       )
     ),

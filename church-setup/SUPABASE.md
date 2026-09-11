@@ -115,7 +115,7 @@ Add these for **Production**:
 | `UPSTASH_REDIS_REST_URL` | Phone audio |
 | `UPSTASH_REDIS_REST_TOKEN` | Phone audio |
 | `RESEND_API_KEY` | Review and “you can sign in” emails |
-| `CHURCH_EMAIL_FROM` | Optional. Default is Resend’s test from-address |
+| `CHURCH_EMAIL_FROM` | Optional. A from-address on a domain you verified in Resend. Do not use example.com. |
 
 Redeploy without build cache after saving.
 
@@ -129,7 +129,7 @@ New churches stay **pending** until you confirm them.
 4. After a church registers, sign in and open **Confirm new churches**, or use the confirm link in the review email.
 5. The operator then gets an email that they can sign in.
 
-Resend’s test from-address can email your Resend account address. To email other church operators, add and verify a domain in Resend, then set `CHURCH_EMAIL_FROM` to something like `Church Translation <noreply@your-domain>`. Confirming still works if that operator email cannot be sent; tell them they can sign in.
+Resend cannot send from `example.com` or `church-translation.vercel.app`. Add a domain you own at [https://resend.com/domains](https://resend.com/domains) (the church website domain is fine, or a cheap domain just for this app). Then set `CHURCH_EMAIL_FROM` to `Church Translation <noreply@your-domain>`. Until that is verified, you can still sign in and confirm churches at `/review-churches`.
 
 ## Check
 
