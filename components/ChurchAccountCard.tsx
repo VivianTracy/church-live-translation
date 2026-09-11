@@ -4,14 +4,12 @@ import { useState } from "react";
 
 type ChurchAccountCardProps = {
   churchName: string;
-  churchSlug: string;
   keyLastFour: string | null;
   onChurchNameChange?: (name: string) => void;
 };
 
 export function ChurchAccountCard({
   churchName,
-  churchSlug,
   keyLastFour,
   onChurchNameChange,
 }: ChurchAccountCardProps) {
@@ -99,31 +97,20 @@ export function ChurchAccountCard({
 
   return (
     <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 space-y-4">
-      <div>
-        <h2 className="text-base font-semibold text-slate-900">This church</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Listen link and OpenAI key for this church. Phone listeners do not
-          sign in.
-        </p>
-      </div>
+      <h2 className="text-base font-semibold text-slate-900">This church</h2>
 
       {isEditing ? (
         <form onSubmit={handleSubmit} className="space-y-4">
-          <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-700">Name</span>
-            <input
-              type="text"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              maxLength={80}
-              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none ring-emerald-600 focus:ring-2"
-            />
-          </label>
-
-          <ChurchSummary
-            churchSlug={churchSlug}
-            shownLastFour={shownLastFour}
+          <input
+            type="text"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            maxLength={80}
+            aria-label="Church name"
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none ring-emerald-600 focus:ring-2"
           />
+
+          <OpenAIKeyHint shownLastFour={shownLastFour} />
 
           <label className="block space-y-2">
             <span className="text-sm font-medium text-slate-700">
@@ -165,14 +152,7 @@ export function ChurchAccountCard({
         </form>
       ) : (
         <div className="space-y-4">
-          <p className="text-sm text-slate-600">
-            Name <span className="font-medium text-slate-900">{name}</span>
-          </p>
-
-          <ChurchSummary
-            churchSlug={churchSlug}
-            shownLastFour={shownLastFour}
-          />
+          <OpenAIKeyHint shownLastFour={shownLastFour} />
 
           {saved ? (
             <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200">
@@ -193,26 +173,13 @@ export function ChurchAccountCard({
   );
 }
 
-function ChurchSummary({
-  churchSlug,
-  shownLastFour,
-}: {
-  churchSlug: string;
-  shownLastFour: string | null;
-}) {
+function OpenAIKeyHint({ shownLastFour }: { shownLastFour: string | null }) {
   return (
-    <>
-      <p className="text-sm text-slate-600">
-        Listen link{" "}
-        <span className="font-mono text-slate-900">/listen/{churchSlug}</span>
-      </p>
-
-      <p className="text-sm text-slate-600">
-        OpenAI key{" "}
-        <span className="font-mono text-slate-900">
-          {shownLastFour ? `sk-…${shownLastFour}` : "Not saved yet"}
-        </span>
-      </p>
-    </>
+    <p className="text-sm text-slate-600">
+      OpenAI key{" "}
+      <span className="font-mono text-slate-900">
+        {shownLastFour ? `sk-…${shownLastFour}` : "Not saved yet"}
+      </span>
+    </p>
   );
 }

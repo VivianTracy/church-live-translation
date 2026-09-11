@@ -22,7 +22,7 @@ Streaming audio or mic → Chrome (/operator-live) on the church computer
                               ↓  WAV chunks
                     Upstash Redis
                               ↓
-        Phones scan a permanent QR → https://church-translate.vercel.app/listen
+        Phones scan a permanent QR → https://church-translation.vercel.app/listen
 ```
 
 The public operator page is on Vercel. The volunteer signs in. The server finds that church, checks the operator, decrypts the church OpenAI key, and returns only a short-lived credential.
@@ -57,7 +57,7 @@ cd church-live-translation
 npm install
 cp church-setup/env.example .env.local
 # add Supabase keys
-# add NEXT_PUBLIC_AUDIENCE_URL=https://church-translate.vercel.app
+# add NEXT_PUBLIC_AUDIENCE_URL=https://church-translation.vercel.app
 npm run dev
 ```
 

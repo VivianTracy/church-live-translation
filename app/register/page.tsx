@@ -14,8 +14,8 @@ export default function RegisterPage() {
             Register this church
           </h2>
           <p className="text-sm text-slate-600">
-            Create the operator sign-in, listen link, and OpenAI key for this
-            church. Phone listeners do not register.
+            Create the operator sign-in, church brief name, and OpenAI key for
+            this church. Phone listeners do not register.
           </p>
 
           {isSupabaseConfigured() ? (

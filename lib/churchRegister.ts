@@ -44,20 +44,6 @@ export function parseChurchName(value: unknown): string | null {
   return name;
 }
 
-export function suggestChurchSlug(name: string): string {
-  const slug = name
-    .trim()
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64)
-    .replace(/-+$/g, "");
-
-  return parseChurchSlug(slug) ?? "";
-}
-
 export function isReservedChurchSlug(slug: string): boolean {
   return RESERVED_CHURCH_SLUGS.has(slug);
 }
@@ -70,6 +56,14 @@ export function parseRegisterChurchSlug(value: unknown): string | null {
   }
 
   return slug;
+}
+
+export function parseChurchNickname(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  return parseRegisterChurchSlug(value.trim().toLowerCase().replace(/\s+/g, ""));
 }
 
 export function parseOperatorEmail(value: unknown): string | null {
@@ -129,7 +123,9 @@ export function parseChurchRegisterInput(
 
   const input = body as Record<string, unknown>;
   const churchName = parseChurchName(input.churchName);
-  const churchSlug = parseRegisterChurchSlug(input.churchSlug);
+  const churchSlug = parseChurchNickname(
+    input.churchNickname ?? input.churchSlug
+  );
   const email = parseOperatorEmail(input.email);
   const password = parseOperatorPassword(input.password);
   const openaiApiKey = parseOpenAIApiKey(input.openaiApiKey);
@@ -141,7 +137,8 @@ export function parseChurchRegisterInput(
   if (!churchSlug) {
     return {
       ok: false,
-      error: "Choose a listen link like pvccc. Use lowercase letters, numbers, and hyphens.",
+      error:
+        "Enter a brief church name like pvccc. Use letters and numbers, with no spaces.",
     };
   }
 
@@ -179,7 +176,7 @@ export function mapChurchRegisterRpcError(message: string): {
 } {
   if (message.includes("slug_taken")) {
     return {
-      error: "That listen link is already taken. Choose another.",
+      error: "That brief name is already taken. Choose another.",
       status: 409,
     };
   }

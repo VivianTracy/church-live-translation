@@ -2,26 +2,27 @@ import {
   isExistingAuthUserError,
   mapChurchRegisterRpcError,
   openAIKeyLastFour,
+  parseChurchNickname,
   parseChurchRegisterInput,
   parseOpenAIApiKey,
   parseRegisterChurchSlug,
-  suggestChurchSlug,
 } from "@/lib/churchRegister";
 import { describe, expect, it } from "vitest";
 
 describe("church registration input", () => {
-  it("suggests a listen slug from the church name", () => {
-    expect(suggestChurchSlug("Peace Valley Chinese Christian Church")).toBe(
-      "peace-valley-chinese-christian-church"
-    );
-    expect(suggestChurchSlug("PVCCC")).toBe("pvccc");
-    expect(suggestChurchSlug("和平教会")).toBe("");
+  it("accepts a brief name with no spaces", () => {
+    expect(parseChurchNickname("PVCCC")).toBe("pvccc");
+    expect(parseChurchNickname(" demo ")).toBe("demo");
+    expect(parseChurchNickname("Peace Valley")).toBe("peacevalley");
+    expect(parseChurchNickname("example-church")).toBe("example-church");
   });
 
-  it("rejects reserved listen slugs", () => {
+  it("rejects reserved or empty brief names", () => {
     expect(parseRegisterChurchSlug("local")).toBeNull();
     expect(parseRegisterChurchSlug("login")).toBeNull();
-    expect(parseRegisterChurchSlug("pvccc")).toBe("pvccc");
+    expect(parseChurchNickname("local")).toBeNull();
+    expect(parseChurchNickname("")).toBeNull();
+    expect(parseChurchNickname("和平教会")).toBeNull();
   });
 
   it("accepts a valid OpenAI key and last four", () => {
@@ -34,7 +35,7 @@ describe("church registration input", () => {
   it("accepts a complete registration form", () => {
     const parsed = parseChurchRegisterInput({
       churchName: " Example Church ",
-      churchSlug: "example-church",
+      churchNickname: "ExampleChurch",
       email: "Op@example.com",
       password: "sunday-123",
       openaiApiKey: "sk-test_abcdefghijklmnopqrstuvwxyz",
@@ -44,7 +45,7 @@ describe("church registration input", () => {
       ok: true,
       value: {
         churchName: "Example Church",
-        churchSlug: "example-church",
+        churchSlug: "examplechurch",
         email: "op@example.com",
         password: "sunday-123",
         openaiApiKey: "sk-test_abcdefghijklmnopqrstuvwxyz",
@@ -57,19 +58,35 @@ describe("church registration input", () => {
     expect(
       parseChurchRegisterInput({
         churchName: " ",
-        churchSlug: "example-church",
+        churchNickname: "examplechurch",
         email: "op@example.com",
         password: "sunday-123",
         openaiApiKey: "sk-test_abcdefghijklmnopqrstuvwxyz",
       })
     ).toEqual({ ok: false, error: "Enter the church name." });
   });
+
+  it("rejects a missing brief name", () => {
+    expect(
+      parseChurchRegisterInput({
+        churchName: "Example Church",
+        churchNickname: " ",
+        email: "op@example.com",
+        password: "sunday-123",
+        openaiApiKey: "sk-test_abcdefghijklmnopqrstuvwxyz",
+      })
+    ).toEqual({
+      ok: false,
+      error:
+        "Enter a brief church name like pvccc. Use letters and numbers, with no spaces.",
+    });
+  });
 });
 
 describe("church registration failures", () => {
-  it("maps a taken slug so the auth user can be rolled back", () => {
+  it("maps a taken nickname so the auth user can be rolled back", () => {
     expect(mapChurchRegisterRpcError("slug_taken")).toEqual({
-      error: "That listen link is already taken. Choose another.",
+      error: "That brief name is already taken. Choose another.",
       status: 409,
     });
   });

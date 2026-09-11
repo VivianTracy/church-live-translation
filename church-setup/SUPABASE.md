@@ -43,7 +43,7 @@ Do not put `OPENAI_API_KEY` on Vercel. Do not put a church encryption secret in 
 
 ## 4. Add a church and operator
 
-New churches should open `/register` and fill in the church name, listen slug, operator email, password, and OpenAI key. Keep Supabase public sign-up **off**.
+New churches should open `/register` and fill in the church name, church brief name, operator email, password, and OpenAI key. Keep Supabase public sign-up **off**. The listen page is `/listen/{brief-name}`.
 
 SQL below is only a fallback if `/register` is not deployed yet.
 
@@ -103,7 +103,7 @@ Add these for **Production**:
 | `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase `anon` key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase `service_role` key |
-| `NEXT_PUBLIC_AUDIENCE_URL` | `https://church-translate.vercel.app` |
+| `NEXT_PUBLIC_AUDIENCE_URL` | `https://church-translation.vercel.app` |
 | `UPSTASH_REDIS_REST_URL` | Phone audio |
 | `UPSTASH_REDIS_REST_TOKEN` | Phone audio |
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { suggestChurchSlug } from "@/lib/churchRegister";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -9,8 +8,7 @@ export function RegisterChurchForm() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [churchSlug, setChurchSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
+  const [churchNickname, setChurchNickname] = useState("");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -20,7 +18,7 @@ export function RegisterChurchForm() {
     const form = event.currentTarget;
     const formData = new FormData(form);
     const churchName = String(formData.get("churchName") ?? "").trim();
-    const slug = String(formData.get("churchSlug") ?? "").trim();
+    const nickname = String(formData.get("churchNickname") ?? "").trim();
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
     const openaiApiKey = String(formData.get("openaiApiKey") ?? "").trim();
@@ -33,7 +31,7 @@ export function RegisterChurchForm() {
         },
         body: JSON.stringify({
           churchName,
-          churchSlug: slug,
+          churchNickname: nickname,
           email,
           password,
           openaiApiKey,
@@ -78,32 +76,33 @@ export function RegisterChurchForm() {
           autoComplete="organization"
           required
           maxLength={80}
-          onChange={(event) => {
-            if (!slugTouched) {
-              setChurchSlug(suggestChurchSlug(event.target.value));
-            }
-          }}
           className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none ring-emerald-600 focus:ring-2"
         />
       </label>
 
       <label className="block space-y-2">
-        <span className="text-sm font-medium text-slate-700">Listen link</span>
+        <span className="text-sm font-medium text-slate-700">
+          Church brief name
+        </span>
         <input
           type="text"
-          name="churchSlug"
+          name="churchNickname"
           required
-          value={churchSlug}
+          value={churchNickname}
+          maxLength={64}
+          autoComplete="off"
+          spellCheck={false}
           onChange={(event) => {
-            setSlugTouched(true);
-            setChurchSlug(event.target.value);
+            setChurchNickname(
+              event.target.value.toLowerCase().replace(/\s+/g, "")
+            );
           }}
           className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none ring-emerald-600 focus:ring-2"
         />
         <span className="block text-xs text-slate-500">
-          Phones will open{" "}
+          No spaces. Phones will open{" "}
           <span className="font-mono">
-            /listen/{churchSlug || "your-church"}
+            /listen/{churchNickname || "nickname"}
           </span>
         </span>
       </label>
