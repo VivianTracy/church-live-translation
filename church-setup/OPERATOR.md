@@ -19,7 +19,7 @@ Use **Google Chrome** or **Microsoft Edge**. Do not use Firefox.
 3. 用本教会操作员的邮箱和密码登录。
 4. 登录后会进入操作页。
 
-手机听众不用登录。他们只打开 `/listen`。
+手机听众不用登录。他们扫描操作员屏幕上的二维码，打开本教会的收听页（例如 `/listen/pvccc`）。
 
 如果网站打不开，再用下面的「本机启动」备用步骤。
 
@@ -34,7 +34,7 @@ Use **Google Chrome** or **Microsoft Edge**. Do not use Firefox.
 
 输入和输出电平条应该会动。会众耳机里应能听到翻译。
 
-手机收听：屏幕上的二维码是固定的（`https://church-translate.vercel.app/listen`）。会众扫码后，等页面显示 **LIVE**，再点 **Tap to Listen**。手机可以用自己的流量，不必连教会 Wi‑Fi。iPhone 必须先点一下才能出声。
+手机收听：屏幕上的二维码是本教会专用的（例如 `https://church-caption.vercel.app/listen/pvccc`）。会众扫码后，等页面显示 **LIVE**，再点 **Tap to Listen**。手机可以用自己的流量，不必连教会 Wi‑Fi。iPhone 必须先点一下才能出声。
 
 如果状态变成 **Failed**，点 **Reconnect**。程序也会在网络短暂断开时自动重试两次。
 
@@ -74,7 +74,7 @@ Use **Google Chrome** or **Microsoft Edge**. Do not use Firefox.
 3. Sign in with this church’s operator email and password.
 4. You should land on the operator page.
 
-Phone listeners do not sign in. They only open `/listen`.
+Phone listeners do not sign in. They scan the QR on the operator screen, which opens this church’s listen page (for example `/listen/pvccc`).
 
 If the website is down, use the local backup steps below.
 
@@ -89,7 +89,7 @@ Confirm a 3.5 mm cable runs from the PC audio out to the TT125 transmitter **MIC
 
 The level meters should move. Headsets should hear the translation.
 
-Phone listeners: the QR on the page stays the same (`https://church-translate.vercel.app/listen`). People scan it, wait until the page says **LIVE**, then tap **Tap to Listen**. Phones can use mobile data. iPhones need that tap before sound plays.
+Phone listeners: the QR on the page is for this church (for example `https://church-caption.vercel.app/listen/pvccc`). People scan it, wait until the page says **LIVE**, then tap **Tap to Listen**. Phones can use mobile data. iPhones need that tap before sound plays.
 
 If the status says **Failed**, click **Reconnect**. The app also retries twice by itself if the network drops briefly.
 

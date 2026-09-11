@@ -1,4 +1,9 @@
 import {
+  InvalidListenChurchError,
+  UnknownListenChurchError,
+  requireListenChurchSlug,
+} from "@/lib/churchListen";
+import {
   appendTranslationAudioChunk,
   getTranslationAudioChunksAfter,
   getTranslationListenState,
@@ -15,6 +20,22 @@ import {
 import { NextRequest } from "next/server";
 
 function errorResponse(request: NextRequest, error: unknown, fallback: string) {
+  if (error instanceof InvalidListenChurchError) {
+    return translationRelayJsonResponse(
+      request,
+      { error: error.message },
+      { status: 400 }
+    );
+  }
+
+  if (error instanceof UnknownListenChurchError) {
+    return translationRelayJsonResponse(
+      request,
+      { error: error.message },
+      { status: 404 }
+    );
+  }
+
   const message = error instanceof Error ? error.message : fallback;
 
   return translationRelayJsonResponse(request, { error: message }, { status: 500 });
@@ -30,6 +51,9 @@ export async function GET(request: NextRequest) {
       return await proxyTranslationRelay(request);
     }
 
+    const { slug, church } = await requireListenChurchSlug(
+      request.nextUrl.searchParams.get("church")
+    );
     const afterParam = request.nextUrl.searchParams.get("after");
 
     if (afterParam !== null) {
@@ -43,12 +67,16 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      const payload = await getTranslationAudioChunksAfter(afterSeq);
-      return translationRelayJsonResponse(request, payload);
+      const payload = await getTranslationAudioChunksAfter(slug, afterSeq);
+      return translationRelayJsonResponse(request, {
+        ...payload,
+        churchName: church?.name ?? null,
+      });
     }
 
     return translationRelayJsonResponse(request, {
-      ...(await getTranslationListenState()),
+      ...(await getTranslationListenState(slug)),
+      churchName: church?.name ?? null,
       relayConfigured: isTranslationRelayConfigured(),
     });
   } catch (error) {
@@ -62,6 +90,9 @@ export async function POST(request: NextRequest) {
       return await proxyTranslationRelay(request);
     }
 
+    const { slug } = await requireListenChurchSlug(
+      request.nextUrl.searchParams.get("church")
+    );
     const body = (await request.json()) as {
       mimeType?: string;
       data?: string;
@@ -83,7 +114,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const chunk = await appendTranslationAudioChunk(body.mimeType, body.data);
+    const chunk = await appendTranslationAudioChunk(
+      slug,
+      body.mimeType,
+      body.data
+    );
 
     return translationRelayJsonResponse(request, { success: true, seq: chunk.seq });
   } catch (error) {

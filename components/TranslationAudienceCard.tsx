@@ -31,7 +31,7 @@ export function TranslationAudienceCard() {
       })
       .catch(() => {
         if (!cancelled && typeof window !== "undefined") {
-          setListenUrl(getTranslationListenUrl(window.location.origin));
+          setListenUrl(getTranslationListenUrl(window.location.origin, "local"));
           setUrlSource("localhost");
         }
       });
@@ -74,7 +74,7 @@ export function TranslationAudienceCard() {
       <div>
         <h2 className="text-base font-semibold text-slate-900">Phone listeners</h2>
         <p className="mt-1 text-sm text-slate-600">
-          This QR code stays the same. People scan it to hear the translation on
+          This QR is for this church. People scan it to hear the translation on
           their phone.
         </p>
       </div>
@@ -99,7 +99,8 @@ export function TranslationAudienceCard() {
       {showDeployWarning ? (
         <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
           This link returned 404. Deploy the latest code, then scan again.
-          Production is missing <span className="font-mono">/listen</span>.
+          Production is missing this church’s{" "}
+          <span className="font-mono">/listen</span> page.
         </p>
       ) : null}
 

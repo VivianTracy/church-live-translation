@@ -9,7 +9,12 @@ describe("church operator resolution", () => {
       membership: {
         church_id: "church-1",
         role: "operator",
-        churches: { id: "church-1", name: "Example Church", status: "active" },
+        churches: {
+          id: "church-1",
+          name: "Example Church",
+          slug: "example-church",
+          status: "active",
+        },
       },
     });
 
@@ -18,6 +23,7 @@ describe("church operator resolution", () => {
       email: "op@example.com",
       churchId: "church-1",
       churchName: "Example Church",
+      churchSlug: "example-church",
       role: "operator",
     });
   });
@@ -39,7 +45,12 @@ describe("church operator resolution", () => {
         membership: {
           church_id: "church-1",
           role: "listener",
-          churches: { id: "church-1", name: "Example Church", status: "active" },
+          churches: {
+            id: "church-1",
+            name: "Example Church",
+            slug: "example-church",
+            status: "active",
+          },
         },
       })
     ).toBeNull();
@@ -55,7 +66,26 @@ describe("church operator resolution", () => {
           churches: {
             id: "church-1",
             name: "Example Church",
+            slug: "example-church",
             status: "suspended",
+          },
+        },
+      })
+    ).toBeNull();
+  });
+
+  it("rejects a church without a listen slug", () => {
+    expect(
+      resolveChurchOperator({
+        userId: "user-1",
+        membership: {
+          church_id: "church-1",
+          role: "operator",
+          churches: {
+            id: "church-1",
+            name: "Example Church",
+            slug: "Not A Slug",
+            status: "active",
           },
         },
       })

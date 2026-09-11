@@ -1,3 +1,5 @@
+import { parseChurchSlug } from "@/lib/churchSlug";
+
 export type ChurchOperatorRole = "operator" | "admin";
 
 export type ChurchOperatorContext = {
@@ -5,12 +7,14 @@ export type ChurchOperatorContext = {
   email: string | null;
   churchId: string;
   churchName: string;
+  churchSlug: string;
   role: ChurchOperatorRole;
 };
 
 export type ChurchRecord = {
   id: string;
   name: string;
+  slug: string;
   status?: string;
 };
 
@@ -48,8 +52,9 @@ export function resolveChurchOperator(input: {
   }
 
   const church = resolveChurchFromMembership(input.membership.churches);
+  const churchSlug = parseChurchSlug(church?.slug);
 
-  if (!church || !isActiveChurch(church.status)) {
+  if (!church || !isActiveChurch(church.status) || !churchSlug) {
     return null;
   }
 
@@ -58,6 +63,7 @@ export function resolveChurchOperator(input: {
     email: input.email ?? null,
     churchId: church.id,
     churchName: church.name,
+    churchSlug,
     role: input.membership.role,
   };
 }

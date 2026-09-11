@@ -100,4 +100,4 @@ Redeploy without build cache after saving.
 1. Open `https://church-translate.vercel.app/login`.
 2. Sign in as the operator.
 3. You should land on `/operator-live` and see the church name.
-4. `/listen` stays public. Phones do not sign in.
+4. Each church has a public `/listen/{slug}` page. Phones do not sign in.

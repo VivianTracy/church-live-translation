@@ -1,3 +1,4 @@
+import { LOCAL_LISTEN_CHURCH_SLUG } from "@/lib/churchSlug";
 import { NextResponse } from "next/server";
 import { requiresChurchLogin } from "@/lib/audioTranslationSessionMode";
 import {
@@ -10,6 +11,7 @@ export async function GET() {
     return NextResponse.json({
       mode: "local",
       churchName: null,
+      churchSlug: LOCAL_LISTEN_CHURCH_SLUG,
       email: null,
     });
   }
@@ -35,6 +37,7 @@ export async function GET() {
   return NextResponse.json({
     mode: "church",
     churchName: operator.churchName,
+    churchSlug: operator.churchSlug,
     email: operator.email,
   });
 }

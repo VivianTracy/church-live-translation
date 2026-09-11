@@ -37,6 +37,7 @@ import {
   saveStoredAudioOutputVolume,
 } from "@/lib/audioOutputVolumeStorage";
 import { listMicrophoneDevices } from "@/lib/microphoneDeviceStorage";
+import { LOCAL_LISTEN_CHURCH_SLUG } from "@/lib/churchSlug";
 import { createTranslationWavUploader } from "@/lib/translationAudioBroadcast";
 import {
   INITIAL_OPERATOR_SESSION_STATE,
@@ -69,7 +70,7 @@ function deviceLabel(deviceId: string, devices: MediaDeviceInfo[], fallback: str
   return match?.label || fallback;
 }
 
-export function useAudioTranslationOperator() {
+export function useAudioTranslationOperator(options?: { churchSlug?: string }) {
   const [session, setSession] = useState<OperatorSessionState>(
     INITIAL_OPERATOR_SESSION_STATE
   );
@@ -328,6 +329,7 @@ export function useAudioTranslationOperator() {
       setMicError("");
       resetSessionMeters();
       uploadWavChunkRef.current = createTranslationWavUploader(
+        options?.churchSlug || LOCAL_LISTEN_CHURCH_SLUG,
         setAudienceBroadcastError,
         () => {
           setChunksUploaded((count) => count + 1);
@@ -483,6 +485,7 @@ export function useAudioTranslationOperator() {
     [
       applySession,
       handleInputTranscript,
+      options?.churchSlug,
       resetSessionMeters,
       syncInputDeviceForSource,
       tearDownConnection,

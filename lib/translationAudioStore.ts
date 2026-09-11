@@ -7,13 +7,22 @@ import {
   type TranslationListenState,
 } from "@/types/translationListen";
 
-const META_KEY = "translation-audio-meta";
-const CHUNKS_KEY = "translation-audio-chunks";
-const SEQ_KEY = "translation-audio-seq";
 const MAX_STORED_CHUNKS = 48;
 
-let localMeta: TranslationAudioMeta = { ...EMPTY_TRANSLATION_AUDIO_META };
-let localChunks: TranslationAudioChunk[] = [];
+type LocalStream = {
+  meta: TranslationAudioMeta;
+  chunks: TranslationAudioChunk[];
+};
+
+const localStreams = new Map<string, LocalStream>();
+
+export function translationAudioRedisKeys(churchSlug: string) {
+  return {
+    meta: `translation-audio-meta:${churchSlug}`,
+    chunks: `translation-audio-chunks:${churchSlug}`,
+    seq: `translation-audio-seq:${churchSlug}`,
+  };
+}
 
 export function parseTranslationAudioChunk(
   raw: unknown
@@ -64,13 +73,32 @@ export function isTranslationRelayConfigured(): boolean {
   return !isLocalListenStorage();
 }
 
-export async function getTranslationAudioMeta(): Promise<TranslationAudioMeta> {
+function getLocalStream(churchSlug: string): LocalStream {
+  const existing = localStreams.get(churchSlug);
+
+  if (existing) {
+    return existing;
+  }
+
+  const created: LocalStream = {
+    meta: { ...EMPTY_TRANSLATION_AUDIO_META },
+    chunks: [],
+  };
+  localStreams.set(churchSlug, created);
+  return created;
+}
+
+export async function getTranslationAudioMeta(
+  churchSlug: string
+): Promise<TranslationAudioMeta> {
   if (isLocalListenStorage()) {
-    return localMeta;
+    return getLocalStream(churchSlug).meta;
   }
 
   try {
-    const meta = await requireRedis().get<TranslationAudioMeta>(META_KEY);
+    const meta = await requireRedis().get<TranslationAudioMeta>(
+      translationAudioRedisKeys(churchSlug).meta
+    );
     return meta ?? EMPTY_TRANSLATION_AUDIO_META;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -80,21 +108,26 @@ export async function getTranslationAudioMeta(): Promise<TranslationAudioMeta> {
   }
 }
 
-export async function setTranslationListenLive(isLive: boolean): Promise<void> {
+export async function setTranslationListenLive(
+  churchSlug: string,
+  isLive: boolean
+): Promise<void> {
   const updatedAt = Date.now();
 
   if (isLocalListenStorage()) {
+    const stream = getLocalStream(churchSlug);
+
     if (!isLive) {
-      localChunks = [];
-      localMeta = {
+      stream.chunks = [];
+      stream.meta = {
         ...EMPTY_TRANSLATION_AUDIO_META,
         updatedAt,
       };
       return;
     }
 
-    localMeta = {
-      ...localMeta,
+    stream.meta = {
+      ...stream.meta,
       isLive: true,
       updatedAt,
     };
@@ -102,13 +135,14 @@ export async function setTranslationListenLive(isLive: boolean): Promise<void> {
   }
 
   const client = requireRedis();
+  const keys = translationAudioRedisKeys(churchSlug);
 
   if (!isLive) {
     await client
       .pipeline()
-      .del(CHUNKS_KEY)
-      .del(SEQ_KEY)
-      .set(META_KEY, {
+      .del(keys.chunks)
+      .del(keys.seq)
+      .set(keys.meta, {
         ...EMPTY_TRANSLATION_AUDIO_META,
         updatedAt,
       })
@@ -116,9 +150,9 @@ export async function setTranslationListenLive(isLive: boolean): Promise<void> {
     return;
   }
 
-  const meta = await getTranslationAudioMeta();
+  const meta = await getTranslationAudioMeta(churchSlug);
 
-  await client.set(META_KEY, {
+  await client.set(keys.meta, {
     ...meta,
     isLive: true,
     updatedAt,
@@ -126,13 +160,15 @@ export async function setTranslationListenLive(isLive: boolean): Promise<void> {
 }
 
 export async function appendTranslationAudioChunk(
+  churchSlug: string,
   mimeType: string,
   data: string
 ): Promise<TranslationAudioChunk> {
   const createdAt = Date.now();
 
   if (isLocalListenStorage()) {
-    const seq = localMeta.latestSeq + 1;
+    const stream = getLocalStream(churchSlug);
+    const seq = stream.meta.latestSeq + 1;
     const chunk: TranslationAudioChunk = {
       seq,
       mimeType,
@@ -140,14 +176,14 @@ export async function appendTranslationAudioChunk(
       createdAt,
     };
 
-    localChunks.push(chunk);
+    stream.chunks.push(chunk);
 
-    if (localChunks.length > MAX_STORED_CHUNKS) {
-      localChunks = localChunks.slice(-MAX_STORED_CHUNKS);
+    if (stream.chunks.length > MAX_STORED_CHUNKS) {
+      stream.chunks = stream.chunks.slice(-MAX_STORED_CHUNKS);
     }
 
-    localMeta = {
-      ...localMeta,
+    stream.meta = {
+      ...stream.meta,
       isLive: true,
       latestSeq: seq,
       mimeType,
@@ -158,7 +194,8 @@ export async function appendTranslationAudioChunk(
   }
 
   const client = requireRedis();
-  const seq = await client.incr(SEQ_KEY);
+  const keys = translationAudioRedisKeys(churchSlug);
+  const seq = await client.incr(keys.seq);
   const chunk: TranslationAudioChunk = {
     seq,
     mimeType,
@@ -168,9 +205,9 @@ export async function appendTranslationAudioChunk(
 
   await client
     .pipeline()
-    .rpush(CHUNKS_KEY, JSON.stringify(chunk))
-    .ltrim(CHUNKS_KEY, -MAX_STORED_CHUNKS, -1)
-    .set(META_KEY, {
+    .rpush(keys.chunks, JSON.stringify(chunk))
+    .ltrim(keys.chunks, -MAX_STORED_CHUNKS, -1)
+    .set(keys.meta, {
       isLive: true,
       latestSeq: seq,
       mimeType,
@@ -182,9 +219,10 @@ export async function appendTranslationAudioChunk(
 }
 
 export async function getTranslationAudioChunksAfter(
+  churchSlug: string,
   afterSeq: number
 ): Promise<{ meta: TranslationAudioMeta; chunks: TranslationAudioChunk[] }> {
-  const meta = await getTranslationAudioMeta();
+  const meta = await getTranslationAudioMeta(churchSlug);
 
   if (meta.latestSeq <= afterSeq) {
     return { meta, chunks: [] };
@@ -193,11 +231,17 @@ export async function getTranslationAudioChunksAfter(
   if (isLocalListenStorage()) {
     return {
       meta,
-      chunks: localChunks.filter((chunk) => chunk.seq > afterSeq),
+      chunks: getLocalStream(churchSlug).chunks.filter(
+        (chunk) => chunk.seq > afterSeq
+      ),
     };
   }
 
-  const rawChunks = await requireRedis().lrange<unknown>(CHUNKS_KEY, 0, -1);
+  const rawChunks = await requireRedis().lrange<unknown>(
+    translationAudioRedisKeys(churchSlug).chunks,
+    0,
+    -1
+  );
   const chunks = rawChunks
     .map(parseTranslationAudioChunk)
     .filter((chunk): chunk is TranslationAudioChunk => chunk !== null)
@@ -206,8 +250,10 @@ export async function getTranslationAudioChunksAfter(
   return { meta, chunks };
 }
 
-export async function getTranslationListenState(): Promise<TranslationListenState> {
-  const meta = await getTranslationAudioMeta();
+export async function getTranslationListenState(
+  churchSlug: string
+): Promise<TranslationListenState> {
+  const meta = await getTranslationAudioMeta(churchSlug);
 
   return {
     isLive: meta.isLive,

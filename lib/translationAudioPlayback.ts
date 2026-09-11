@@ -1,4 +1,5 @@
 import type { TranslationAudioChunk } from "@/types/translationListen";
+import { withChurchSearchParam } from "@/lib/churchSlug";
 
 function base64ToBytes(base64: string): Uint8Array {
   const binary = atob(base64);
@@ -200,10 +201,19 @@ export class TranslationAudioChunkPlayer {
   }
 }
 
-export async function fetchTranslationAudioAfter(afterSeq: number) {
-  const response = await fetch(`/api/translation-audio?after=${afterSeq}`, {
-    cache: "no-store",
-  });
+export async function fetchTranslationAudioAfter(
+  churchSlug: string,
+  afterSeq: number
+) {
+  const response = await fetch(
+    withChurchSearchParam(
+      `/api/translation-audio?after=${afterSeq}`,
+      churchSlug
+    ),
+    {
+      cache: "no-store",
+    }
+  );
 
   if (!response.ok) {
     let message = "Failed to load translation audio.";

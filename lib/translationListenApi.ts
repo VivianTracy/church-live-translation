@@ -1,3 +1,4 @@
+import { withChurchSearchParam } from "@/lib/churchSlug";
 import { getTranslationRelayApiUrl } from "@/lib/translationRelayUrl";
 import type { TranslationListenState } from "@/types/translationListen";
 
@@ -30,10 +31,13 @@ async function readApiError(response: Response, fallback: string): Promise<strin
 }
 
 export async function saveTranslationListenState(
-  state: TranslationListenState
+  state: TranslationListenState,
+  churchSlug: string
 ): Promise<void> {
   const response = await fetchTranslationRelay(
-    getTranslationRelayApiUrl("/api/translation-listen-state"),
+    getTranslationRelayApiUrl(
+      withChurchSearchParam("/api/translation-listen-state", churchSlug)
+    ),
     {
       method: "POST",
       headers: {
@@ -50,10 +54,15 @@ export async function saveTranslationListenState(
   }
 }
 
-export async function loadTranslationListenState(): Promise<TranslationListenState> {
-  const response = await fetchTranslationRelay("/api/translation-listen-state", {
-    cache: "no-store",
-  });
+export async function loadTranslationListenState(
+  churchSlug: string
+): Promise<TranslationListenState & { churchName?: string | null }> {
+  const response = await fetchTranslationRelay(
+    withChurchSearchParam("/api/translation-listen-state", churchSlug),
+    {
+      cache: "no-store",
+    }
+  );
 
   if (!response.ok) {
     throw new Error(
@@ -61,24 +70,34 @@ export async function loadTranslationListenState(): Promise<TranslationListenSta
     );
   }
 
-  const data = (await response.json()) as TranslationListenState;
+  const data = (await response.json()) as TranslationListenState & {
+    churchName?: string | null;
+  };
   return {
     isLive: data.isLive,
     updatedAt: data.updatedAt,
+    churchName: data.churchName,
   };
 }
 
-export async function clearTranslationListenState(): Promise<void> {
-  await saveTranslationListenState({ isLive: false, updatedAt: Date.now() });
+export async function clearTranslationListenState(
+  churchSlug: string
+): Promise<void> {
+  await saveTranslationListenState(
+    { isLive: false, updatedAt: Date.now() },
+    churchSlug
+  );
 }
 
-export async function loadTranslationRelayStatus(): Promise<{
+export async function loadTranslationRelayStatus(churchSlug: string): Promise<{
   relayConfigured: boolean;
   isLive: boolean;
   updatedAt: number;
 }> {
   const response = await fetchTranslationRelay(
-    getTranslationRelayApiUrl("/api/translation-listen-state"),
+    getTranslationRelayApiUrl(
+      withChurchSearchParam("/api/translation-listen-state", churchSlug)
+    ),
     {
       cache: "no-store",
     }

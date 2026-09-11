@@ -8,6 +8,7 @@ import { ChurchTranslationHeader } from "@/components/ChurchTranslationHeader";
 import { TranslationAudienceCard } from "@/components/TranslationAudienceCard";
 import { TranslationDirectionCard } from "@/components/TranslationDirectionCard";
 import { TranslationSetupSummary } from "@/components/TranslationSetupSummary";
+import { TranslationUsageCard } from "@/components/TranslationUsageCard";
 import { formatAudioTranslationDirectionLabel } from "@/lib/audioTranslationDirection";
 import { isOperatorSessionTiming } from "@/lib/operatorSessionState";
 import {
@@ -27,6 +28,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type OperatorAccount = {
   mode: "local" | "church";
   churchName: string | null;
+  churchSlug: string;
   email: string | null;
 };
 
@@ -74,7 +76,9 @@ export default function OperatorLivePage() {
     settingsLocked,
     startListening,
     stopListening,
-  } = useAudioTranslationOperator();
+  } = useAudioTranslationOperator({
+    churchSlug: account?.churchSlug,
+  });
 
   useEffect(() => {
     void fetch("/api/operator/me", { cache: "no-store" })
@@ -103,6 +107,7 @@ export default function OperatorLivePage() {
         setAccount({
           mode: body.mode,
           churchName: body.churchName,
+          churchSlug: body.churchSlug || "local",
           email: body.email,
         });
         setAccountError("");
@@ -122,7 +127,15 @@ export default function OperatorLivePage() {
       );
     }, 0);
 
-    void loadTranslationRelayStatus()
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!account?.churchSlug) {
+      return;
+    }
+
+    void loadTranslationRelayStatus(account.churchSlug)
       .then((status) => {
         setRelayReady(status.relayConfigured);
         setRelayError("");
@@ -135,15 +148,20 @@ export default function OperatorLivePage() {
             : "Phone relay status unavailable. Headset audio still works."
         );
       });
-
-    return () => window.clearTimeout(timer);
-  }, []);
+  }, [account?.churchSlug]);
 
   const markAudienceLive = useCallback(() => {
-    void saveTranslationListenState({
-      isLive: true,
-      updatedAt: Date.now(),
-    })
+    if (!account?.churchSlug) {
+      return;
+    }
+
+    void saveTranslationListenState(
+      {
+        isLive: true,
+        updatedAt: Date.now(),
+      },
+      account.churchSlug
+    )
       .then(() => {
         setRelayError("");
       })
@@ -154,7 +172,7 @@ export default function OperatorLivePage() {
             : "Phone relay: Failed to save listen state."
         );
       });
-  }, []);
+  }, [account]);
 
   useEffect(() => {
     const audienceActive =
@@ -171,10 +189,11 @@ export default function OperatorLivePage() {
 
     if (
       audienceWasActiveRef.current &&
+      account?.churchSlug &&
       (sessionStatus === "off" || sessionStatus === "failed")
     ) {
       audienceWasActiveRef.current = false;
-      void clearTranslationListenState().catch((error) => {
+      void clearTranslationListenState(account.churchSlug).catch((error) => {
         setRelayError(
           error instanceof Error
             ? `Phone relay: ${error.message}`
@@ -182,7 +201,7 @@ export default function OperatorLivePage() {
         );
       });
     }
-  }, [markAudienceLive, sessionStatus]);
+  }, [account, markAudienceLive, sessionStatus]);
 
   useEffect(() => {
     if (!isOperatorSessionTiming(sessionStatus)) {
@@ -210,6 +229,8 @@ export default function OperatorLivePage() {
             {accountError}
           </p>
         ) : null}
+
+        {account?.mode === "church" ? <TranslationUsageCard /> : null}
 
         <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 space-y-8">
           <TranslationDirectionCard
@@ -266,7 +287,10 @@ export default function OperatorLivePage() {
         {usingRemoteRelay && relayOrigin ? (
           <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200">
             Phone QR points to{" "}
-            <span className="font-mono">{relayOrigin}/listen</span>.
+            <span className="font-mono">
+              {relayOrigin}/listen/{account?.churchSlug ?? "your-church"}
+            </span>
+            .
           </p>
         ) : null}
 

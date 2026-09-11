@@ -12,11 +12,11 @@ afterEach(() => {
 });
 
 describe("audience listen URL", () => {
-  it("uses NEXT_PUBLIC_AUDIENCE_URL for the permanent /listen QR", () => {
+  it("uses NEXT_PUBLIC_AUDIENCE_URL for the permanent church QR", () => {
     vi.stubEnv("NEXT_PUBLIC_AUDIENCE_URL", "https://church-translate.vercel.app/");
 
-    expect(getTranslationListenUrl("http://localhost:3000")).toBe(
-      "https://church-translate.vercel.app/listen"
+    expect(getTranslationListenUrl("http://localhost:3000", "pvccc")).toBe(
+      "https://church-translate.vercel.app/listen/pvccc"
     );
   });
 
@@ -24,8 +24,8 @@ describe("audience listen URL", () => {
     vi.stubEnv("NEXT_PUBLIC_AUDIENCE_URL", "");
     vi.stubEnv("NEXT_PUBLIC_RELAY_URL", "");
 
-    expect(getTranslationListenUrl("http://localhost:3000")).toBe(
-      "http://localhost:3000/listen"
+    expect(getTranslationListenUrl("http://localhost:3000", "pvccc")).toBe(
+      "http://localhost:3000/listen/pvccc"
     );
   });
 

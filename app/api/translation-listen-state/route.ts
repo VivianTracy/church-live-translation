@@ -1,4 +1,9 @@
 import {
+  InvalidListenChurchError,
+  UnknownListenChurchError,
+  requireListenChurchSlug,
+} from "@/lib/churchListen";
+import {
   getTranslationListenState,
   isTranslationRelayConfigured,
   setTranslationListenLive,
@@ -14,6 +19,22 @@ import {
 import { NextRequest } from "next/server";
 
 function errorResponse(request: NextRequest, error: unknown, fallback: string) {
+  if (error instanceof InvalidListenChurchError) {
+    return translationRelayJsonResponse(
+      request,
+      { error: error.message },
+      { status: 400 }
+    );
+  }
+
+  if (error instanceof UnknownListenChurchError) {
+    return translationRelayJsonResponse(
+      request,
+      { error: error.message },
+      { status: 404 }
+    );
+  }
+
   const message = error instanceof Error ? error.message : fallback;
 
   return translationRelayJsonResponse(request, { error: message }, { status: 500 });
@@ -29,8 +50,13 @@ export async function GET(request: NextRequest) {
       return await proxyTranslationRelay(request);
     }
 
+    const { slug, church } = await requireListenChurchSlug(
+      request.nextUrl.searchParams.get("church")
+    );
+
     return translationRelayJsonResponse(request, {
-      ...(await getTranslationListenState()),
+      ...(await getTranslationListenState(slug)),
+      churchName: church?.name ?? null,
       relayConfigured: isTranslationRelayConfigured(),
     });
   } catch (error) {
@@ -44,6 +70,9 @@ export async function POST(request: NextRequest) {
       return await proxyTranslationRelay(request);
     }
 
+    const { slug } = await requireListenChurchSlug(
+      request.nextUrl.searchParams.get("church")
+    );
     const body = (await request.json()) as { isLive?: boolean };
 
     if (typeof body.isLive !== "boolean") {
@@ -54,7 +83,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await setTranslationListenLive(body.isLive);
+    await setTranslationListenLive(slug, body.isLive);
 
     return translationRelayJsonResponse(request, { success: true });
   } catch (error) {

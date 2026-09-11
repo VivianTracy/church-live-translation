@@ -27,7 +27,7 @@ export async function getChurchOperatorForUser(
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("church_operators")
-    .select("church_id, role, churches(id, name, status)")
+    .select("church_id, role, churches(id, name, status, slug)")
     .eq("user_id", userId)
     .limit(1)
     .maybeSingle();

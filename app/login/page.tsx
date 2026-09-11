@@ -15,7 +15,7 @@ export default function LoginPage() {
           </h2>
           <p className="text-sm text-slate-600">
             Use the email and password for this church. Phone listeners do not
-            sign in.
+            sign in. They use this church’s QR code.
           </p>
 
           {isSupabaseConfigured() ? (

@@ -1,3 +1,4 @@
+import { withChurchSearchParam } from "@/lib/churchSlug";
 import { getTranslationRelayApiUrl } from "@/lib/translationRelayUrl";
 
 export const TRANSLATION_BROADCAST_MIME_TYPE = "audio/wav";
@@ -17,20 +18,26 @@ async function readUploadError(response: Response): Promise<string> {
 }
 
 export function uploadTranslationWavChunk(
+  churchSlug: string,
   wavBase64: string,
   onError: (message: string) => void,
   onUploaded?: () => void
 ): void {
-  void fetch(getTranslationRelayApiUrl("/api/translation-audio"), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      mimeType: TRANSLATION_BROADCAST_MIME_TYPE,
-      data: wavBase64,
-    }),
-  })
+  void fetch(
+    getTranslationRelayApiUrl(
+      withChurchSearchParam("/api/translation-audio", churchSlug)
+    ),
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        mimeType: TRANSLATION_BROADCAST_MIME_TYPE,
+        data: wavBase64,
+      }),
+    }
+  )
     .then(async (response) => {
       if (!response.ok) {
         throw new Error(await readUploadError(response));
@@ -49,6 +56,7 @@ export function uploadTranslationWavChunk(
 }
 
 export function createTranslationWavUploader(
+  churchSlug: string,
   onError: (message: string) => void,
   onUploaded?: () => void
 ) {
@@ -60,6 +68,7 @@ export function createTranslationWavUploader(
     }
 
     uploadTranslationWavChunk(
+      churchSlug,
       wavBase64,
       (message) => {
         const now = Date.now();
