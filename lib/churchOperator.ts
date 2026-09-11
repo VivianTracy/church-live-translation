@@ -29,7 +29,7 @@ export function isChurchOperatorRole(role: string): role is ChurchOperatorRole {
 }
 
 export function isActiveChurch(status: string | undefined): boolean {
-  return status === "active" || status === undefined;
+  return status === "active" || status === "pending" || status === undefined;
 }
 
 export function resolveChurchFromMembership(

@@ -12,8 +12,6 @@ const RESERVED_CHURCH_SLUGS = new Set([
   "api",
   "auth",
   "health",
-  "verify-church",
-  "review-churches",
 ]);
 
 export type ChurchRegisterFields = {
@@ -178,9 +176,6 @@ export const CHURCH_BRIEF_NAME_TAKEN_MESSAGE =
 export const CHURCH_EMAIL_TAKEN_MESSAGE =
   "That email is already registered. Sign in instead.";
 
-export const CHURCH_REVIEW_SETUP_MESSAGE =
-  "Church review is not set up yet. In Supabase SQL Editor, run the latest church verification SQL, then try again.";
-
 export function churchRegisterErrorText(error: {
   message?: string;
   details?: string;
@@ -190,21 +185,6 @@ export function churchRegisterErrorText(error: {
   return [error?.message, error?.details, error?.hint, error?.code]
     .filter((part): part is string => Boolean(part && part.trim()))
     .join(" ");
-}
-
-export function isChurchReviewSetupError(message: string): boolean {
-  const lower = message.toLowerCase();
-
-  return (
-    lower.includes("church_verifications") ||
-    lower.includes("churches_status_known") ||
-    lower.includes("p_token_hash") ||
-    lower.includes("schema cache") ||
-    (lower.includes("register_church") &&
-      (lower.includes("could not find the function") ||
-        lower.includes("does not exist") ||
-        lower.includes("pgrst202")))
-  );
 }
 
 export function mapChurchRegisterRpcError(message: string): {
@@ -235,22 +215,7 @@ export function mapChurchRegisterRpcError(message: string): {
     return { error: "Church details are not valid.", status: 400 };
   }
 
-  if (isChurchReviewSetupError(message)) {
-    return {
-      error: CHURCH_REVIEW_SETUP_MESSAGE,
-      status: 503,
-    };
-  }
-
   return { error: "Could not finish church registration.", status: 500 };
-}
-
-export function parseRegisterChurchId(data: unknown): string | null {
-  if (typeof data === "string" && data.trim()) {
-    return data.trim();
-  }
-
-  return null;
 }
 
 export function isExistingAuthUserError(message: string | undefined): boolean {

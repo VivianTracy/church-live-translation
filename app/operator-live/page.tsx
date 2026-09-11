@@ -23,7 +23,6 @@ import {
   isUsingRemoteTranslationRelay,
 } from "@/lib/translationRelayUrl";
 import { useAudioTranslationOperator } from "@/lib/useAudioTranslationOperator";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -33,7 +32,6 @@ type OperatorAccount = {
   churchSlug: string;
   email: string | null;
   keyLastFour: string | null;
-  isReviewer?: boolean;
 };
 
 export default function OperatorLivePage() {
@@ -41,7 +39,6 @@ export default function OperatorLivePage() {
   const [seconds, setSeconds] = useState(0);
   const [account, setAccount] = useState<OperatorAccount | null>(null);
   const [accountError, setAccountError] = useState("");
-  const [pendingReview, setPendingReview] = useState(false);
   const [relayError, setRelayError] = useState("");
   const [relayReady, setRelayReady] = useState<boolean | null>(null);
   const [showMissingRelayConfig, setShowMissingRelayConfig] = useState(false);
@@ -95,14 +92,12 @@ export default function OperatorLivePage() {
 
         const body = (await response.json()) as OperatorAccount & {
           error?: string;
-          code?: string;
         };
 
         if (response.status === 403) {
           setAccountError(
             body.error ?? "This account is not an authorized church operator."
           );
-          setPendingReview(body.code === "church_pending");
           return;
         }
 
@@ -117,7 +112,6 @@ export default function OperatorLivePage() {
           churchSlug: body.churchSlug || "local",
           email: body.email,
           keyLastFour: body.keyLastFour ?? null,
-          isReviewer: body.isReviewer === true,
         });
         setAccountError("");
       })
@@ -230,31 +224,14 @@ export default function OperatorLivePage() {
         <ChurchTranslationHeader
           churchName={account?.churchName}
           email={account?.email}
-          showSignOut={account?.mode === "church" || pendingReview}
+          showSignOut={account?.mode === "church"}
         />
 
-        {account?.isReviewer ? (
-          <p className="text-center text-sm text-slate-600">
-            <Link href="/review-churches" className="font-medium text-emerald-800">
-              Confirm new churches
-            </Link>
-          </p>
-        ) : null}
-
         {accountError ? (
-          <p
-            className={
-              pendingReview
-                ? "rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200"
-                : "rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200"
-            }
-          >
+          <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
             {accountError}
           </p>
         ) : null}
-
-        {pendingReview ? null : (
-          <>
         {account?.mode === "church" ? (
           <TranslationUsageCard refreshKey={sessionStatus} />
         ) : null}
@@ -408,8 +385,6 @@ export default function OperatorLivePage() {
             is online.
           </p>
         ) : null}
-          </>
-        )}
       </div>
     </main>
   );

@@ -8,9 +8,7 @@ import {
 
 function isProtectedOperatorPage(pathname: string): boolean {
   return (
-    pathname === "/" ||
-    pathname.startsWith("/operator-live") ||
-    pathname.startsWith("/review-churches")
+    pathname === "/" || pathname.startsWith("/operator-live")
   );
 }
 

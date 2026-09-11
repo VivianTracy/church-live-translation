@@ -69,7 +69,7 @@ Use **Google Chrome** or **Microsoft Edge**. Do not use Firefox.
 ### 1. Open the site and sign in
 
 1. Open **Google Chrome** or **Microsoft Edge**.
-2. Go to the login page. The first time for this church, click **Register this church**. After the church is confirmed, you will get an email. Then sign in with this church’s operator email and password.
+2. Go to the login page. The first time for this church, click **Register this church**. After that, sign in with this church’s operator email and password.
 3. You should land on the operator page.
 
 Phone listeners do not sign in. They scan the QR on the operator screen, which opens this church’s listen page (for example `/listen/pvccc`).

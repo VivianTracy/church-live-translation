@@ -71,7 +71,6 @@ Open **http://127.0.0.1:3000/login** in Chrome or Edge, then sign in. `npm run d
 | `NEXT_PUBLIC_AUDIENCE_URL` | Vercel and local | Permanent phone QR |
 | `UPSTASH_REDIS_REST_URL` | Vercel | Phone audio relay |
 | `UPSTASH_REDIS_REST_TOKEN` | Vercel | Phone audio relay |
-| `RESEND_API_KEY` | Vercel and local server | Church review emails |
 | `OPENAI_API_KEY` | Local only, if Supabase is unset | Temporary local fallback |
 
 Do not commit `.env.local`. Do not put `OPENAI_API_KEY` on Vercel.

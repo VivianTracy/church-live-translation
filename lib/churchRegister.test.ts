@@ -20,8 +20,6 @@ describe("church registration input", () => {
   it("rejects reserved or empty brief names", () => {
     expect(parseRegisterChurchSlug("local")).toBeNull();
     expect(parseRegisterChurchSlug("login")).toBeNull();
-    expect(parseRegisterChurchSlug("verify-church")).toBeNull();
-    expect(parseRegisterChurchSlug("review-churches")).toBeNull();
     expect(parseChurchNickname("local")).toBeNull();
     expect(parseChurchNickname("")).toBeNull();
     expect(parseChurchNickname("和平教会")).toBeNull();
@@ -104,20 +102,4 @@ describe("church registration failures", () => {
     expect(isExistingAuthUserError("invalid login")).toBe(false);
   });
 
-  it("maps missing review SQL to a setup message", () => {
-    expect(
-      mapChurchRegisterRpcError(
-        "Could not find the table 'public.church_verifications' in the schema cache"
-      )
-    ).toEqual({
-      error:
-        "Church review is not set up yet. In Supabase SQL Editor, run the latest church verification SQL, then try again.",
-      status: 503,
-    });
-    expect(
-      mapChurchRegisterRpcError(
-        'new row for relation "churches" violates check constraint "churches_status_known"'
-      ).status
-    ).toBe(503);
-  });
 });

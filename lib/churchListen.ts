@@ -62,7 +62,7 @@ export async function getActiveChurchBySlug(
     .maybeSingle();
 
   const church =
-    error || !data || data.status !== "active"
+    error || !data || (data.status !== "active" && data.status !== "pending")
       ? null
       : {
           id: data.id,
