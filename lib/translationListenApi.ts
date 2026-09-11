@@ -1,4 +1,5 @@
 import { withChurchSearchParam } from "@/lib/churchSlug";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import { getTranslationRelayApiUrl } from "@/lib/translationRelayUrl";
 import type { TranslationListenState } from "@/types/translationListen";
 
@@ -7,7 +8,7 @@ async function fetchTranslationRelay(
   init?: RequestInit
 ): Promise<Response> {
   try {
-    return await fetch(input, init);
+    return await fetchWithTimeout(input, init, 6000);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
@@ -57,11 +58,12 @@ export async function saveTranslationListenState(
 export async function loadTranslationListenState(
   churchSlug: string
 ): Promise<TranslationListenState & { churchName?: string | null }> {
-  const response = await fetchTranslationRelay(
+  const response = await fetchWithTimeout(
     withChurchSearchParam("/api/translation-listen-state", churchSlug),
     {
       cache: "no-store",
-    }
+    },
+    4000
   );
 
   if (!response.ok) {

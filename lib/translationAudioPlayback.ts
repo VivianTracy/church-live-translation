@@ -1,5 +1,6 @@
 import type { TranslationAudioChunk } from "@/types/translationListen";
 import { withChurchSearchParam } from "@/lib/churchSlug";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 function base64ToBytes(base64: string): Uint8Array {
   const binary = atob(base64);
@@ -68,22 +69,22 @@ export class TranslationAudioChunkPlayer {
   async prepare(): Promise<void> {
     this.audio.muted = false;
     this.audio.volume = 1;
+    this.audio.loop = true;
+    this.audio.src = SILENT_WAV_DATA_URL;
     try {
       await this.audio.play();
     } catch {
       // Web Audio can still start from this same tap.
     }
 
-    if (!this.context) {
+    if (!this.context || this.context.state === "closed") {
       this.context = createPlaybackAudioContext();
       this.gain = this.context.createGain();
       this.gain.gain.value = PLAYBACK_GAIN;
       this.gain.connect(this.context.destination);
     }
 
-    if (this.context.state === "suspended") {
-      await this.context.resume();
-    }
+    await this.resume();
 
     if (this.context.state !== "running" || !this.gain) {
       throw new Error("This phone did not allow audio playback. Tap again.");
@@ -96,6 +97,26 @@ export class TranslationAudioChunkPlayer {
     source.start(0);
 
     this.nextStartTime = this.context.currentTime + PLAYBACK_BUFFER_SECONDS;
+  }
+
+  async resume(): Promise<void> {
+    if (this.stopped || !this.context) {
+      return;
+    }
+
+    try {
+      await this.audio.play();
+    } catch {
+      // A later tap can unlock HTML audio again.
+    }
+
+    if (this.context.state !== "running" && this.context.state !== "closed") {
+      await this.context.resume();
+    }
+
+    if (this.context.state === "running" && this.nextStartTime < this.context.currentTime) {
+      this.nextStartTime = this.context.currentTime + UNDERRUN_PREROLL_SECONDS;
+    }
   }
 
   enqueue(chunk: TranslationAudioChunk): void {
@@ -140,6 +161,8 @@ export class TranslationAudioChunkPlayer {
   }
 
   private async scheduleWavChunk(base64: string): Promise<void> {
+    await this.resume();
+
     if (!this.context || !this.gain || this.context.state !== "running") {
       throw new Error("Phone audio is paused. Tap Listen again.");
     }
@@ -212,6 +235,7 @@ export class TranslationAudioChunkPlayer {
     this.stopped = true;
     this.queue = [];
     this.processing = false;
+    this.audio.loop = false;
     this.activeSources.forEach((source) => {
       source.stop();
       source.disconnect();
@@ -252,14 +276,15 @@ export async function fetchTranslationAudioAfter(
   churchSlug: string,
   afterSeq: number
 ) {
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     withChurchSearchParam(
       `/api/translation-audio?after=${afterSeq}`,
       churchSlug
     ),
     {
       cache: "no-store",
-    }
+    },
+    6000
   );
 
   if (!response.ok) {
