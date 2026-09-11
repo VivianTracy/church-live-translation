@@ -12,6 +12,7 @@ const RESERVED_CHURCH_SLUGS = new Set([
   "api",
   "auth",
   "health",
+  "verify-church",
 ]);
 
 export type ChurchRegisterFields = {

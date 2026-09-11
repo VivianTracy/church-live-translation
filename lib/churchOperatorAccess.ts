@@ -1,5 +1,6 @@
 import {
-  resolveChurchOperator,
+  resolveChurchAccess,
+  type ChurchAccessResult,
   type ChurchOperatorContext,
   type ChurchOperatorRecord,
 } from "@/lib/churchOperator";
@@ -20,10 +21,9 @@ export async function getSignedInUser() {
   return user;
 }
 
-export async function getChurchOperatorForUser(
-  userId: string,
-  email?: string | null
-): Promise<ChurchOperatorContext | null> {
+async function getChurchMembership(
+  userId: string
+): Promise<ChurchOperatorRecord | null> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("church_operators")
@@ -36,11 +36,29 @@ export async function getChurchOperatorForUser(
     return null;
   }
 
-  return resolveChurchOperator({
+  return data as ChurchOperatorRecord;
+}
+
+export async function getChurchAccessForUser(
+  userId: string,
+  email?: string | null
+): Promise<ChurchAccessResult> {
+  const membership = await getChurchMembership(userId);
+
+  return resolveChurchAccess({
     userId,
     email,
-    membership: data as ChurchOperatorRecord,
+    membership,
   });
+}
+
+export async function getChurchOperatorForUser(
+  userId: string,
+  email?: string | null
+): Promise<ChurchOperatorContext | null> {
+  const access = await getChurchAccessForUser(userId, email);
+
+  return access.ok ? access.operator : null;
 }
 
 export async function getChurchOperatorFromRequest(): Promise<ChurchOperatorContext | null> {

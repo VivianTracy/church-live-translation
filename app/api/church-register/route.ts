@@ -7,6 +7,13 @@ import {
   consumeChurchRegisterRateLimit,
   getClientIp,
 } from "@/lib/churchRegisterRateLimit";
+import { isChurchEmailConfigured, sendChurchEmail } from "@/lib/churchEmail";
+import {
+  buildChurchReviewEmail,
+  createChurchVerificationToken,
+  getChurchReviewEmail,
+  getPublicAppOrigin,
+} from "@/lib/churchVerification";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseAdminConfigured } from "@/lib/supabase/env";
 import { verifyOpenAIApiKey } from "@/lib/verifyOpenAIApiKey";
@@ -16,6 +23,13 @@ export async function POST(request: Request) {
   if (!isSupabaseAdminConfigured()) {
     return NextResponse.json(
       { error: "Church registration is not configured." },
+      { status: 503 }
+    );
+  }
+
+  if (!isChurchEmailConfigured()) {
+    return NextResponse.json(
+      { error: "Church review email is not configured." },
       { status: 503 }
     );
   }
@@ -72,7 +86,7 @@ export async function POST(request: Request) {
   }
 
   const userId = created.user.id;
-  const { error: rpcError } = await admin.rpc("register_church", {
+  const { data: churchId, error: rpcError } = await admin.rpc("register_church", {
     p_user_id: userId,
     p_name: parsed.value.churchName,
     p_slug: parsed.value.churchSlug,
@@ -80,19 +94,61 @@ export async function POST(request: Request) {
     p_key_last_four: parsed.value.keyLastFour,
   });
 
-  if (rpcError) {
+  if (rpcError || typeof churchId !== "string") {
     const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
 
     if (deleteError) {
       console.error("Church register rollback error:", deleteError);
     }
 
-    const mapped = mapChurchRegisterRpcError(rpcError.message);
+    const mapped = mapChurchRegisterRpcError(rpcError?.message ?? "");
     return NextResponse.json({ error: mapped.error }, { status: mapped.status });
+  }
+
+  const { token, tokenHash } = createChurchVerificationToken();
+  const { error: verificationError } = await admin
+    .from("church_verifications")
+    .insert({
+      church_id: churchId,
+      token_hash: tokenHash,
+      operator_email: parsed.value.email,
+    });
+
+  if (verificationError) {
+    console.error("Church verification insert error:", verificationError);
+    return NextResponse.json(
+      { error: "Could not finish church registration." },
+      { status: 500 }
+    );
+  }
+
+  const origin = getPublicAppOrigin(request.url);
+  const reviewEmail = buildChurchReviewEmail({
+    origin,
+    token,
+    details: {
+      churchName: parsed.value.churchName,
+      churchSlug: parsed.value.churchSlug,
+      operatorEmail: parsed.value.email,
+      keyLastFour: parsed.value.keyLastFour,
+    },
+  });
+  const emailed = await sendChurchEmail({
+    to: getChurchReviewEmail(),
+    ...reviewEmail,
+  });
+
+  if (!emailed.ok) {
+    console.error("Church review email failed:", emailed.error, {
+      churchName: parsed.value.churchName,
+      churchSlug: parsed.value.churchSlug,
+      reviewUrl: `${origin}/verify-church/${token}`,
+    });
   }
 
   return NextResponse.json({
     ok: true,
+    pending: true,
     email: parsed.value.email,
     churchSlug: parsed.value.churchSlug,
   });

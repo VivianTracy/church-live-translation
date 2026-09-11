@@ -28,8 +28,24 @@ export function isChurchOperatorRole(role: string): role is ChurchOperatorRole {
   return role === "operator" || role === "admin";
 }
 
+export const CHURCH_PENDING_LOGIN_MESSAGE =
+  "This church is waiting for confirmation. You will get an email when you can sign in.";
+
+export type ChurchAccessResult =
+  | { ok: true; operator: ChurchOperatorContext }
+  | {
+      ok: false;
+      reason: "pending" | "none";
+      churchName?: string;
+      churchSlug?: string;
+    };
+
 export function isActiveChurch(status: string | undefined): boolean {
   return status === "active" || status === undefined;
+}
+
+export function isPendingChurch(status: string | undefined): boolean {
+  return status === "pending";
 }
 
 export function resolveChurchFromMembership(
@@ -42,28 +58,54 @@ export function resolveChurchFromMembership(
   return Array.isArray(churches) ? churches[0] ?? null : churches;
 }
 
-export function resolveChurchOperator(input: {
+export function resolveChurchAccess(input: {
   userId: string;
   email?: string | null;
   membership: ChurchOperatorRecord | null;
-}): ChurchOperatorContext | null {
+}): ChurchAccessResult {
   if (!input.membership || !isChurchOperatorRole(input.membership.role)) {
-    return null;
+    return { ok: false, reason: "none" };
   }
 
   const church = resolveChurchFromMembership(input.membership.churches);
   const churchSlug = parseChurchSlug(church?.slug);
 
-  if (!church || !isActiveChurch(church.status) || !churchSlug) {
-    return null;
+  if (!church || !churchSlug) {
+    return { ok: false, reason: "none" };
+  }
+
+  if (isPendingChurch(church.status)) {
+    return {
+      ok: false,
+      reason: "pending",
+      churchName: church.name,
+      churchSlug,
+    };
+  }
+
+  if (!isActiveChurch(church.status)) {
+    return { ok: false, reason: "none" };
   }
 
   return {
-    userId: input.userId,
-    email: input.email ?? null,
-    churchId: church.id,
-    churchName: church.name,
-    churchSlug,
-    role: input.membership.role,
+    ok: true,
+    operator: {
+      userId: input.userId,
+      email: input.email ?? null,
+      churchId: church.id,
+      churchName: church.name,
+      churchSlug,
+      role: input.membership.role,
+    },
   };
+}
+
+export function resolveChurchOperator(input: {
+  userId: string;
+  email?: string | null;
+  membership: ChurchOperatorRecord | null;
+}): ChurchOperatorContext | null {
+  const access = resolveChurchAccess(input);
+
+  return access.ok ? access.operator : null;
 }

@@ -1,14 +1,12 @@
 "use client";
 
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export function RegisterChurchForm() {
-  const router = useRouter();
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [churchNickname, setChurchNickname] = useState("");
+  const [submitted, setSubmitted] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,26 +42,21 @@ export function RegisterChurchForm() {
         return;
       }
 
-      const supabase = createSupabaseBrowserClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError) {
-        setError("Church created. Sign in with the same email and password.");
-        router.replace("/login");
-        router.refresh();
-        return;
-      }
-
-      router.replace("/operator-live");
-      router.refresh();
+      setSubmitted(true);
     } catch {
       setError("Could not register this church.");
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (submitted) {
+    return (
+      <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200">
+        This church is waiting for confirmation. You will get an email when you
+        can sign in.
+      </p>
+    );
   }
 
   return (

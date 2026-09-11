@@ -13,11 +13,13 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState("");
+  const [pendingReview, setPendingReview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setPendingReview(false);
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
@@ -33,6 +35,37 @@ export function LoginForm() {
 
       if (signInError) {
         setError("Could not sign in. Check the email and password.");
+        return;
+      }
+
+      const meResponse = await fetch("/api/operator/me", { cache: "no-store" });
+      const meBody = (await meResponse.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+      };
+
+      if (meResponse.status === 403 && meBody.code === "church_pending") {
+        await supabase.auth.signOut();
+        setPendingReview(true);
+        setError(
+          meBody.error ??
+            "This church is waiting for confirmation. You will get an email when you can sign in."
+        );
+        return;
+      }
+
+      if (meResponse.status === 403) {
+        await supabase.auth.signOut();
+        setError(
+          meBody.error ?? "This account is not an authorized church operator."
+        );
+        return;
+      }
+
+      if (!meResponse.ok) {
+        setError(
+          meBody.error ?? "Could not confirm church sign-in. Try again."
+        );
         return;
       }
 
@@ -79,7 +112,13 @@ export function LoginForm() {
       </p>
 
       {error ? (
-        <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
+        <p
+          className={
+            pendingReview
+              ? "rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200"
+              : "rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200"
+          }
+        >
           {error}
         </p>
       ) : null}

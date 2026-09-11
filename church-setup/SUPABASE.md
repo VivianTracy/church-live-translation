@@ -29,7 +29,9 @@ If church login is already set up, also run:
 
 [`supabase/migrations/20260911120000_register_church.sql`](../supabase/migrations/20260911120000_register_church.sql)
 
-The duration file records how long translation ran. The register file lets a church create itself at `/register` without SQL.
+[`supabase/migrations/20260911130000_church_verification.sql`](../supabase/migrations/20260911130000_church_verification.sql)
+
+The duration file records how long translation ran. The register file lets a church create itself at `/register` without SQL. The verification file keeps a new church pending until you confirm it.
 
 If you already ran an older `schema.sql` that created `public.church_secrets`, this migration drops that public table. Store the key in Vault next.
 
@@ -47,7 +49,7 @@ Do not put `OPENAI_API_KEY` on Vercel. Do not put a church encryption secret in 
 
 ## 4. Add a church and operator
 
-New churches should open `/register` and fill in the church name, church brief name, operator email, password, and OpenAI key. Keep Supabase public sign-up **off**. The listen page is `/listen/{brief-name}`.
+New churches should open `/register` and fill in the church name, church brief name, operator email, password, and OpenAI key. Keep Supabase public sign-up **off**. After they register, you get a review email. Confirm the church on that page. They get an email when they can sign in. The listen page is `/listen/{brief-name}`.
 
 SQL below is only a fallback if `/register` is not deployed yet.
 
@@ -110,12 +112,26 @@ Add these for **Production**:
 | `NEXT_PUBLIC_AUDIENCE_URL` | `https://church-translation.vercel.app` |
 | `UPSTASH_REDIS_REST_URL` | Phone audio |
 | `UPSTASH_REDIS_REST_TOKEN` | Phone audio |
+| `RESEND_API_KEY` | Review and “you can sign in” emails |
+| `CHURCH_EMAIL_FROM` | Optional. Default is Resend’s test from-address |
 
 Redeploy without build cache after saving.
 
+## 7. Review email (Resend)
+
+New churches stay **pending** until you confirm them.
+
+1. Create a free account at [https://resend.com](https://resend.com) with `vivian.zke@gmail.com`.
+2. Copy an API key into `RESEND_API_KEY` on Vercel and in `.env.local`.
+3. Leave `CHURCH_REVIEW_EMAIL` unset unless you want reviews sent somewhere else. It defaults to `vivian.zke@gmail.com`.
+4. After a church registers, open the confirm link in that email. Check the church name, brief name, operator email, and OpenAI key ending. Click **Confirm this church**.
+5. The operator then gets an email that they can sign in.
+
+Resend’s test from-address can email your Resend account address. To email other church operators, add and verify a domain in Resend, then set `CHURCH_EMAIL_FROM` to something like `Church Translation <noreply@your-domain>`. Confirming still works if that operator email cannot be sent; tell them they can sign in.
+
 ## Check
 
-1. Open `/register` and create a church, or `/login` if the church already exists.
-2. You should land on `/operator-live` and see the church name.
-3. Each church has a public `/listen/{slug}` page. Phones do not sign in.
+1. Open `/register` and create a church.
+2. You should get a review email. Confirm the church. The operator should get an email, then sign in at `/login`.
+3. Each confirmed church has a public `/listen/{slug}` page. Phones do not sign in.
 4. Keep **Allow new users to sign up** off in Supabase. Registration is only `/register`.

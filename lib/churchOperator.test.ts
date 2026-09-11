@@ -1,4 +1,4 @@
-import { resolveChurchOperator } from "@/lib/churchOperator";
+import { resolveChurchAccess, resolveChurchOperator } from "@/lib/churchOperator";
 import { describe, expect, it } from "vitest";
 
 describe("church operator resolution", () => {
@@ -68,6 +68,45 @@ describe("church operator resolution", () => {
             name: "Example Church",
             slug: "example-church",
             status: "suspended",
+          },
+        },
+      })
+    ).toBeNull();
+  });
+
+  it("marks a pending church as waiting for confirmation", () => {
+    expect(
+      resolveChurchAccess({
+        userId: "user-1",
+        email: "op@example.com",
+        membership: {
+          church_id: "church-1",
+          role: "admin",
+          churches: {
+            id: "church-1",
+            name: "Example Church",
+            slug: "example-church",
+            status: "pending",
+          },
+        },
+      })
+    ).toEqual({
+      ok: false,
+      reason: "pending",
+      churchName: "Example Church",
+      churchSlug: "example-church",
+    });
+    expect(
+      resolveChurchOperator({
+        userId: "user-1",
+        membership: {
+          church_id: "church-1",
+          role: "admin",
+          churches: {
+            id: "church-1",
+            name: "Example Church",
+            slug: "example-church",
+            status: "pending",
           },
         },
       })

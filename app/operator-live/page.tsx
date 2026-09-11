@@ -39,6 +39,7 @@ export default function OperatorLivePage() {
   const [seconds, setSeconds] = useState(0);
   const [account, setAccount] = useState<OperatorAccount | null>(null);
   const [accountError, setAccountError] = useState("");
+  const [pendingReview, setPendingReview] = useState(false);
   const [relayError, setRelayError] = useState("");
   const [relayReady, setRelayReady] = useState<boolean | null>(null);
   const [showMissingRelayConfig, setShowMissingRelayConfig] = useState(false);
@@ -92,12 +93,14 @@ export default function OperatorLivePage() {
 
         const body = (await response.json()) as OperatorAccount & {
           error?: string;
+          code?: string;
         };
 
         if (response.status === 403) {
           setAccountError(
             body.error ?? "This account is not an authorized church operator."
           );
+          setPendingReview(body.code === "church_pending");
           return;
         }
 
@@ -224,15 +227,23 @@ export default function OperatorLivePage() {
         <ChurchTranslationHeader
           churchName={account?.churchName}
           email={account?.email}
-          showSignOut={account?.mode === "church"}
+          showSignOut={account?.mode === "church" || pendingReview}
         />
 
         {accountError ? (
-          <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
+          <p
+            className={
+              pendingReview
+                ? "rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200"
+                : "rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200"
+            }
+          >
             {accountError}
           </p>
         ) : null}
 
+        {pendingReview ? null : (
+          <>
         {account?.mode === "church" ? (
           <TranslationUsageCard refreshKey={sessionStatus} />
         ) : null}
@@ -386,6 +397,8 @@ export default function OperatorLivePage() {
             is online.
           </p>
         ) : null}
+          </>
+        )}
       </div>
     </main>
   );
