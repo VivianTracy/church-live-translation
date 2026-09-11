@@ -1,7 +1,7 @@
 import { redis } from "@/lib/redis";
 
-export const CHURCH_REGISTER_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
-export const CHURCH_REGISTER_RATE_LIMIT_MAX_PER_IP = 5;
+export const CHURCH_REGISTER_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
+export const CHURCH_REGISTER_RATE_LIMIT_MAX_PER_IP = 20;
 
 export type ChurchRegisterRateLimitResult =
   | { allowed: true }
