@@ -9,7 +9,7 @@ describe("church operator resolution", () => {
       membership: {
         church_id: "church-1",
         role: "operator",
-        churches: { id: "church-1", name: "Example Church" },
+        churches: { id: "church-1", name: "Example Church", status: "active" },
       },
     });
 
@@ -39,7 +39,24 @@ describe("church operator resolution", () => {
         membership: {
           church_id: "church-1",
           role: "listener",
-          churches: { id: "church-1", name: "Example Church" },
+          churches: { id: "church-1", name: "Example Church", status: "active" },
+        },
+      })
+    ).toBeNull();
+  });
+
+  it("rejects a suspended church", () => {
+    expect(
+      resolveChurchOperator({
+        userId: "user-1",
+        membership: {
+          church_id: "church-1",
+          role: "operator",
+          churches: {
+            id: "church-1",
+            name: "Example Church",
+            status: "suspended",
+          },
         },
       })
     ).toBeNull();

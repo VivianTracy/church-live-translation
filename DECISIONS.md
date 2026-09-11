@@ -2,7 +2,7 @@
 
 ## 2026-09-10
 
-Public Vercel operator uses Supabase church login. The session endpoint identifies the signed-in user’s church, requires an authorized operator, decrypts that church’s OpenAI key, and returns only a temporary Realtime credential. Session creates are rate-limited and recorded.
+Public Vercel operator uses Supabase church login. The session endpoint identifies the signed-in user’s church, requires an authorized operator, reads that church’s OpenAI key from Vault, and returns only a temporary Realtime credential. Session creates are rate-limited and recorded. Secret metadata stays in a private schema.
 
 **Reason:** The OpenAI key must not live in the browser or as a shared Vercel env var once the operator page is on the public internet.
 

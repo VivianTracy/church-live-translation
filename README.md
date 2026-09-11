@@ -56,7 +56,7 @@ git clone https://github.com/VivianTracy/church-live-translation.git
 cd church-live-translation
 npm install
 cp church-setup/env.example .env.local
-# add Supabase keys and CHURCH_SECRET_ENCRYPTION_KEY
+# add Supabase keys
 # add NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app
 npm run dev
 ```
@@ -67,8 +67,7 @@ Open **http://127.0.0.1:3000/login** in Chrome or Edge, then sign in. `npm run d
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Vercel and local | Church sign-in |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Vercel and local | Church sign-in |
-| `SUPABASE_SERVICE_ROLE_KEY` | Vercel and local server | Church key + session log |
-| `CHURCH_SECRET_ENCRYPTION_KEY` | Vercel and local server | Decrypt the church OpenAI key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Vercel and local server | Vault key + session log |
 | `NEXT_PUBLIC_AUDIENCE_URL` | Vercel and local | Permanent phone QR |
 | `UPSTASH_REDIS_REST_URL` | Vercel | Phone audio relay |
 | `UPSTASH_REDIS_REST_TOKEN` | Vercel | Phone audio relay |

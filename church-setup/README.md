@@ -93,7 +93,6 @@ Edit `.env.local` in the project root. For the public site, see [`SUPABASE.md`](
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-CHURCH_SECRET_ENCRYPTION_KEY=
 NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app
 ```
 
@@ -180,7 +179,7 @@ Headset translation still works if this section is skipped. Phones will not hear
 | Vercel site | Hosts `/login`, `/operator-live`, `/listen`, and the session API |
 | Phones | Open `https://church-caption.vercel.app/listen` and tap **Tap to Listen** |
 
-The OpenAI key is stored encrypted in Supabase. Do not add `OPENAI_API_KEY` to Vercel.
+The OpenAI key is stored in Supabase Vault. Do not add `OPENAI_API_KEY` to Vercel.
 
 Until this work is merged to `main`, point Vercel Production at the **`feature/public-church-login`** branch.
 
@@ -234,7 +233,6 @@ In the Vercel project → **Settings** → **Environment Variables**, add these 
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase `anon` key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase `service_role` key |
-| `CHURCH_SECRET_ENCRYPTION_KEY` | 64-character hex secret |
 
 Do **not** add `OPENAI_API_KEY` here. See [`SUPABASE.md`](./SUPABASE.md).
 
@@ -276,7 +274,6 @@ On the church computer, `.env.local` needs:
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-CHURCH_SECRET_ENCRYPTION_KEY=
 NEXT_PUBLIC_AUDIENCE_URL=https://church-caption.vercel.app
 ```
 

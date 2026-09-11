@@ -5,7 +5,6 @@ import {
 } from "@/lib/churchOperator";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { decryptOpenAIApiKey } from "@/lib/churchOpenAIKey";
 
 export async function getSignedInUser() {
   const supabase = await createSupabaseServerClient();
@@ -28,7 +27,7 @@ export async function getChurchOperatorForUser(
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("church_operators")
-    .select("church_id, role, churches(id, name)")
+    .select("church_id, role, churches(id, name, status)")
     .eq("user_id", userId)
     .limit(1)
     .maybeSingle();
@@ -58,15 +57,13 @@ export async function getDecryptedChurchOpenAIApiKey(
   churchId: string
 ): Promise<string | null> {
   const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
-    .from("church_secrets")
-    .select("encrypted_openai_api_key")
-    .eq("church_id", churchId)
-    .maybeSingle();
+  const { data, error } = await admin.rpc("church_openai_api_key", {
+    p_church_id: churchId,
+  });
 
-  if (error || !data?.encrypted_openai_api_key) {
+  if (error || typeof data !== "string" || !data.trim()) {
     return null;
   }
 
-  return decryptOpenAIApiKey(data.encrypted_openai_api_key);
+  return data.trim();
 }

@@ -8,19 +8,29 @@ export type ChurchOperatorContext = {
   role: ChurchOperatorRole;
 };
 
+export type ChurchRecord = {
+  id: string;
+  name: string;
+  status?: string;
+};
+
 export type ChurchOperatorRecord = {
   church_id: string;
   role: string;
-  churches: { id: string; name: string } | { id: string; name: string }[] | null;
+  churches: ChurchRecord | ChurchRecord[] | null;
 };
 
 export function isChurchOperatorRole(role: string): role is ChurchOperatorRole {
   return role === "operator" || role === "admin";
 }
 
+export function isActiveChurch(status: string | undefined): boolean {
+  return status === "active" || status === undefined;
+}
+
 export function resolveChurchFromMembership(
   churches: ChurchOperatorRecord["churches"]
-): { id: string; name: string } | null {
+): ChurchRecord | null {
   if (!churches) {
     return null;
   }
@@ -39,7 +49,7 @@ export function resolveChurchOperator(input: {
 
   const church = resolveChurchFromMembership(input.membership.churches);
 
-  if (!church) {
+  if (!church || !isActiveChurch(church.status)) {
     return null;
   }
 
