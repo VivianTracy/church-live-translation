@@ -113,6 +113,29 @@ export function directionFromDetectedLanguage(
   return language === "zh" ? "zh-to-en" : "en-to-zh";
 }
 
+export function oppositeAudioTranslationDirection(
+  direction: ResolvedAudioTranslationDirection
+): ResolvedAudioTranslationDirection {
+  return direction === "zh-to-en" ? "en-to-zh" : "zh-to-en";
+}
+
+export const AUTO_DIRECTION_PROBE_MS = 8000;
+export const AUTO_DIRECTION_PROBE_INPUT_PEAK = 0.08;
+
+export function shouldProbeOppositeAutoDirection(input: {
+  elapsedMs: number;
+  isTranslating: boolean;
+  inputPeak: number;
+  alreadyProbed: boolean;
+}): boolean {
+  return (
+    !input.alreadyProbed &&
+    !input.isTranslating &&
+    input.elapsedMs >= AUTO_DIRECTION_PROBE_MS &&
+    input.inputPeak >= AUTO_DIRECTION_PROBE_INPUT_PEAK
+  );
+}
+
 export function formatAudioTranslationDirectionLabel(
   direction: AudioTranslationDirection,
   resolved: ResolvedAudioTranslationDirection | null = null,

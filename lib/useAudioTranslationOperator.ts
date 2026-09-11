@@ -9,8 +9,10 @@ import {
   getAudioTranslationDirectionConfig,
   loadStoredAudioTranslationDirection,
   loadStoredAutoResolvedDirection,
+  oppositeAudioTranslationDirection,
   saveStoredAudioTranslationDirection,
   saveStoredAutoResolvedDirection,
+  shouldProbeOppositeAutoDirection,
   type AudioTranslationDirection,
   type ResolvedAudioTranslationDirection,
 } from "@/lib/audioTranslationDirection";
@@ -108,6 +110,9 @@ export function useAudioTranslationOperator() {
   const sessionOutputLanguageRef = useRef<"en" | "zh">("en");
   const transcriptBufferRef = useRef("");
   const languageLockedRef = useRef(false);
+  const preserveAutoDetectionRef = useRef(false);
+  const autoDirectionProbedRef = useRef(false);
+  const inputPeakRef = useRef(0);
   const audioInputSourceRef = useRef<AudioInputSource>("obs-streaming");
   const sessionStartedAtRef = useRef<number | null>(null);
   const uploadWavChunkRef = useRef<((wavBase64: string) => void) | null>(null);
@@ -244,6 +249,7 @@ export function useAudioTranslationOperator() {
     languageLockedRef.current = translationDirectionRef.current !== "auto";
     resolvedDirectionRef.current = null;
     setResolvedDirection(null);
+    autoDirectionProbedRef.current = false;
   }, []);
 
   const resetSessionMeters = useCallback(() => {
@@ -264,12 +270,21 @@ export function useAudioTranslationOperator() {
       const outputLanguage = getAudioTranslationDirectionConfig(direction)
         .outputLanguage;
 
-      if (outputLanguage !== sessionOutputLanguageRef.current) {
-        sessionOutputLanguageRef.current = outputLanguage;
-        connectionRef.current?.updateOutputLanguage(outputLanguage);
+      if (outputLanguage === sessionOutputLanguageRef.current) {
+        return;
       }
+
+      sessionOutputLanguageRef.current = outputLanguage;
+      preserveAutoDetectionRef.current = true;
+      connectionRef.current?.stop();
+      connectionRef.current = null;
+      startingRef.current = false;
+      applySession(
+        reduceOperatorSession(sessionRef.current, { type: "start" })
+      );
+      void startListeningRef.current("reconnect");
     },
-    []
+    [applySession]
   );
 
   const handleInputTranscript = useCallback(
@@ -337,20 +352,31 @@ export function useAudioTranslationOperator() {
           );
         }
 
+        const preserveAutoDetection = preserveAutoDetectionRef.current;
+        preserveAutoDetectionRef.current = false;
+
         const startingDirection =
           translationDirectionRef.current === "auto"
-            ? loadStoredAutoResolvedDirection()
+            ? preserveAutoDetection && resolvedDirectionRef.current
+              ? resolvedDirectionRef.current
+              : loadStoredAutoResolvedDirection()
             : translationDirectionRef.current;
         const startingOutputLanguage =
           getAudioTranslationDirectionConfig(startingDirection).outputLanguage;
 
         sessionOutputLanguageRef.current = startingOutputLanguage;
         transcriptBufferRef.current = "";
+        autoDirectionProbedRef.current = preserveAutoDetection;
 
         if (translationDirectionRef.current === "auto") {
-          languageLockedRef.current = false;
-          resolvedDirectionRef.current = startingDirection;
-          setResolvedDirection(startingDirection);
+          if (preserveAutoDetection && resolvedDirectionRef.current) {
+            languageLockedRef.current = true;
+            setResolvedDirection(resolvedDirectionRef.current);
+          } else {
+            languageLockedRef.current = false;
+            resolvedDirectionRef.current = null;
+            setResolvedDirection(null);
+          }
         } else {
           languageLockedRef.current = true;
           resolvedDirectionRef.current = null;
@@ -364,6 +390,7 @@ export function useAudioTranslationOperator() {
           outputLanguage: startingOutputLanguage,
           onTranslatingChange: setIsTranslating,
           onInputLevels: (inputLevel, inputPeak) => {
+            inputPeakRef.current = inputPeak;
             setLevels((current) => ({
               ...current,
               inputLevel,
@@ -465,6 +492,46 @@ export function useAudioTranslationOperator() {
   useEffect(() => {
     startListeningRef.current = startListening;
   }, [startListening]);
+
+  useEffect(() => {
+    if (
+      session.status !== "live" ||
+      translationDirection !== "auto" ||
+      isTranslating
+    ) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      const startedAt = sessionStartedAtRef.current;
+
+      if (
+        startedAt === null ||
+        !shouldProbeOppositeAutoDirection({
+          elapsedMs: Date.now() - startedAt,
+          isTranslating: false,
+          inputPeak: inputPeakRef.current,
+          alreadyProbed: autoDirectionProbedRef.current,
+        })
+      ) {
+        return;
+      }
+
+      const currentDirection =
+        sessionOutputLanguageRef.current === "en" ? "zh-to-en" : "en-to-zh";
+      autoDirectionProbedRef.current = true;
+      applyDetectedDirection(
+        oppositeAudioTranslationDirection(currentDirection)
+      );
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [
+    applyDetectedDirection,
+    isTranslating,
+    session.status,
+    translationDirection,
+  ]);
 
   const stopListening = useCallback(() => {
     sessionGenerationRef.current += 1;
