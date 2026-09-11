@@ -1,7 +1,11 @@
 import {
+  CHURCH_BRIEF_NAME_TAKEN_MESSAGE,
+  CHURCH_EMAIL_TAKEN_MESSAGE,
+  churchRegisterErrorText,
   isExistingAuthUserError,
   mapChurchRegisterRpcError,
   parseChurchRegisterInput,
+  parseRegisterChurchId,
 } from "@/lib/churchRegister";
 import {
   consumeChurchRegisterRateLimit,
@@ -64,6 +68,23 @@ export async function POST(request: Request) {
   }
 
   const admin = createSupabaseAdminClient();
+  const { data: existingChurch, error: slugLookupError } = await admin
+    .from("churches")
+    .select("id")
+    .eq("slug", parsed.value.churchSlug)
+    .maybeSingle();
+
+  if (slugLookupError) {
+    console.error("Church register slug lookup error:", slugLookupError);
+  }
+
+  if (existingChurch) {
+    return NextResponse.json(
+      { error: CHURCH_BRIEF_NAME_TAKEN_MESSAGE },
+      { status: 409 }
+    );
+  }
+
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email: parsed.value.email,
     password: parsed.value.password,
@@ -73,7 +94,7 @@ export async function POST(request: Request) {
   if (createError || !created.user) {
     if (isExistingAuthUserError(createError?.message)) {
       return NextResponse.json(
-        { error: "That email is already registered. Sign in instead." },
+        { error: CHURCH_EMAIL_TAKEN_MESSAGE },
         { status: 409 }
       );
     }
@@ -86,40 +107,31 @@ export async function POST(request: Request) {
   }
 
   const userId = created.user.id;
-  const { data: churchId, error: rpcError } = await admin.rpc("register_church", {
-    p_user_id: userId,
-    p_name: parsed.value.churchName,
-    p_slug: parsed.value.churchSlug,
-    p_openai_api_key: parsed.value.openaiApiKey,
-    p_key_last_four: parsed.value.keyLastFour,
-  });
+  const { token, tokenHash } = createChurchVerificationToken();
+  const { data: churchIdRaw, error: rpcError } = await admin.rpc(
+    "register_church",
+    {
+      p_user_id: userId,
+      p_name: parsed.value.churchName,
+      p_slug: parsed.value.churchSlug,
+      p_openai_api_key: parsed.value.openaiApiKey,
+      p_key_last_four: parsed.value.keyLastFour,
+      p_token_hash: tokenHash,
+      p_operator_email: parsed.value.email,
+    }
+  );
+  const churchId = parseRegisterChurchId(churchIdRaw);
 
-  if (rpcError || typeof churchId !== "string") {
+  if (rpcError || !churchId) {
     const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
 
     if (deleteError) {
       console.error("Church register rollback error:", deleteError);
     }
 
-    const mapped = mapChurchRegisterRpcError(rpcError?.message ?? "");
+    console.error("Church register_church error:", rpcError, churchIdRaw);
+    const mapped = mapChurchRegisterRpcError(churchRegisterErrorText(rpcError));
     return NextResponse.json({ error: mapped.error }, { status: mapped.status });
-  }
-
-  const { token, tokenHash } = createChurchVerificationToken();
-  const { error: verificationError } = await admin
-    .from("church_verifications")
-    .insert({
-      church_id: churchId,
-      token_hash: tokenHash,
-      operator_email: parsed.value.email,
-    });
-
-  if (verificationError) {
-    console.error("Church verification insert error:", verificationError);
-    return NextResponse.json(
-      { error: "Could not finish church registration." },
-      { status: 500 }
-    );
   }
 
   const origin = getPublicAppOrigin(request.url);

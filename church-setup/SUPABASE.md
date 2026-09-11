@@ -31,7 +31,9 @@ If church login is already set up, also run:
 
 [`supabase/migrations/20260911130000_church_verification.sql`](../supabase/migrations/20260911130000_church_verification.sql)
 
-The duration file records how long translation ran. The register file lets a church create itself at `/register` without SQL. The verification file keeps a new church pending until you confirm it.
+[`supabase/migrations/20260911140000_register_church_verification.sql`](../supabase/migrations/20260911140000_register_church_verification.sql)
+
+The duration file records how long translation ran. The register file lets a church create itself at `/register` without SQL. The verification files keep a new church pending until you confirm it.
 
 If you already ran an older `schema.sql` that created `public.church_secrets`, this migration drops that public table. Store the key in Vault next.
 

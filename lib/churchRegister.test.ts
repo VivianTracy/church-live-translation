@@ -90,11 +90,33 @@ describe("church registration failures", () => {
       error: "That brief name is already taken. Choose another.",
       status: 409,
     });
+    expect(
+      mapChurchRegisterRpcError(
+        'duplicate key value violates unique constraint "churches_slug_key"'
+      ).error
+    ).toBe("That brief name is already taken. Choose another.");
   });
 
   it("maps an existing operator as a sign-in instead", () => {
     expect(mapChurchRegisterRpcError("already_operator").status).toBe(409);
     expect(isExistingAuthUserError("User already registered")).toBe(true);
     expect(isExistingAuthUserError("invalid login")).toBe(false);
+  });
+
+  it("maps missing review SQL to a setup message", () => {
+    expect(
+      mapChurchRegisterRpcError(
+        "Could not find the table 'public.church_verifications' in the schema cache"
+      )
+    ).toEqual({
+      error:
+        "Church review is not set up yet. In Supabase SQL Editor, run the latest church verification SQL, then try again.",
+      status: 503,
+    });
+    expect(
+      mapChurchRegisterRpcError(
+        'new row for relation "churches" violates check constraint "churches_status_known"'
+      ).status
+    ).toBe(503);
   });
 });
