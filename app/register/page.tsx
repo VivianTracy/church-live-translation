@@ -17,7 +17,7 @@ export default function RegisterPage() {
           <p className="text-sm text-slate-600">
             Create the operator sign-in, church brief name, and OpenAI key for
             this church. After you register, we confirm the church. You will get
-            an email when you can sign in. Phone listeners do not register.
+            an email when you can sign in.
           </p>
 
           {isSupabaseConfigured() ? (

@@ -7,6 +7,7 @@ export function RegisterChurchForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [churchNickname, setChurchNickname] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [emailError, setEmailError] = useState("");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,13 +36,22 @@ export function RegisterChurchForm() {
           openaiApiKey,
         }),
       });
-      const body = (await response.json()) as { error?: string };
+      const body = (await response.json()) as {
+        error?: string;
+        emailedReviewer?: boolean;
+        emailError?: string;
+      };
 
       if (!response.ok) {
         setError(body.error ?? "Could not register this church.");
         return;
       }
 
+      setEmailError(
+        body.emailedReviewer === false
+          ? body.emailError || "The review email could not be sent."
+          : ""
+      );
       setSubmitted(true);
     } catch {
       setError("Could not register this church.");
@@ -52,10 +62,17 @@ export function RegisterChurchForm() {
 
   if (submitted) {
     return (
-      <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200">
-        This church is waiting for confirmation. You will get an email when you
-        can sign in.
-      </p>
+      <div className="space-y-3">
+        <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200">
+          This church is waiting for confirmation. You will get an email when
+          you can sign in.
+        </p>
+        {emailError ? (
+          <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
+            The review email could not be sent. {emailError}
+          </p>
+        ) : null}
+      </div>
     );
   }
 

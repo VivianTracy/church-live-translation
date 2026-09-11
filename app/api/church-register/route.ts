@@ -161,6 +161,8 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     pending: true,
+    emailedReviewer: emailed.ok,
+    emailError: emailed.ok ? undefined : emailed.error,
     email: parsed.value.email,
     churchSlug: parsed.value.churchSlug,
   });

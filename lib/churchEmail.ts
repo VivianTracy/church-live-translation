@@ -32,6 +32,29 @@ export function isChurchEmailConfigured(): boolean {
   return Boolean(getResendApiKey());
 }
 
+export function readResendSendError(status: number, body: string): string {
+  try {
+    const parsed = JSON.parse(body) as { message?: string };
+    const message = parsed.message?.trim();
+
+    if (message) {
+      if (message.toLowerCase().includes("testing emails")) {
+        return "Resend can only email the account owner until a sending domain is verified.";
+      }
+
+      return message;
+    }
+  } catch {
+    // Use the status fallback below.
+  }
+
+  if (status === 401 || status === 403) {
+    return "Resend rejected the API key or from-address.";
+  }
+
+  return "Could not send email.";
+}
+
 export async function sendChurchEmail(
   input: SendChurchEmailInput
 ): Promise<SendChurchEmailResult> {
@@ -46,26 +69,32 @@ export async function sendChurchEmail(
     return { ok: false, error: "That email is not valid." };
   }
 
-  const response = await fetch(RESEND_EMAILS_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: getChurchEmailFrom(),
-      to: [to],
-      subject: input.subject,
-      text: input.text,
-      html: input.html,
-    }),
-  });
+  try {
+    const response = await fetch(RESEND_EMAILS_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: getChurchEmailFrom(),
+        to: [to],
+        subject: input.subject,
+        text: input.text,
+        html: input.html,
+      }),
+    });
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    console.error("Church email send failed:", response.status, body);
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      const error = readResendSendError(response.status, body);
+      console.error("Church email send failed:", response.status, body);
+      return { ok: false, error };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    console.error("Church email send failed:", error);
     return { ok: false, error: "Could not send email." };
   }
-
-  return { ok: true };
 }

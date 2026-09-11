@@ -1,4 +1,4 @@
-import { isChurchEmailConfigured } from "@/lib/churchEmail";
+import { isChurchEmailConfigured, readResendSendError } from "@/lib/churchEmail";
 import {
   buildChurchApprovedEmail,
   buildChurchReviewEmail,
@@ -87,5 +87,22 @@ describe("church verification emails", () => {
     expect(isChurchEmailConfigured()).toBe(false);
     vi.stubEnv("RESEND_API_KEY", "re_test");
     expect(isChurchEmailConfigured()).toBe(true);
+  });
+
+  it("explains Resend testing-mode failures", () => {
+    expect(
+      readResendSendError(
+        403,
+        JSON.stringify({
+          message:
+            "You can only send testing emails to your own email address (you@example.com).",
+        })
+      )
+    ).toBe(
+      "Resend can only email the account owner until a sending domain is verified."
+    );
+    expect(readResendSendError(401, "")).toBe(
+      "Resend rejected the API key or from-address."
+    );
   });
 });
