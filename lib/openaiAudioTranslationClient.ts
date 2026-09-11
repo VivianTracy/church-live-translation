@@ -135,6 +135,26 @@ async function playRoutedAudio(
   await audio.play();
 }
 
+function getPlayedAudioStream(
+  audio: HTMLAudioElement,
+  fallback: MediaStream
+): MediaStream {
+  const capture = (
+    audio as HTMLAudioElement & { captureStream?: () => MediaStream }
+  ).captureStream;
+
+  if (typeof capture !== "function") {
+    return fallback;
+  }
+
+  try {
+    const played = capture.call(audio);
+    return played.getAudioTracks().length > 0 ? played : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function connectOpenAIAudioTranslation(
   options: ConnectOptions
 ): Promise<AudioTranslationConnection> {
@@ -253,10 +273,12 @@ export async function connectOpenAIAudioTranslation(
       }
 
       const generation = ++attachGeneration;
+      let captureStream = outputStream;
 
       try {
         transmitterAudio.volume = outputVolume;
         await playRoutedAudio(transmitterAudio, outputStream, outputDeviceId);
+        captureStream = getPlayedAudioStream(transmitterAudio, outputStream);
       } catch (error) {
         if (generation === attachGeneration && !stopped) {
           options.onError(
@@ -282,7 +304,7 @@ export async function connectOpenAIAudioTranslation(
           await monitorContext.resume();
         }
 
-        const outputSource = monitorContext.createMediaStreamSource(outputStream);
+        const outputSource = monitorContext.createMediaStreamSource(captureStream);
         const outputAnalyser = monitorContext.createAnalyser();
         outputAnalyser.fftSize = 2048;
         outputSource.connect(outputAnalyser);

@@ -113,12 +113,10 @@ export function startAudioNodePcmUploader(
   onChunk: (wavBase64: string) => void
 ): () => void {
   const processor = audioContext.createScriptProcessor(4096, 1, 1);
-  const silentGain = audioContext.createGain();
+  const keepAlive = audioContext.createMediaStreamDestination();
   const sourceRate = audioContext.sampleRate;
   const pendingChunks: Int16Array[] = [];
   let chunkTimer: ReturnType<typeof setInterval> | null = null;
-
-  silentGain.gain.value = 0;
 
   processor.onaudioprocess = (event) => {
     const mixed = mixInputBuffer(event.inputBuffer);
@@ -130,8 +128,7 @@ export function startAudioNodePcmUploader(
   };
 
   sourceNode.connect(processor);
-  processor.connect(silentGain);
-  silentGain.connect(audioContext.destination);
+  processor.connect(keepAlive);
 
   const flushChunk = () => {
     if (pendingChunks.length === 0) {
@@ -153,6 +150,6 @@ export function startAudioNodePcmUploader(
 
     flushChunk();
     processor.disconnect();
-    silentGain.disconnect();
+    keepAlive.disconnect();
   };
 }
