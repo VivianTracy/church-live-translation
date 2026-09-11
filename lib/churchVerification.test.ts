@@ -8,6 +8,8 @@ import {
   getChurchVerificationUrl,
   getPublicAppOrigin,
   hashChurchVerificationToken,
+  isChurchReviewer,
+  parseChurchId,
   parseChurchVerificationToken,
 } from "@/lib/churchVerification";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -71,8 +73,17 @@ describe("church verification emails", () => {
   it("emails reviews to Vivian unless overridden", () => {
     vi.stubEnv("CHURCH_REVIEW_EMAIL", "");
     expect(getChurchReviewEmail()).toBe("vivian.zke@gmail.com");
+    expect(isChurchReviewer("Vivian.zke@gmail.com")).toBe(true);
+    expect(isChurchReviewer("op@example.com")).toBe(false);
     vi.stubEnv("CHURCH_REVIEW_EMAIL", "review@example.com");
     expect(getChurchReviewEmail()).toBe("review@example.com");
+  });
+
+  it("accepts a church id", () => {
+    expect(parseChurchId("2f1b7c4a-3d5e-4f6a-8b9c-0d1e2f3a4b5c")).toBe(
+      "2f1b7c4a-3d5e-4f6a-8b9c-0d1e2f3a4b5c"
+    );
+    expect(parseChurchId("not-an-id")).toBeNull();
   });
 
   it("uses the public site origin for review links", () => {

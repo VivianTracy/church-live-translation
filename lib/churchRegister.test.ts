@@ -21,6 +21,7 @@ describe("church registration input", () => {
     expect(parseRegisterChurchSlug("local")).toBeNull();
     expect(parseRegisterChurchSlug("login")).toBeNull();
     expect(parseRegisterChurchSlug("verify-church")).toBeNull();
+    expect(parseRegisterChurchSlug("review-churches")).toBeNull();
     expect(parseChurchNickname("local")).toBeNull();
     expect(parseChurchNickname("")).toBeNull();
     expect(parseChurchNickname("和平教会")).toBeNull();

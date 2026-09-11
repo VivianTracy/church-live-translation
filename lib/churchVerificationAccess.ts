@@ -125,7 +125,13 @@ export async function confirmChurchVerification(
     return { ok: false, error: "not_found" };
   }
 
-  if (record.status === "active" && record.confirmedAt) {
+  return activatePendingChurch(record);
+}
+
+async function activatePendingChurch(
+  record: ChurchVerificationRecord
+): Promise<ConfirmChurchVerificationResult> {
+  if (record.status === "active") {
     return { ok: true, alreadyConfirmed: true, record };
   }
 
@@ -148,13 +154,7 @@ export async function confirmChurchVerification(
   }
 
   if (!updated) {
-    const latest = await getChurchVerificationByToken(rawToken);
-
-    if (latest?.status === "active") {
-      return { ok: true, alreadyConfirmed: true, record: latest };
-    }
-
-    return { ok: false, error: "not_pending" };
+    return { ok: true, alreadyConfirmed: true, record };
   }
 
   const confirmedAt = new Date().toISOString();
@@ -176,4 +176,89 @@ export async function confirmChurchVerification(
       confirmedAt,
     },
   };
+}
+
+async function getChurchOperatorEmail(churchId: string): Promise<string | null> {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("church_operators")
+    .select("user_id")
+    .eq("church_id", churchId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data?.user_id) {
+    return null;
+  }
+
+  const { data: user, error: userError } = await admin.auth.admin.getUserById(
+    data.user_id
+  );
+
+  if (userError || !user.user?.email) {
+    return null;
+  }
+
+  return user.user.email.toLowerCase();
+}
+
+export async function listPendingChurchReviews(): Promise<
+  ChurchVerificationRecord[]
+> {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("churches")
+    .select("id, name, slug, status")
+    .eq("status", "pending")
+    .order("created_at", { ascending: true });
+
+  if (error || !data) {
+    console.error("Pending church list error:", error);
+    return [];
+  }
+
+  const reviews: ChurchVerificationRecord[] = [];
+
+  for (const church of data) {
+    const operatorEmail = await getChurchOperatorEmail(church.id);
+
+    reviews.push({
+      churchId: church.id,
+      churchName: church.name,
+      churchSlug: church.slug,
+      status: church.status,
+      operatorEmail: operatorEmail ?? "",
+      keyLastFour: await getKeyLastFour(church.id),
+      confirmedAt: null,
+    });
+  }
+
+  return reviews;
+}
+
+export async function confirmChurchById(
+  churchId: string
+): Promise<ConfirmChurchVerificationResult> {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("churches")
+    .select("id, name, slug, status")
+    .eq("id", churchId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return { ok: false, error: "not_found" };
+  }
+
+  const operatorEmail = await getChurchOperatorEmail(data.id);
+
+  return activatePendingChurch({
+    churchId: data.id,
+    churchName: data.name,
+    churchSlug: data.slug,
+    status: data.status,
+    operatorEmail: operatorEmail ?? "",
+    keyLastFour: await getKeyLastFour(data.id),
+    confirmedAt: null,
+  });
 }

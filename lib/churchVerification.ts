@@ -38,6 +38,26 @@ export function getChurchReviewEmail(): string {
   );
 }
 
+export function isChurchReviewer(email: string | null | undefined): boolean {
+  return parseOperatorEmail(email) === getChurchReviewEmail();
+}
+
+export function parseChurchId(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const id = value.trim().toLowerCase();
+
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)
+  ) {
+    return null;
+  }
+
+  return id;
+}
+
 export function createChurchVerificationToken(): {
   token: string;
   tokenHash: string;

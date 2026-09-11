@@ -7,7 +7,11 @@ import {
 } from "@/lib/supabase/env";
 
 function isProtectedOperatorPage(pathname: string): boolean {
-  return pathname === "/" || pathname.startsWith("/operator-live");
+  return (
+    pathname === "/" ||
+    pathname.startsWith("/operator-live") ||
+    pathname.startsWith("/review-churches")
+  );
 }
 
 function isPublicAuthPage(pathname: string): boolean {

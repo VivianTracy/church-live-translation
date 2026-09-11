@@ -7,6 +7,7 @@ import {
   getSignedInUser,
 } from "@/lib/churchOperatorAccess";
 import { LOCAL_LISTEN_CHURCH_SLUG } from "@/lib/churchSlug";
+import { isChurchReviewer } from "@/lib/churchVerification";
 
 export async function GET() {
   if (!requiresChurchLogin()) {
@@ -57,5 +58,6 @@ export async function GET() {
     churchSlug: operator.churchSlug,
     email: operator.email,
     keyLastFour: await getChurchOpenAIKeyLastFour(operator.churchId),
+    isReviewer: isChurchReviewer(operator.email),
   });
 }

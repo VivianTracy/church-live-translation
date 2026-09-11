@@ -23,6 +23,7 @@ import {
   isUsingRemoteTranslationRelay,
 } from "@/lib/translationRelayUrl";
 import { useAudioTranslationOperator } from "@/lib/useAudioTranslationOperator";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -32,6 +33,7 @@ type OperatorAccount = {
   churchSlug: string;
   email: string | null;
   keyLastFour: string | null;
+  isReviewer?: boolean;
 };
 
 export default function OperatorLivePage() {
@@ -115,6 +117,7 @@ export default function OperatorLivePage() {
           churchSlug: body.churchSlug || "local",
           email: body.email,
           keyLastFour: body.keyLastFour ?? null,
+          isReviewer: body.isReviewer === true,
         });
         setAccountError("");
       })
@@ -229,6 +232,14 @@ export default function OperatorLivePage() {
           email={account?.email}
           showSignOut={account?.mode === "church" || pendingReview}
         />
+
+        {account?.isReviewer ? (
+          <p className="text-center text-sm text-slate-600">
+            <Link href="/review-churches" className="font-medium text-emerald-800">
+              Confirm new churches
+            </Link>
+          </p>
+        ) : null}
 
         {accountError ? (
           <p

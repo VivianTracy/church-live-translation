@@ -126,7 +126,7 @@ New churches stay **pending** until you confirm them.
 1. Create a free account at [https://resend.com](https://resend.com) with `vivian.zke@gmail.com`.
 2. Copy an API key into `RESEND_API_KEY` on Vercel and in `.env.local`.
 3. Leave `CHURCH_REVIEW_EMAIL` unset unless you want reviews sent somewhere else. It defaults to `vivian.zke@gmail.com`.
-4. After a church registers, open the confirm link in that email. Check the church name, brief name, operator email, and OpenAI key ending. Click **Confirm this church**.
+4. After a church registers, sign in and open **Confirm new churches**, or use the confirm link in the review email.
 5. The operator then gets an email that they can sign in.
 
 Resend’s test from-address can email your Resend account address. To email other church operators, add and verify a domain in Resend, then set `CHURCH_EMAIL_FROM` to something like `Church Translation <noreply@your-domain>`. Confirming still works if that operator email cannot be sent; tell them they can sign in.
