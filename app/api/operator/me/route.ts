@@ -3,9 +3,13 @@ import { requiresChurchLogin } from "@/lib/audioTranslationSessionMode";
 import {
   getChurchOpenAIKeyLastFour,
   getChurchOperatorForUser,
-  getSignedInUser,
 } from "@/lib/churchOperatorAccess";
 import { LOCAL_LISTEN_CHURCH_SLUG } from "@/lib/churchSlug";
+import {
+  getActiveOperatorUser,
+  operatorAuthErrorResponse,
+  operatorLoginJson,
+} from "@/lib/operatorLoginAccess";
 
 export async function GET() {
   if (!requiresChurchLogin()) {
@@ -18,16 +22,16 @@ export async function GET() {
     });
   }
 
-  const user = await getSignedInUser();
+  const active = await getActiveOperatorUser();
 
-  if (!user) {
-    return NextResponse.json(
-      { error: "Sign in required." },
-      { status: 401 }
-    );
+  if (!active.ok) {
+    return operatorAuthErrorResponse(active);
   }
 
-  const operator = await getChurchOperatorForUser(user.id, user.email);
+  const operator = await getChurchOperatorForUser(
+    active.user.id,
+    active.user.email
+  );
 
   if (!operator) {
     return NextResponse.json(
@@ -42,5 +46,6 @@ export async function GET() {
     churchSlug: operator.churchSlug,
     email: operator.email,
     keyLastFour: await getChurchOpenAIKeyLastFour(operator.churchId),
+    ...operatorLoginJson(active.login),
   });
 }

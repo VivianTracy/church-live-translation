@@ -11,6 +11,8 @@ import { TranslationDirectionCard } from "@/components/TranslationDirectionCard"
 import { TranslationSetupSummary } from "@/components/TranslationSetupSummary";
 import { TranslationUsageCard } from "@/components/TranslationUsageCard";
 import { formatAudioTranslationDirectionLabel } from "@/lib/audioTranslationDirection";
+import type { OperatorLoginReason } from "@/lib/operatorLogin";
+import { expireOperatorSession, useOperatorSessionGuard } from "@/lib/useOperatorSessionGuard";
 import { isOperatorSessionTiming } from "@/lib/operatorSessionState";
 import {
   clearTranslationListenState,
@@ -23,7 +25,6 @@ import {
   isUsingRemoteTranslationRelay,
 } from "@/lib/translationRelayUrl";
 import { useAudioTranslationOperator } from "@/lib/useAudioTranslationOperator";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type OperatorAccount = {
@@ -32,13 +33,18 @@ type OperatorAccount = {
   churchSlug: string;
   email: string | null;
   keyLastFour: string | null;
+  idleDeadlineAt?: string | null;
 };
 
+function loginReasonFromBody(reason: string | undefined): OperatorLoginReason | undefined {
+  return reason === "idle" || reason === "replaced" ? reason : undefined;
+}
+
 export default function OperatorLivePage() {
-  const router = useRouter();
   const [seconds, setSeconds] = useState(0);
   const [account, setAccount] = useState<OperatorAccount | null>(null);
   const [accountError, setAccountError] = useState("");
+  const [idleDeadlineAt, setIdleDeadlineAt] = useState<string | null>(null);
   const [relayError, setRelayError] = useState("");
   const [relayReady, setRelayReady] = useState<boolean | null>(null);
   const [showMissingRelayConfig, setShowMissingRelayConfig] = useState(false);
@@ -82,17 +88,31 @@ export default function OperatorLivePage() {
     churchSlug: account?.churchSlug,
   });
 
+  const handleUnauthorized = useCallback((reason?: OperatorLoginReason) => {
+    stopListening();
+    expireOperatorSession(reason);
+  }, [stopListening]);
+
+  useOperatorSessionGuard({
+    enabled: account?.mode === "church",
+    isTranslationActive: isOperatorSessionTiming(sessionStatus),
+    idleDeadlineAt,
+    onUnauthorized: handleUnauthorized,
+  });
+
   useEffect(() => {
     void fetch("/api/operator/me", { cache: "no-store" })
       .then(async (response) => {
+        const body = (await response.json().catch(() => ({}))) as OperatorAccount & {
+          error?: string;
+          reason?: string;
+          idleDeadlineAt?: string;
+        };
+
         if (response.status === 401) {
-          router.replace("/login?next=/operator-live");
+          expireOperatorSession(loginReasonFromBody(body.reason));
           return;
         }
-
-        const body = (await response.json()) as OperatorAccount & {
-          error?: string;
-        };
 
         if (response.status === 403) {
           setAccountError(
@@ -113,12 +133,13 @@ export default function OperatorLivePage() {
           email: body.email,
           keyLastFour: body.keyLastFour ?? null,
         });
+        setIdleDeadlineAt(body.idleDeadlineAt ?? null);
         setAccountError("");
       })
       .catch(() => {
         setAccountError("Could not confirm church sign-in.");
       });
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { claimOperatorLogin } from "@/lib/operatorLoginClient";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -51,6 +52,16 @@ export function RegisterChurchForm() {
       });
 
       if (signInError) {
+        setError("Church created. Sign in with the same email and password.");
+        router.replace("/login");
+        router.refresh();
+        return;
+      }
+
+      const claimed = await claimOperatorLogin();
+
+      if (!claimed.ok) {
+        await supabase.auth.signOut({ scope: "local" });
         setError("Church created. Sign in with the same email and password.");
         router.replace("/login");
         router.refresh();

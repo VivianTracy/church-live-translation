@@ -3,6 +3,7 @@ import {
   type ChurchOperatorContext,
   type ChurchOperatorRecord,
 } from "@/lib/churchOperator";
+import { getActiveOperatorUser } from "@/lib/operatorLoginAccess";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -44,13 +45,13 @@ export async function getChurchOperatorForUser(
 }
 
 export async function getChurchOperatorFromRequest(): Promise<ChurchOperatorContext | null> {
-  const user = await getSignedInUser();
+  const active = await getActiveOperatorUser();
 
-  if (!user) {
+  if (!active.ok) {
     return null;
   }
 
-  return getChurchOperatorForUser(user.id, user.email);
+  return getChurchOperatorForUser(active.user.id, active.user.email);
 }
 
 export async function getDecryptedChurchOpenAIApiKey(

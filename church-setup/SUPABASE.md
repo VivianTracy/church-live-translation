@@ -29,11 +29,13 @@ If church login is already set up, also run:
 
 [`supabase/migrations/20260911120000_register_church.sql`](../supabase/migrations/20260911120000_register_church.sql)
 
+[`supabase/migrations/20260915120000_operator_login.sql`](../supabase/migrations/20260915120000_operator_login.sql)
+
 If you already ran the church verification SQL, also run:
 
 [`supabase/migrations/20260911150000_remove_church_verification.sql`](../supabase/migrations/20260911150000_remove_church_verification.sql)
 
-The duration file records how long translation ran. The register file lets a church create itself at `/register` without SQL. The last file turns any pending churches on and removes the review step.
+The duration file records how long translation ran. The register file lets a church create itself at `/register` without SQL. The operator login file keeps one sign-in at a time and signs the operator out after 10 minutes without translation. The last file turns any pending churches on and removes the review step.
 
 If you already ran an older `schema.sql` that created `public.church_secrets`, this migration drops that public table. Store the key in Vault next.
 

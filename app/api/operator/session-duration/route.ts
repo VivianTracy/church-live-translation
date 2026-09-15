@@ -1,8 +1,10 @@
 import { requiresChurchLogin } from "@/lib/audioTranslationSessionMode";
+import { getChurchOperatorForUser } from "@/lib/churchOperatorAccess";
 import {
-  getChurchOperatorForUser,
-  getSignedInUser,
-} from "@/lib/churchOperatorAccess";
+  getActiveOperatorUser,
+  operatorAuthErrorResponse,
+  touchCurrentOperatorTranslation,
+} from "@/lib/operatorLoginAccess";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   isSessionEventId,
@@ -15,13 +17,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, recorded: false });
   }
 
-  const user = await getSignedInUser();
+  const active = await getActiveOperatorUser();
 
-  if (!user) {
-    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  if (!active.ok) {
+    return operatorAuthErrorResponse(active);
   }
 
-  const operator = await getChurchOperatorForUser(user.id, user.email);
+  const operator = await getChurchOperatorForUser(
+    active.user.id,
+    active.user.email
+  );
 
   if (!operator) {
     return NextResponse.json(
@@ -59,6 +64,8 @@ export async function POST(request: Request) {
     console.error("Translation session duration error:", error);
     return NextResponse.json({ ok: true, recorded: false });
   }
+
+  await touchCurrentOperatorTranslation();
 
   return NextResponse.json({
     ok: true,

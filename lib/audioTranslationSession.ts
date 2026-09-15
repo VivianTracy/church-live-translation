@@ -1,9 +1,9 @@
 import {
   getChurchOperatorForUser,
   getDecryptedChurchOpenAIApiKey,
-  getSignedInUser,
 } from "@/lib/churchOperatorAccess";
 import { requiresChurchLogin } from "@/lib/audioTranslationSessionMode";
+import { touchCurrentOperatorTranslation } from "@/lib/operatorLoginAccess";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { getOpenAIApiKey } from "@/lib/openaiServer";
 import { recordTranslationSessionEvent } from "@/lib/translationSessionAudit";
@@ -56,17 +56,20 @@ export async function authorizeAudioTranslationSession(): Promise<AudioTranslati
     };
   }
 
-  const user = await getSignedInUser();
+  const active = await touchCurrentOperatorTranslation();
 
-  if (!user) {
+  if (!active.ok) {
     return {
       ok: false,
-      status: 401,
-      error: "Sign in as a church operator to start translation.",
+      status: active.status,
+      error: active.error,
     };
   }
 
-  const operator = await getChurchOperatorForUser(user.id, user.email);
+  const operator = await getChurchOperatorForUser(
+    active.user.id,
+    active.user.email
+  );
 
   if (!operator) {
     return {

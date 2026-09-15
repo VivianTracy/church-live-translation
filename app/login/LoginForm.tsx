@@ -1,5 +1,7 @@
 "use client";
 
+import { claimOperatorLogin } from "@/lib/operatorLoginClient";
+import { operatorLoginReasonMessage } from "@/lib/operatorLogin";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -12,6 +14,7 @@ function safeNextPath(value: string | null): string {
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const reasonNotice = operatorLoginReasonMessage(searchParams.get("reason"));
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -33,6 +36,14 @@ export function LoginForm() {
 
       if (signInError) {
         setError("Could not sign in. Check the email and password.");
+        return;
+      }
+
+      const claimed = await claimOperatorLogin();
+
+      if (!claimed.ok) {
+        await supabase.auth.signOut({ scope: "local" });
+        setError(claimed.error ?? "Could not finish church sign-in.");
         return;
       }
 
@@ -77,6 +88,12 @@ export function LoginForm() {
           Forgot password?
         </Link>
       </p>
+
+      {reasonNotice ? (
+        <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
+          {reasonNotice}
+        </p>
+      ) : null}
 
       {error ? (
         <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">

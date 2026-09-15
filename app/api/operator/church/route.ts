@@ -4,10 +4,11 @@ import {
   parseOpenAIApiKey,
   openAIKeyLastFour,
 } from "@/lib/churchRegister";
+import { getChurchOperatorForUser } from "@/lib/churchOperatorAccess";
 import {
-  getChurchOperatorForUser,
-  getSignedInUser,
-} from "@/lib/churchOperatorAccess";
+  getActiveOperatorUser,
+  operatorAuthErrorResponse,
+} from "@/lib/operatorLoginAccess";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { verifyOpenAIApiKey } from "@/lib/verifyOpenAIApiKey";
 import { NextResponse } from "next/server";
@@ -20,13 +21,16 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const user = await getSignedInUser();
+  const active = await getActiveOperatorUser();
 
-  if (!user) {
-    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  if (!active.ok) {
+    return operatorAuthErrorResponse(active);
   }
 
-  const operator = await getChurchOperatorForUser(user.id, user.email);
+  const operator = await getChurchOperatorForUser(
+    active.user.id,
+    active.user.email
+  );
 
   if (!operator) {
     return NextResponse.json(

@@ -4,6 +4,7 @@ import {
   MIN_CHURCH_PASSWORD_LENGTH,
   parseOperatorPassword,
 } from "@/lib/churchRegister";
+import { claimOperatorLogin } from "@/lib/operatorLoginClient";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -75,6 +76,18 @@ export function ResetPasswordForm() {
 
       if (updateError) {
         setError("Could not save the new password. Try the reset link again.");
+        return;
+      }
+
+      const claimed = await claimOperatorLogin();
+
+      if (!claimed.ok) {
+        await supabase.auth.signOut({ scope: "local" });
+        setError(
+          "Password saved. Sign in with the new password to continue."
+        );
+        router.replace("/login");
+        router.refresh();
         return;
       }
 
