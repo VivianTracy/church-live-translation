@@ -6,12 +6,16 @@ import { AudioOutputDeviceCard } from "@/components/AudioOutputDeviceCard";
 import { AudioTranslationStatusCard } from "@/components/AudioTranslationStatusCard";
 import { ChurchAccountCard } from "@/components/ChurchAccountCard";
 import { ChurchTranslationHeader } from "@/components/ChurchTranslationHeader";
+import { ContactFootnote } from "@/components/ContactFootnote";
 import { TranslationAudienceCard } from "@/components/TranslationAudienceCard";
 import { TranslationDirectionCard } from "@/components/TranslationDirectionCard";
 import { TranslationSetupSummary } from "@/components/TranslationSetupSummary";
 import { TranslationUsageCard } from "@/components/TranslationUsageCard";
 import { formatAudioTranslationDirectionLabel } from "@/lib/audioTranslationDirection";
-import type { OperatorLoginReason } from "@/lib/operatorLogin";
+import {
+  parseOperatorLoginReason,
+  type OperatorLoginReason,
+} from "@/lib/operatorLogin";
 import { expireOperatorSession, useOperatorSessionGuard } from "@/lib/useOperatorSessionGuard";
 import { isOperatorSessionTiming } from "@/lib/operatorSessionState";
 import {
@@ -33,12 +37,9 @@ type OperatorAccount = {
   churchSlug: string;
   email: string | null;
   keyLastFour: string | null;
+  demo?: boolean;
   idleDeadlineAt?: string | null;
 };
-
-function loginReasonFromBody(reason: string | undefined): OperatorLoginReason | undefined {
-  return reason === "idle" || reason === "replaced" ? reason : undefined;
-}
 
 export default function OperatorLivePage() {
   const [seconds, setSeconds] = useState(0);
@@ -110,7 +111,7 @@ export default function OperatorLivePage() {
         };
 
         if (response.status === 401) {
-          expireOperatorSession(loginReasonFromBody(body.reason));
+          expireOperatorSession(parseOperatorLoginReason(body.reason));
           return;
         }
 
@@ -132,6 +133,7 @@ export default function OperatorLivePage() {
           churchSlug: body.churchSlug || "local",
           email: body.email,
           keyLastFour: body.keyLastFour ?? null,
+          demo: Boolean(body.demo),
         });
         setIdleDeadlineAt(body.idleDeadlineAt ?? null);
         setAccountError("");
@@ -257,7 +259,16 @@ export default function OperatorLivePage() {
           <TranslationUsageCard refreshKey={sessionStatus} />
         ) : null}
 
-        {account?.mode === "church" && account.churchName && account.churchSlug ? (
+        {account?.demo ? (
+          <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
+            This demo signs out after 5 minutes.
+          </p>
+        ) : null}
+
+        {account?.mode === "church" &&
+        !account.demo &&
+        account.churchName &&
+        account.churchSlug ? (
           <ChurchAccountCard
             churchName={account.churchName}
             keyLastFour={account.keyLastFour}
@@ -406,6 +417,8 @@ export default function OperatorLivePage() {
             is online.
           </p>
         ) : null}
+
+        <ContactFootnote />
       </div>
     </main>
   );

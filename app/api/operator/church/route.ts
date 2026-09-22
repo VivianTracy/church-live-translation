@@ -39,6 +39,13 @@ export async function PATCH(request: Request) {
     );
   }
 
+  if (active.login.sessionExpiresAt) {
+    return NextResponse.json(
+      { error: "Demo sessions cannot change church settings." },
+      { status: 403 }
+    );
+  }
+
   const body = (await request.json().catch(() => ({}))) as {
     churchName?: unknown;
     openaiApiKey?: unknown;

@@ -5,15 +5,14 @@ import {
   redirectToOperatorLogin,
   reportOperatorTranslationActivity,
 } from "@/lib/operatorLoginClient";
-import type { OperatorLoginReason } from "@/lib/operatorLogin";
+import {
+  parseOperatorLoginReason,
+  type OperatorLoginReason,
+} from "@/lib/operatorLogin";
 import { useEffect, useRef } from "react";
 
 const LOGIN_POLL_MS = 15_000;
 const TRANSLATION_HEARTBEAT_MS = 30_000;
-
-function asLoginReason(value: string | undefined): OperatorLoginReason | undefined {
-  return value === "idle" || value === "replaced" ? value : undefined;
-}
 
 export function useOperatorSessionGuard(options: {
   enabled: boolean;
@@ -37,8 +36,8 @@ export function useOperatorSessionGuard(options: {
       return;
     }
 
-    const expire = (reason?: string) => {
-      onUnauthorizedRef.current(asLoginReason(reason));
+    const expire = (reason?: OperatorLoginReason) => {
+      onUnauthorizedRef.current(reason);
     };
 
     const poll = async () => {
@@ -46,7 +45,7 @@ export function useOperatorSessionGuard(options: {
 
       if (!result.ok) {
         if (result.status === 401) {
-          expire(result.reason);
+          expire(parseOperatorLoginReason(result.reason));
         }
         return;
       }
@@ -74,7 +73,7 @@ export function useOperatorSessionGuard(options: {
 
       if (!result.ok) {
         if (result.status === 401) {
-          onUnauthorizedRef.current(asLoginReason(result.reason));
+          onUnauthorizedRef.current(parseOperatorLoginReason(result.reason));
         }
         return;
       }

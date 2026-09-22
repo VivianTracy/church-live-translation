@@ -1,13 +1,16 @@
 export const OPERATOR_LOGIN_COOKIE = "church-operator-login";
 export const OPERATOR_IDLE_MS = 10 * 60 * 1000;
 export const OPERATOR_IDLE_MINUTES = OPERATOR_IDLE_MS / 60_000;
+export const OPERATOR_DEMO_MS = 5 * 60 * 1000;
+export const OPERATOR_DEMO_MINUTES = OPERATOR_DEMO_MS / 60_000;
 
-export type OperatorLoginReason = "idle" | "replaced";
+export type OperatorLoginReason = "idle" | "replaced" | "demo";
 
 export type OperatorLoginTimes = {
   loginId: string;
   loggedInAt: string;
   lastTranslationAt: string | null;
+  sessionExpiresAt?: string | null;
 };
 
 export type OperatorLoginDecision =
@@ -51,6 +54,59 @@ export function operatorIdleDeadlineAt(
   return new Date(startMs + OPERATOR_IDLE_MS).toISOString();
 }
 
+export function isOperatorSessionExpired(
+  login: Pick<OperatorLoginTimes, "sessionExpiresAt">,
+  now: Date = new Date()
+): boolean {
+  if (!login.sessionExpiresAt) {
+    return false;
+  }
+
+  const expiresMs = Date.parse(login.sessionExpiresAt);
+
+  if (!Number.isFinite(expiresMs)) {
+    return true;
+  }
+
+  return now.getTime() >= expiresMs;
+}
+
+export function operatorSessionDeadlineAt(
+  login: Pick<
+    OperatorLoginTimes,
+    "loggedInAt" | "lastTranslationAt" | "sessionExpiresAt"
+  >
+): string {
+  const idleDeadline = operatorIdleDeadlineAt(login);
+
+  if (!login.sessionExpiresAt) {
+    return idleDeadline;
+  }
+
+  const expiresMs = Date.parse(login.sessionExpiresAt);
+  const idleMs = Date.parse(idleDeadline);
+
+  if (!Number.isFinite(expiresMs)) {
+    return idleDeadline;
+  }
+
+  if (!Number.isFinite(idleMs) || expiresMs <= idleMs) {
+    return new Date(expiresMs).toISOString();
+  }
+
+  return idleDeadline;
+}
+
+export function parseOperatorLoginReason(
+  value: string | null | undefined
+): OperatorLoginReason | undefined {
+  if (value === "idle" || value === "replaced" || value === "demo") {
+    return value;
+  }
+
+  return undefined;
+}
+
 export function evaluateOperatorLogin(input: {
   cookieLoginId: string | null;
   stored: OperatorLoginTimes | null;
@@ -63,6 +119,10 @@ export function evaluateOperatorLogin(input: {
     input.stored.loginId !== input.cookieLoginId
   ) {
     return { ok: false, reason: "replaced" };
+  }
+
+  if (isOperatorSessionExpired(input.stored, input.now)) {
+    return { ok: false, reason: "demo" };
   }
 
   if (isOperatorLoginIdle(input.stored, input.now)) {
@@ -81,6 +141,10 @@ export function operatorLoginReasonMessage(
 
   if (reason === "replaced") {
     return "This account is signed in on another computer.";
+  }
+
+  if (reason === "demo") {
+    return `The demo signed out after ${OPERATOR_DEMO_MINUTES} minutes.`;
   }
 
   return null;

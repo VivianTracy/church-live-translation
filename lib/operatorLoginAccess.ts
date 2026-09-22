@@ -1,15 +1,20 @@
 import {
   OPERATOR_LOGIN_COOKIE,
   evaluateOperatorLogin,
-  isOperatorLoginId,
-  operatorIdleDeadlineAt,
   operatorLoginCookieOptions,
   operatorLoginReasonMessage,
+  operatorSessionDeadlineAt,
   type OperatorLoginReason,
   type OperatorLoginTimes,
 } from "@/lib/operatorLogin";
+import {
+  openOperatorLoginCookie,
+  sealOperatorLoginCookie,
+  type SealedOperatorLogin,
+} from "@/lib/operatorLoginSeal";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireSupabaseServiceRoleKey } from "@/lib/supabase/env";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
@@ -35,26 +40,50 @@ export type ActiveOperatorSuccess = {
 
 export type ActiveOperatorResult = ActiveOperatorSuccess | ActiveOperatorFailure;
 
-function asOperatorLoginTimes(row: OperatorLoginRow): OperatorLoginTimes {
+function asOperatorLoginTimes(
+  row: OperatorLoginRow,
+  sessionExpiresAt: string | null = null
+): OperatorLoginTimes {
   return {
     loginId: row.login_id,
     loggedInAt: row.logged_in_at,
     lastTranslationAt: row.last_translation_at,
+    sessionExpiresAt,
   };
 }
 
-export async function readOperatorLoginCookie(): Promise<string | null> {
-  const cookieStore = await cookies();
-  const value = cookieStore.get(OPERATOR_LOGIN_COOKIE)?.value;
-  return isOperatorLoginId(value) ? value : null;
+function loginCookieMaxAge(sessionExpiresAt: string | null) {
+  if (!sessionExpiresAt) {
+    return 60 * 60 * 24;
+  }
+
+  const remainingSeconds = Math.ceil(
+    (Date.parse(sessionExpiresAt) - Date.now()) / 1000
+  );
+  return Math.max(1, remainingSeconds);
 }
 
-export async function writeOperatorLoginCookie(loginId: string) {
+export async function readOperatorLoginSession(): Promise<SealedOperatorLogin | null> {
+  const cookieStore = await cookies();
+  return openOperatorLoginCookie(
+    cookieStore.get(OPERATOR_LOGIN_COOKIE)?.value,
+    requireSupabaseServiceRoleKey()
+  );
+}
+
+export async function writeOperatorLoginCookie(
+  loginId: string,
+  sessionExpiresAt: string | null
+) {
   const cookieStore = await cookies();
   cookieStore.set(
     OPERATOR_LOGIN_COOKIE,
-    loginId,
-    operatorLoginCookieOptions()
+    sealOperatorLoginCookie(
+      loginId,
+      sessionExpiresAt,
+      requireSupabaseServiceRoleKey()
+    ),
+    operatorLoginCookieOptions(loginCookieMaxAge(sessionExpiresAt))
   );
 }
 
@@ -88,19 +117,19 @@ async function loadOperatorLogin(
 }
 
 export async function invalidateLocalOperatorSession() {
-  const loginId = await readOperatorLoginCookie();
+  const session = await readOperatorLoginSession();
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user && loginId) {
+  if (user && session) {
     const admin = createSupabaseAdminClient();
     await admin
       .from("operator_logins")
       .delete()
       .eq("user_id", user.id)
-      .eq("login_id", loginId);
+      .eq("login_id", session.loginId);
   }
 
   await supabase.auth.signOut({ scope: "local" });
@@ -128,9 +157,9 @@ async function revokeOtherAuthSessions() {
   }
 }
 
-export async function claimOperatorLoginForCurrentUser(): Promise<
-  ActiveOperatorResult
-> {
+export async function claimOperatorLoginForCurrentUser(options?: {
+  sessionExpiresAt?: string | null;
+}): Promise<ActiveOperatorResult> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -148,6 +177,7 @@ export async function claimOperatorLoginForCurrentUser(): Promise<
 
   const loginId = crypto.randomUUID();
   const now = new Date().toISOString();
+  const sessionExpiresAt = options?.sessionExpiresAt ?? null;
   const admin = createSupabaseAdminClient();
   const { data, error: upsertError } = await admin
     .from("operator_logins")
@@ -172,12 +202,12 @@ export async function claimOperatorLoginForCurrentUser(): Promise<
   }
 
   await revokeOtherAuthSessions();
-  await writeOperatorLoginCookie(loginId);
+  await writeOperatorLoginCookie(loginId, sessionExpiresAt);
 
   return {
     ok: true,
     user,
-    login: asOperatorLoginTimes(data as OperatorLoginRow),
+    login: asOperatorLoginTimes(data as OperatorLoginRow, sessionExpiresAt),
   };
 }
 
@@ -197,6 +227,7 @@ export async function getActiveOperatorUser(): Promise<ActiveOperatorResult> {
     };
   }
 
+  const cookie = await readOperatorLoginSession();
   let stored: OperatorLoginTimes | null;
 
   try {
@@ -211,8 +242,15 @@ export async function getActiveOperatorUser(): Promise<ActiveOperatorResult> {
     };
   }
 
+  if (stored) {
+    stored = {
+      ...stored,
+      sessionExpiresAt: cookie?.sessionExpiresAt ?? null,
+    };
+  }
+
   const decision = evaluateOperatorLogin({
-    cookieLoginId: await readOperatorLoginCookie(),
+    cookieLoginId: cookie?.loginId ?? null,
     stored,
   });
 
@@ -286,7 +324,10 @@ export async function touchCurrentOperatorTranslation(): Promise<
   return {
     ok: true,
     user: active.user,
-    login: asOperatorLoginTimes(data as OperatorLoginRow),
+    login: asOperatorLoginTimes(
+      data as OperatorLoginRow,
+      active.login.sessionExpiresAt ?? null
+    ),
   };
 }
 
@@ -299,6 +340,7 @@ export function operatorAuthErrorResponse(result: ActiveOperatorFailure) {
 
 export function operatorLoginJson(login: OperatorLoginTimes) {
   return {
-    idleDeadlineAt: operatorIdleDeadlineAt(login),
+    idleDeadlineAt: operatorSessionDeadlineAt(login),
+    demo: Boolean(login.sessionExpiresAt),
   };
 }

@@ -2,8 +2,10 @@ import {
   OPERATOR_IDLE_MS,
   evaluateOperatorLogin,
   isOperatorLoginIdle,
+  isOperatorSessionExpired,
   operatorIdleDeadlineAt,
   operatorLoginReasonMessage,
+  operatorSessionDeadlineAt,
 } from "@/lib/operatorLogin";
 import { describe, expect, it } from "vitest";
 
@@ -121,6 +123,51 @@ describe("operatorLoginReasonMessage", () => {
   it("explains idle and replaced sign-outs", () => {
     expect(operatorLoginReasonMessage("idle")).toContain("10 minutes");
     expect(operatorLoginReasonMessage("replaced")).toContain("another computer");
+    expect(operatorLoginReasonMessage("demo")).toContain("5 minutes");
     expect(operatorLoginReasonMessage("other")).toBeNull();
+  });
+});
+
+describe("demo session limit", () => {
+  const login = {
+    loginId: LOGIN_ID,
+    loggedInAt: "2026-09-15T09:55:00.000Z",
+    lastTranslationAt: "2026-09-15T09:59:00.000Z",
+    sessionExpiresAt: "2026-09-15T10:00:00.000Z",
+  };
+
+  it("keeps a demo active before 5 minutes", () => {
+    const now = new Date("2026-09-15T09:59:00.000Z");
+
+    expect(isOperatorSessionExpired(login, now)).toBe(false);
+    expect(
+      evaluateOperatorLogin({
+        cookieLoginId: LOGIN_ID,
+        stored: login,
+        now,
+      })
+    ).toEqual({ ok: true });
+  });
+
+  it("signs out at 5 minutes even when translation is still active", () => {
+    const now = new Date("2026-09-15T10:00:00.000Z");
+
+    expect(isOperatorSessionExpired(login, now)).toBe(true);
+    expect(
+      evaluateOperatorLogin({
+        cookieLoginId: LOGIN_ID,
+        stored: login,
+        now,
+      })
+    ).toEqual({ ok: false, reason: "demo" });
+  });
+
+  it("uses the demo end time when it is sooner than the idle timeout", () => {
+    expect(operatorSessionDeadlineAt(login)).toBe(
+      new Date("2026-09-15T10:00:00.000Z").toISOString()
+    );
+    expect(operatorIdleDeadlineAt(login)).not.toBe(
+      operatorSessionDeadlineAt(login)
+    );
   });
 });
