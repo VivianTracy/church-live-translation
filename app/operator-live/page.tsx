@@ -260,9 +260,13 @@ export default function OperatorLivePage() {
         ) : null}
 
         {account?.demo ? (
-          <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
-            This demo signs out after 5 minutes.
-          </p>
+          <div className="space-y-1 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
+            <p>This demo signs out after 5 minutes.</p>
+            <p>
+              For a quick test, speak to your phone and use a wireless earpiece
+              to receive the translation.
+            </p>
+          </div>
         ) : null}
 
         {account?.mode === "church" &&
