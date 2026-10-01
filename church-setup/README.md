@@ -182,7 +182,7 @@ Headset translation still works if this section is skipped. Phones will not hear
 
 The OpenAI key is stored in Supabase Vault. Do not add `OPENAI_API_KEY` to Vercel.
 
-Point Vercel Production at **`main`**.
+Vercel production is already set to deploy **`feature/public-church-login`**. That branch is the live site.
 
 Church login: [`SUPABASE.md`](./SUPABASE.md)
 
@@ -191,7 +191,7 @@ Church login: [`SUPABASE.md`](./SUPABASE.md)
 1. Sign in at [https://vercel.com](https://vercel.com) with the church GitHub account.
 2. Import **`VivianTracy/church-live-translation`** (or your fork).
 3. Framework preset: **Next.js**. Leave the build command as `next build`.
-4. Production branch: **`main`**.
+4. Production branch: **`feature/public-church-login`**. This project is already set that way.
 5. Deploy. The public URL should be **`https://church-translation.vercel.app`**.
 
 If the project name is different, use that hostname everywhere you see `church-translation.vercel.app`.

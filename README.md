@@ -1,53 +1,52 @@
 # Church Translation
 
-Live speech-to-speech translation for wireless headsets (for example Retekess TT125), with an optional phone listener page.
+Live Chinese and English translation for wireless headsets, with a phone listener page. One volunteer runs it. No interpreter is required.
 
-> Making bilingual worship accessible without requiring a dedicated interpreter.
+Licensed under the [MIT License](./LICENSE).
 
-This software is licensed under the [MIT License](./LICENSE).
+## Sign in
 
-## How it works
+Sunday starts here:
 
-One volunteer opens the operator page in **Chrome or Edge** and signs in. Firefox cannot send translated audio to a chosen speaker.
+**[https://church-translation.vercel.app/login](https://church-translation.vercel.app/login)**
 
-```text
-Streaming audio or mic → Chrome (/operator-live) on the church computer
-                              ↓  church sign-in
-                    temporary Realtime credential
-                              ↓
-                    gpt-realtime-translate
-                              ↓
-        PC audio out → transmitter → wireless headsets
+Use Chrome or Edge on the church computer. Sign in, then start translation. Phone listeners do not sign in. They scan the QR code on the operator page.
 
-                              ↓  WAV chunks
-                    Upstash Redis
-                              ↓
-        Phones scan a permanent QR → https://church-translation.vercel.app/listen
-```
+Day-of steps in Chinese and English: [church-setup/OPERATOR.md](./church-setup/OPERATOR.md)
 
-The public operator page is on Vercel. The volunteer signs in. The server finds that church, checks the operator, decrypts the church OpenAI key, and returns only a short-lived credential.
+## Vercel
 
-Phones open `/listen`. They do not sign in. They can use mobile data. They never see the OpenAI key.
+Vercel production deploys the **`feature/public-church-login`** branch. That branch is the live site at [church-translation.vercel.app](https://church-translation.vercel.app).
+
+## How a service runs
+
+1. The volunteer signs in on the church computer.
+2. Sermon audio goes in through a streaming feed or a microphone.
+3. OpenAI `gpt-realtime-translate` speaks the other language.
+4. The computer plays that audio into the transmitter, then to wireless headsets.
+5. The same audio is sent to phones through Upstash Redis.
+
+Phones open a permanent link such as `https://church-translation.vercel.app/listen`. They can use mobile data. They never see the OpenAI key.
 
 | Setting | What to use |
 |---|---|
-| Translation | OpenAI `gpt-realtime-translate` on the church computer |
 | Direction | Auto, or lock Chinese → English / English → Chinese |
 | Audio in | Streaming (ClearClick / X32, BlackHole, VB-Cable) or a microphone |
-| Audio out | Headphone jack or USB dongle into the TT125-TX **MIC** port |
-| Phones | Permanent QR to `/listen` on the Vercel site |
+| Audio out | Headphone jack or USB dongle into the transmitter |
+| Phones | QR code on the operator page |
 
-**Auto** starts translating immediately (last used direction, or Chinese → English). It only changes direction after clear Chinese or English speech, so a short Bible verse or “Amen” does not flip the headsets.
+**Auto** starts immediately, using the last direction or Chinese → English. It switches only after clear Chinese or English speech, so a short verse or “Amen” does not flip the headsets.
 
-Sunday operators open the Vercel site, sign in, and start translation. Local `npm run start` is for development or a church computer that is not using church login yet.
+Firefox cannot send translated audio to a chosen speaker.
 
-Church login, Vercel, and Redis: [`church-setup/README.md`](./church-setup/README.md) and [`church-setup/SUPABASE.md`](./church-setup/SUPABASE.md)
+## Set up a church
 
-## Sunday / 主日
+One-time setup for login, Vercel, and Redis:
 
-Daily operator steps (Chinese and English), including how to open Terminal or Command Prompt:
+- [church-setup/README.md](./church-setup/README.md)
+- [church-setup/SUPABASE.md](./church-setup/SUPABASE.md)
 
-**[`church-setup/OPERATOR.md`](./church-setup/OPERATOR.md)**
+Local `npm run start` is for development, or for a computer that is not using church login yet.
 
 ## Local development
 
@@ -56,30 +55,31 @@ git clone https://github.com/VivianTracy/church-live-translation.git
 cd church-live-translation
 npm install
 cp church-setup/env.example .env.local
-# add Supabase keys
-# add NEXT_PUBLIC_AUDIENCE_URL=https://church-translation.vercel.app
-npm run dev
 ```
 
-Open **http://127.0.0.1:3000/login** in Chrome or Edge, then sign in. `npm run dev` does not open the browser.
+Add the Supabase keys and this line to `.env.local`:
+
+```env
+NEXT_PUBLIC_AUDIENCE_URL=https://church-translation.vercel.app
+```
+
+Then run `npm run dev` and open [http://127.0.0.1:3000/login](http://127.0.0.1:3000/login). `npm run dev` does not open the browser.
 
 | Variable | Where | Required for |
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Vercel and local | Church sign-in |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Vercel and local | Church sign-in |
-| `SUPABASE_SERVICE_ROLE_KEY` | Vercel and local server | Vault key + session log |
+| `SUPABASE_SERVICE_ROLE_KEY` | Vercel and local server | Vault key and session log |
 | `NEXT_PUBLIC_AUDIENCE_URL` | Vercel and local | Permanent phone QR |
-| `UPSTASH_REDIS_REST_URL` | Vercel | Phone audio relay |
-| `UPSTASH_REDIS_REST_TOKEN` | Vercel | Phone audio relay |
+| `UPSTASH_REDIS_REST_URL` | Vercel | Phone audio |
+| `UPSTASH_REDIS_REST_TOKEN` | Vercel | Phone audio |
 | `OPENAI_API_KEY` | Local only, if Supabase is unset | Temporary local fallback |
 
 Do not commit `.env.local`. Do not put `OPENAI_API_KEY` on Vercel.
 
-Deploy the Vercel Production branch from `main`.
+## Cost
 
-## Cost estimate
-
-`gpt-realtime-translate` is about **$0.034 per minute** of streamed audio ([pricing](https://developers.openai.com/api/docs/models/gpt-realtime-translate)). Phone listening uses a small amount of Vercel and Upstash traffic. It does not start a second OpenAI session.
+`gpt-realtime-translate` is about **$0.034 per minute** of streamed audio ([pricing](https://developers.openai.com/api/docs/models/gpt-realtime-translate)). Phone listening uses a little Vercel and Upstash traffic. It does not start a second OpenAI session.
 
 | Duration | Estimated OpenAI cost |
 |---|---|
@@ -89,6 +89,6 @@ Deploy the Vercel Production branch from `main`.
 
 ## Design principles
 
-- Fit existing church AV. Do not replace OBS or the mixer.
+- Fit the church’s existing mixer and streaming setup.
 - One volunteer, one Start translation button.
 - Reliability over cleverness. Optimize for Sunday morning.

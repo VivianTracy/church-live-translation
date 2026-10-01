@@ -7,11 +7,13 @@ import { Suspense } from "react";
 
 export default function LoginPage() {
   return (
-    <main className="min-h-screen bg-stone-50 px-6 py-10 text-slate-900">
-      <div className="mx-auto max-w-md space-y-6">
-        <ChurchTranslationHeader />
+    <main className="min-h-screen bg-stone-50 px-6 py-6 text-slate-900 sm:py-10">
+      <div className="mx-auto flex max-w-md flex-col gap-6">
+        <div className="order-2 sm:order-1">
+          <ChurchTranslationHeader />
+        </div>
 
-        <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 space-y-4">
+        <section className="order-1 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 space-y-4 sm:order-2">
           <h2 className="text-xl font-semibold text-slate-900">
             Church operator sign in
           </h2>
@@ -47,7 +49,7 @@ export default function LoginPage() {
         </section>
 
         {isSupabaseConfigured() ? (
-          <p className="text-center text-sm text-slate-600">
+          <p className="order-3 text-center text-sm text-slate-600">
             New church?{" "}
             <Link href="/register" className="font-medium text-emerald-800">
               Register this church
@@ -55,7 +57,9 @@ export default function LoginPage() {
           </p>
         ) : null}
 
-        <ContactFootnote />
+        <div className="order-4">
+          <ContactFootnote />
+        </div>
       </div>
     </main>
   );
