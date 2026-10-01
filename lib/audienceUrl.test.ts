@@ -13,10 +13,10 @@ afterEach(() => {
 
 describe("audience listen URL", () => {
   it("uses NEXT_PUBLIC_AUDIENCE_URL for the permanent church QR", () => {
-    vi.stubEnv("NEXT_PUBLIC_AUDIENCE_URL", "https://church-translation.vercel.app/");
+    vi.stubEnv("NEXT_PUBLIC_AUDIENCE_URL", "https://church-translation.org/");
 
     expect(getTranslationListenUrl("http://localhost:3000", "pvccc")).toBe(
-      "https://church-translation.vercel.app/listen/pvccc"
+      "https://church-translation.org/listen/pvccc"
     );
   });
 
@@ -30,7 +30,7 @@ describe("audience listen URL", () => {
   });
 
   it("keeps operator relay calls on the same origin", () => {
-    vi.stubEnv("NEXT_PUBLIC_AUDIENCE_URL", "https://church-translation.vercel.app");
+    vi.stubEnv("NEXT_PUBLIC_AUDIENCE_URL", "https://church-translation.org");
 
     expect(getTranslationRelayApiUrl("/api/translation-listen-state")).toBe(
       "/api/translation-listen-state"
@@ -38,7 +38,7 @@ describe("audience listen URL", () => {
   });
 
   it("proxies the church computer to the deployed phone page", () => {
-    vi.stubEnv("NEXT_PUBLIC_AUDIENCE_URL", "https://church-translation.vercel.app");
+    vi.stubEnv("NEXT_PUBLIC_AUDIENCE_URL", "https://church-translation.org");
 
     expect(
       shouldProxyTranslationRelay(
@@ -47,7 +47,7 @@ describe("audience listen URL", () => {
     ).toBe(true);
     expect(
       shouldProxyTranslationRelay(
-        new Request("https://church-translation.vercel.app/api/translation-listen-state")
+        new Request("https://church-translation.org/api/translation-listen-state")
       )
     ).toBe(false);
     expect(
@@ -61,7 +61,7 @@ describe("audience listen URL", () => {
 
   it("treats localhost hostnames as local operator", () => {
     expect(isLocalDevHostname("localhost")).toBe(true);
-    expect(isLocalDevHostname("church-translation.vercel.app")).toBe(false);
+    expect(isLocalDevHostname("church-translation.org")).toBe(false);
   });
 });
 
