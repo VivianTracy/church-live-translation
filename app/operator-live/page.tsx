@@ -329,7 +329,7 @@ export default function OperatorLivePage() {
           <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
             Add{" "}
             <span className="font-mono">
-              NEXT_PUBLIC_AUDIENCE_URL=https://church-translation.org
+              NEXT_PUBLIC_AUDIENCE_URL=https://church-translation.vercel.app
             </span>{" "}
             to <span className="font-mono">.env.local</span> and restart so the
             QR code stays permanent for phones.
@@ -417,7 +417,7 @@ export default function OperatorLivePage() {
           <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
             Translation is playing locally, but no chunks have reached the phone
             relay yet. If this stays at 0, check that{" "}
-            <span className="font-mono">https://church-translation.org</span>{" "}
+            <span className="font-mono">https://church-translation.vercel.app</span>{" "}
             is online.
           </p>
         ) : null}

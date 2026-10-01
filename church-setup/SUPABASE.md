@@ -10,8 +10,7 @@ The OpenAI key is stored in **Supabase Vault**. Public tables keep only church a
 2. Create a project for this church app.
 3. Open **Authentication** → **Providers** and keep **Email** enabled.
 4. Keep **Allow new users to sign up** **off**. Churches register at `/register` in this app, not through the Supabase sign-up form.
-5. Open **Authentication** → **URL Configuration**. Set Site URL to `https://church-translation.org`. Add Redirect URLs:
-   - `https://church-translation.org/**`
+5. Open **Authentication** → **URL Configuration**. Set Site URL to `https://church-translation.vercel.app`. Add Redirect URLs:
    - `https://church-translation.vercel.app/**`
    - `http://127.0.0.1:3000/**`
    Password reset emails open `/auth/callback`, then `/reset-password`.
@@ -114,7 +113,7 @@ Add these for **Production**:
 | `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase `anon` key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase `service_role` key |
-| `NEXT_PUBLIC_AUDIENCE_URL` | `https://church-translation.org` |
+| `NEXT_PUBLIC_AUDIENCE_URL` | `https://church-translation.vercel.app` |
 | `UPSTASH_REDIS_REST_URL` | Phone audio |
 | `UPSTASH_REDIS_REST_TOKEN` | Phone audio |
 

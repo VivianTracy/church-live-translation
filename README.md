@@ -8,7 +8,7 @@ Licensed under the [MIT License](./LICENSE).
 
 Sunday starts here:
 
-**[https://church-translation.org/login](https://church-translation.org/login)**
+**[https://church-translation.vercel.app/login](https://church-translation.vercel.app/login)**
 
 Use Chrome or Edge on the church computer. Sign in, then start translation. Phone listeners do not sign in. They scan the QR code on the operator page.
 
@@ -16,7 +16,7 @@ Day-of steps in Chinese and English: [church-setup/OPERATOR.md](./church-setup/O
 
 ## Vercel
 
-Vercel production deploys **`main`**. The public site is [church-translation.org](https://church-translation.org).
+Vercel production deploys **`main`**. The public site is [church-translation.vercel.app](https://church-translation.vercel.app).
 
 ## How a service runs
 
@@ -26,7 +26,7 @@ Vercel production deploys **`main`**. The public site is [church-translation.org
 4. The computer plays that audio into the transmitter, then to wireless headsets.
 5. The same audio is sent to phones through Upstash Redis.
 
-Phones open a permanent link such as `https://church-translation.org/listen`. They can use mobile data. They never see the OpenAI key.
+Phones open a permanent link such as `https://church-translation.vercel.app/listen`. They can use mobile data. They never see the OpenAI key.
 
 | Setting | What to use |
 |---|---|
@@ -60,7 +60,7 @@ cp church-setup/env.example .env.local
 Add the Supabase keys and this line to `.env.local`:
 
 ```env
-NEXT_PUBLIC_AUDIENCE_URL=https://church-translation.org
+NEXT_PUBLIC_AUDIENCE_URL=https://church-translation.vercel.app
 ```
 
 Then run `npm run dev` and open [http://127.0.0.1:3000/login](http://127.0.0.1:3000/login). `npm run dev` does not open the browser.
