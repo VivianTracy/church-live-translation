@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AUDIO_TRANSLATION_DIRECTION_LABELS,
   formatAudioTranslationDirectionLabel,
   loadStoredAudioTranslationDirection,
   saveStoredAudioTranslationDirection,
@@ -76,12 +75,9 @@ export function TranslationDirectionCard({
 
       {selectedDirection === "auto" ? (
         <p className="text-xs text-slate-500">
-          Auto starts translating right away. It only changes direction after
-          clear Chinese or English speech, so a Bible verse or Amen does not
-          flip the headsets.{" "}
-          {AUDIO_TRANSLATION_DIRECTION_LABELS["zh-to-en"]} and{" "}
-          {AUDIO_TRANSLATION_DIRECTION_LABELS["en-to-zh"]} stay available as a
-          manual override.
+          Auto starts translating right away using the last direction. If the
+          sermon is the other language, it switches after it hears enough
+          speech. Lock a direction if you already know.
         </p>
       ) : null}
     </div>

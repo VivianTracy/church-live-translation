@@ -13,12 +13,12 @@ npm install
 cp church-setup/env.example .env.local
 ```
 
-Add `OPENAI_API_KEY` to `.env.local`, then:
+Add the Supabase keys from `church-setup/SUPABASE.md`, then:
 
 ```bash
 npm run dev
 ```
 
-Open **http://localhost:3000/operator-live** in Chrome or Edge.
+Open **http://localhost:3000/login** in Chrome or Edge and sign in as a church operator.
 
-Do not commit `.env.local`.
+Do not commit `.env.local`. Do not put `OPENAI_API_KEY` on Vercel.

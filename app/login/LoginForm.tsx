@@ -1,0 +1,113 @@
+"use client";
+
+import { claimOperatorLogin } from "@/lib/operatorLoginClient";
+import { operatorLoginReasonMessage } from "@/lib/operatorLogin";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+
+function safeNextPath(value: string | null): string {
+  return value && value.startsWith("/") ? value : "/operator-live";
+}
+
+export function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const reasonNotice = operatorLoginReasonMessage(searchParams.get("reason"));
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setIsSubmitting(true);
+
+    const formData = new FormData(event.currentTarget);
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        setError("Could not sign in. Check the email and password.");
+        return;
+      }
+
+      const claimed = await claimOperatorLogin();
+
+      if (!claimed.ok) {
+        await supabase.auth.signOut({ scope: "local" });
+        setError(claimed.error ?? "Could not finish church sign-in.");
+        return;
+      }
+
+      router.replace(safeNextPath(searchParams.get("next")));
+      router.refresh();
+    } catch {
+      setError("Church sign-in is not configured on this computer.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <label className="block space-y-2">
+        <span className="text-sm font-medium text-slate-700">Email</span>
+        <input
+          type="email"
+          name="email"
+          autoComplete="username"
+          required
+          className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none ring-emerald-600 focus:ring-2"
+        />
+      </label>
+
+      <label className="block space-y-2">
+        <span className="text-sm font-medium text-slate-700">Password</span>
+        <input
+          type="password"
+          name="password"
+          autoComplete="current-password"
+          required
+          className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none ring-emerald-600 focus:ring-2"
+        />
+      </label>
+
+      <p>
+        <Link
+          href="/forgot-password"
+          className="text-sm font-medium text-emerald-800 hover:underline"
+        >
+          Forgot password?
+        </Link>
+      </p>
+
+      {reasonNotice ? (
+        <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
+          {reasonNotice}
+        </p>
+      ) : null}
+
+      {error ? (
+        <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
+          {error}
+        </p>
+      ) : null}
+
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className="w-full rounded-2xl bg-emerald-700 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+      >
+        {isSubmitting ? "Signing in…" : "Sign in"}
+      </button>
+    </form>
+  );
+}

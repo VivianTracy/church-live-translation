@@ -9,8 +9,10 @@ import {
   getAudioTranslationDirectionConfig,
   loadStoredAudioTranslationDirection,
   loadStoredAutoResolvedDirection,
+  oppositeAudioTranslationDirection,
   saveStoredAudioTranslationDirection,
   saveStoredAutoResolvedDirection,
+  shouldProbeOppositeAutoDirection,
   type AudioTranslationDirection,
   type ResolvedAudioTranslationDirection,
 } from "@/lib/audioTranslationDirection";
@@ -35,9 +37,13 @@ import {
   saveStoredAudioOutputVolume,
 } from "@/lib/audioOutputVolumeStorage";
 import { listMicrophoneDevices } from "@/lib/microphoneDeviceStorage";
+import { LOCAL_LISTEN_CHURCH_SLUG } from "@/lib/churchSlug";
+import { createTranslationWavUploader } from "@/lib/translationAudioBroadcast";
+import { reportTranslationSessionDuration } from "@/lib/translationSessionDuration";
 import {
   INITIAL_OPERATOR_SESSION_STATE,
   isOperatorSessionLocked,
+  isOperatorSessionTiming,
   reduceOperatorSession,
   type OperatorSessionState,
 } from "@/lib/operatorSessionState";
@@ -66,7 +72,7 @@ function deviceLabel(deviceId: string, devices: MediaDeviceInfo[], fallback: str
   return match?.label || fallback;
 }
 
-export function useAudioTranslationOperator() {
+export function useAudioTranslationOperator(options?: { churchSlug?: string }) {
   const [session, setSession] = useState<OperatorSessionState>(
     INITIAL_OPERATOR_SESSION_STATE
   );
@@ -86,6 +92,8 @@ export function useAudioTranslationOperator() {
   const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([]);
   const [micError, setMicError] = useState("");
   const [levels, setLevels] = useState<AudioLevels>(INITIAL_LEVELS);
+  const [audienceBroadcastError, setAudienceBroadcastError] = useState("");
+  const [chunksUploaded, setChunksUploaded] = useState(0);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
 
   const connectionRef = useRef<AudioTranslationConnection | null>(null);
@@ -105,8 +113,13 @@ export function useAudioTranslationOperator() {
   const sessionOutputLanguageRef = useRef<"en" | "zh">("en");
   const transcriptBufferRef = useRef("");
   const languageLockedRef = useRef(false);
+  const preserveAutoDetectionRef = useRef(false);
+  const autoDirectionProbedRef = useRef(false);
+  const inputPeakRef = useRef(0);
   const audioInputSourceRef = useRef<AudioInputSource>("obs-streaming");
   const sessionStartedAtRef = useRef<number | null>(null);
+  const sessionEventIdRef = useRef<string | null>(null);
+  const uploadWavChunkRef = useRef<((wavBase64: string) => void) | null>(null);
 
   const directionConfig = getAudioTranslationDirectionConfig(
     translationDirection,
@@ -240,13 +253,33 @@ export function useAudioTranslationOperator() {
     languageLockedRef.current = translationDirectionRef.current !== "auto";
     resolvedDirectionRef.current = null;
     setResolvedDirection(null);
+    autoDirectionProbedRef.current = false;
+  }, []);
+
+  const flushSessionDuration = useCallback((clearEvent = false) => {
+    const eventId = sessionEventIdRef.current;
+    const startedAt = sessionStartedAtRef.current;
+
+    if (eventId && startedAt !== null) {
+      reportTranslationSessionDuration(
+        eventId,
+        Math.max(0, Math.round((Date.now() - startedAt) / 1000))
+      );
+    }
+
+    if (clearEvent) {
+      sessionEventIdRef.current = null;
+    }
   }, []);
 
   const resetSessionMeters = useCallback(() => {
+    flushSessionDuration(true);
     setLevels(INITIAL_LEVELS);
     setLatencyMs(null);
+    setChunksUploaded(0);
+    setAudienceBroadcastError("");
     sessionStartedAtRef.current = null;
-  }, []);
+  }, [flushSessionDuration]);
 
   const applyDetectedDirection = useCallback(
     (direction: ResolvedAudioTranslationDirection) => {
@@ -258,12 +291,21 @@ export function useAudioTranslationOperator() {
       const outputLanguage = getAudioTranslationDirectionConfig(direction)
         .outputLanguage;
 
-      if (outputLanguage !== sessionOutputLanguageRef.current) {
-        sessionOutputLanguageRef.current = outputLanguage;
-        connectionRef.current?.updateOutputLanguage(outputLanguage);
+      if (outputLanguage === sessionOutputLanguageRef.current) {
+        return;
       }
+
+      sessionOutputLanguageRef.current = outputLanguage;
+      preserveAutoDetectionRef.current = true;
+      connectionRef.current?.stop();
+      connectionRef.current = null;
+      startingRef.current = false;
+      applySession(
+        reduceOperatorSession(sessionRef.current, { type: "start" })
+      );
+      void startListeningRef.current("reconnect");
     },
-    []
+    [applySession]
   );
 
   const handleInputTranscript = useCallback(
@@ -288,6 +330,7 @@ export function useAudioTranslationOperator() {
     connectionRef.current?.stop();
     connectionRef.current = null;
     startingRef.current = false;
+    uploadWavChunkRef.current = null;
     setIsTranslating(false);
     resetSessionMeters();
   }, [resetSessionMeters]);
@@ -305,6 +348,13 @@ export function useAudioTranslationOperator() {
       }
       setMicError("");
       resetSessionMeters();
+      uploadWavChunkRef.current = createTranslationWavUploader(
+        options?.churchSlug || LOCAL_LISTEN_CHURCH_SLUG,
+        setAudienceBroadcastError,
+        () => {
+          setChunksUploaded((count) => count + 1);
+        }
+      );
 
       const generation = sessionGenerationRef.current;
 
@@ -324,20 +374,31 @@ export function useAudioTranslationOperator() {
           );
         }
 
+        const preserveAutoDetection = preserveAutoDetectionRef.current;
+        preserveAutoDetectionRef.current = false;
+
         const startingDirection =
           translationDirectionRef.current === "auto"
-            ? loadStoredAutoResolvedDirection()
+            ? preserveAutoDetection && resolvedDirectionRef.current
+              ? resolvedDirectionRef.current
+              : loadStoredAutoResolvedDirection()
             : translationDirectionRef.current;
         const startingOutputLanguage =
           getAudioTranslationDirectionConfig(startingDirection).outputLanguage;
 
         sessionOutputLanguageRef.current = startingOutputLanguage;
         transcriptBufferRef.current = "";
+        autoDirectionProbedRef.current = preserveAutoDetection;
 
         if (translationDirectionRef.current === "auto") {
-          languageLockedRef.current = false;
-          resolvedDirectionRef.current = startingDirection;
-          setResolvedDirection(startingDirection);
+          if (preserveAutoDetection && resolvedDirectionRef.current) {
+            languageLockedRef.current = true;
+            setResolvedDirection(resolvedDirectionRef.current);
+          } else {
+            languageLockedRef.current = false;
+            resolvedDirectionRef.current = null;
+            setResolvedDirection(null);
+          }
         } else {
           languageLockedRef.current = true;
           resolvedDirectionRef.current = null;
@@ -351,6 +412,7 @@ export function useAudioTranslationOperator() {
           outputLanguage: startingOutputLanguage,
           onTranslatingChange: setIsTranslating,
           onInputLevels: (inputLevel, inputPeak) => {
+            inputPeakRef.current = inputPeak;
             setLevels((current) => ({
               ...current,
               inputLevel,
@@ -368,6 +430,14 @@ export function useAudioTranslationOperator() {
           onFirstOutputAudio: () => {
             if (sessionStartedAtRef.current !== null) {
               setLatencyMs(Date.now() - sessionStartedAtRef.current);
+            }
+          },
+          onWavChunk: (wavBase64) => {
+            uploadWavChunkRef.current?.(wavBase64);
+          },
+          onSessionEvent: (sessionEventId) => {
+            if (sessionGenerationRef.current === generation) {
+              sessionEventIdRef.current = sessionEventId;
             }
           },
           onError: (message) => {
@@ -440,6 +510,7 @@ export function useAudioTranslationOperator() {
     [
       applySession,
       handleInputTranscript,
+      options?.churchSlug,
       resetSessionMeters,
       syncInputDeviceForSource,
       tearDownConnection,
@@ -449,6 +520,67 @@ export function useAudioTranslationOperator() {
   useEffect(() => {
     startListeningRef.current = startListening;
   }, [startListening]);
+
+  useEffect(() => {
+    if (!isOperatorSessionTiming(session.status)) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      flushSessionDuration();
+    }, 15_000);
+
+    const onPageHide = () => {
+      flushSessionDuration();
+    };
+
+    window.addEventListener("pagehide", onPageHide);
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [flushSessionDuration, session.status]);
+
+  useEffect(() => {
+    if (
+      session.status !== "live" ||
+      translationDirection !== "auto" ||
+      isTranslating
+    ) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      const startedAt = sessionStartedAtRef.current;
+
+      if (
+        startedAt === null ||
+        !shouldProbeOppositeAutoDirection({
+          elapsedMs: Date.now() - startedAt,
+          isTranslating: false,
+          inputPeak: inputPeakRef.current,
+          alreadyProbed: autoDirectionProbedRef.current,
+        })
+      ) {
+        return;
+      }
+
+      const currentDirection =
+        sessionOutputLanguageRef.current === "en" ? "zh-to-en" : "en-to-zh";
+      autoDirectionProbedRef.current = true;
+      applyDetectedDirection(
+        oppositeAudioTranslationDirection(currentDirection)
+      );
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [
+    applyDetectedDirection,
+    isTranslating,
+    session.status,
+    translationDirection,
+  ]);
 
   const stopListening = useCallback(() => {
     sessionGenerationRef.current += 1;
@@ -549,6 +681,8 @@ export function useAudioTranslationOperator() {
     outputDeviceLabel,
     micError,
     translationError: session.error,
+    audienceBroadcastError,
+    chunksUploaded,
     latencyMs,
     inputLevel: levels.inputLevel,
     inputPeak: levels.inputPeak,

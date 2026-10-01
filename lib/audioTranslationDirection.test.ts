@@ -4,7 +4,9 @@ import {
   formatAudioTranslationDirectionLabel,
   getAudioTranslationDirectionConfig,
   loadStoredAudioTranslationDirection,
+  oppositeAudioTranslationDirection,
   saveStoredAudioTranslationDirection,
+  shouldProbeOppositeAutoDirection,
 } from "@/lib/audioTranslationDirection";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -34,6 +36,26 @@ describe("audio translation direction", () => {
   it("maps detected speech to the headset output language", () => {
     expect(directionFromDetectedLanguage("zh")).toBe("zh-to-en");
     expect(directionFromDetectedLanguage("en")).toBe("en-to-zh");
+  });
+
+  it("probes the opposite Auto direction after silence on a loud input", () => {
+    expect(
+      shouldProbeOppositeAutoDirection({
+        elapsedMs: 8000,
+        isTranslating: false,
+        inputPeak: 0.2,
+        alreadyProbed: false,
+      })
+    ).toBe(true);
+    expect(
+      shouldProbeOppositeAutoDirection({
+        elapsedMs: 8000,
+        isTranslating: true,
+        inputPeak: 0.2,
+        alreadyProbed: false,
+      })
+    ).toBe(false);
+    expect(oppositeAudioTranslationDirection("zh-to-en")).toBe("en-to-zh");
   });
 
   it("formats auto labels after a direction is resolved", () => {

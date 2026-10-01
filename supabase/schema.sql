@@ -1,0 +1,3 @@
+-- Source of truth: supabase/migrations/20260911000000_church_login_private_secrets.sql
+-- Apply that migration in the Supabase SQL editor or with the Supabase CLI.
+-- Do not paste this pointer file into the SQL editor.
