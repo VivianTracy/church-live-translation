@@ -3,10 +3,12 @@ import { clampAudioOutputVolume } from "@/lib/audioOutputVolumeStorage";
 import { getTranslationMicrophoneStream } from "@/lib/microphoneStream";
 import { startAudioNodePcmUploader } from "@/lib/pcmAudioCapture";
 import { OPENAI_TRANSLATION_CALLS_URL } from "@/lib/openaiModels";
+import { startInputSpeechGate } from "@/lib/speechGate";
 import {
   createTranslationSessionResources,
   stopTranslationSessionResources,
 } from "@/lib/translationSessionResources";
+import { createTranslationToneGraph } from "@/lib/translationOutputTone";
 
 /** Brief Wi-Fi blips can report disconnected before ICE recovers. */
 const DISCONNECT_GRACE_MS = 1500;
@@ -60,6 +62,7 @@ export type AudioTranslationConnection = {
 
 type ConnectOptions = {
   deviceId?: string;
+  inputSource?: "obs-streaming" | "microphone";
   outputDeviceId?: string;
   outputVolume?: number;
   outputLanguage?: "en" | "zh";
@@ -169,6 +172,7 @@ export async function connectOpenAIAudioTranslation(
   let attachGeneration = 0;
   let activeOutputTrackId: string | null = null;
   let events: RTCDataChannel | null = null;
+  let outputGain: GainNode | null = null;
 
   const cleanup = () => {
     if (stopped) {
@@ -200,6 +204,7 @@ export async function connectOpenAIAudioTranslation(
       },
       body: JSON.stringify({
         outputLanguage: options.outputLanguage ?? "en",
+        inputSource: options.inputSource ?? "obs-streaming",
       }),
     });
 
@@ -238,6 +243,19 @@ export async function connectOpenAIAudioTranslation(
       options.onInputLevels
     );
 
+    let sendStream = mic.stream;
+
+    try {
+      const gate = startInputSpeechGate(inputContext, inputSource);
+      resources.stopSpeechGate = gate.stop;
+
+      if (gate.stream.getAudioTracks().length > 0) {
+        sendStream = gate.stream;
+      }
+    } catch (error) {
+      console.error("Speech gate unavailable, sending the raw input.", error);
+    }
+
     const peerConnection = new RTCPeerConnection();
     resources.peerConnection = peerConnection;
     events = peerConnection.createDataChannel("oai-events");
@@ -267,19 +285,56 @@ export async function connectOpenAIAudioTranslation(
       resources.monitorContext = null;
     };
 
+    const releaseToneGraph = () => {
+      outputGain = null;
+      void resources.toneContext?.close();
+      resources.toneContext = null;
+    };
+
     const attachTranslatedStream = async (outputStream: MediaStream) => {
       if (stopped) {
         return;
       }
 
       const generation = ++attachGeneration;
-      let captureStream = outputStream;
+      releaseToneGraph();
+
+      let playbackStream = outputStream;
+      transmitterAudio.volume = outputVolume;
 
       try {
-        transmitterAudio.volume = outputVolume;
-        await playRoutedAudio(transmitterAudio, outputStream, outputDeviceId);
-        captureStream = getPlayedAudioStream(transmitterAudio, outputStream);
+        const tone = await createTranslationToneGraph(outputStream, outputVolume);
+
+        if (generation !== attachGeneration || stopped) {
+          void tone.context.close();
+          return;
+        }
+
+        resources.toneContext = tone.context;
+        outputGain = tone.gain;
+        playbackStream = tone.stream;
+        transmitterAudio.volume = 1;
       } catch (error) {
+        console.error("Output tone processing unavailable.", error);
+        outputGain = null;
+        playbackStream = outputStream;
+        transmitterAudio.volume = outputVolume;
+      }
+
+      if (generation !== attachGeneration || stopped) {
+        return;
+      }
+
+      let captureStream = playbackStream;
+
+      try {
+        await playRoutedAudio(transmitterAudio, playbackStream, outputDeviceId);
+        captureStream = getPlayedAudioStream(transmitterAudio, playbackStream);
+      } catch (error) {
+        if (generation === attachGeneration) {
+          releaseToneGraph();
+          transmitterAudio.volume = outputVolume;
+        }
         if (generation === attachGeneration && !stopped) {
           options.onError(
             error instanceof Error
@@ -341,8 +396,8 @@ export async function connectOpenAIAudioTranslation(
       }
     };
 
-    for (const track of mic.stream.getAudioTracks()) {
-      peerConnection.addTrack(track, mic.stream);
+    for (const track of sendStream.getAudioTracks()) {
+      peerConnection.addTrack(track, sendStream);
     }
 
     peerConnection.ontrack = (event) => {
@@ -502,9 +557,17 @@ export async function connectOpenAIAudioTranslation(
       setOutputVolume(volume: number) {
         outputVolume = clampAudioOutputVolume(volume);
 
-        if (!stopped) {
-          transmitterAudio.volume = outputVolume;
+        if (stopped) {
+          return;
         }
+
+        if (outputGain) {
+          outputGain.gain.value = outputVolume;
+          transmitterAudio.volume = 1;
+          return;
+        }
+
+        transmitterAudio.volume = outputVolume;
       },
 
       stop: cleanup,
