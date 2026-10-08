@@ -1,6 +1,7 @@
 import {
   applyTranslationCompressor,
   applyTranslationHighShelf,
+  routeTranslationOutputDevice,
   TRANSLATION_COMPRESSOR,
   TRANSLATION_HIGHSHELF_FREQUENCY_HZ,
   TRANSLATION_HIGHSHELF_GAIN_DB,
@@ -40,5 +41,19 @@ describe("translation output tone", () => {
     expect(compressor.knee.value).toBe(TRANSLATION_COMPRESSOR.knee);
     expect(compressor.attack.value).toBe(TRANSLATION_COMPRESSOR.attack);
     expect(compressor.release.value).toBe(TRANSLATION_COMPRESSOR.release);
+  });
+
+  it("sends playback to the selected output device", async () => {
+    const sinkIds: string[] = [];
+    const context = {
+      setSinkId: async (sinkId: string) => {
+        sinkIds.push(sinkId);
+      },
+    } as unknown as AudioContext;
+
+    await routeTranslationOutputDevice(context, "");
+    await routeTranslationOutputDevice(context, "bluetooth-earpiece");
+
+    expect(sinkIds).toEqual(["", "bluetooth-earpiece"]);
   });
 });

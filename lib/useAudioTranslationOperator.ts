@@ -38,6 +38,7 @@ import {
 } from "@/lib/audioOutputVolumeStorage";
 import { listMicrophoneDevices } from "@/lib/microphoneDeviceStorage";
 import { LOCAL_LISTEN_CHURCH_SLUG } from "@/lib/churchSlug";
+import type { TranslationLanguageCode } from "@/lib/translationLanguages";
 import { createTranslationWavUploader } from "@/lib/translationAudioBroadcast";
 import { reportTranslationSessionDuration } from "@/lib/translationSessionDuration";
 import {
@@ -72,7 +73,10 @@ function deviceLabel(deviceId: string, devices: MediaDeviceInfo[], fallback: str
   return match?.label || fallback;
 }
 
-export function useAudioTranslationOperator(options?: { churchSlug?: string }) {
+export function useAudioTranslationOperator(options?: {
+  churchSlug?: string;
+  headsetLanguage?: TranslationLanguageCode;
+}) {
   const [session, setSession] = useState<OperatorSessionState>(
     INITIAL_OPERATOR_SESSION_STATE
   );
@@ -110,7 +114,8 @@ export function useAudioTranslationOperator(options?: { churchSlug?: string }) {
   const resolvedDirectionRef = useRef<ResolvedAudioTranslationDirection | null>(
     null
   );
-  const sessionOutputLanguageRef = useRef<"en" | "zh">("en");
+  const sessionOutputLanguageRef = useRef<TranslationLanguageCode>("en");
+  const headsetLanguageRef = useRef(options?.headsetLanguage);
   const transcriptBufferRef = useRef("");
   const languageLockedRef = useRef(false);
   const preserveAutoDetectionRef = useRef(false);
@@ -135,6 +140,10 @@ export function useAudioTranslationOperator(options?: { churchSlug?: string }) {
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  useEffect(() => {
+    headsetLanguageRef.current = options?.headsetLanguage;
+  }, [options?.headsetLanguage]);
 
   const applySession = useCallback((next: OperatorSessionState) => {
     sessionRef.current = next;
@@ -310,7 +319,11 @@ export function useAudioTranslationOperator(options?: { churchSlug?: string }) {
 
   const handleInputTranscript = useCallback(
     (delta: string) => {
-      if (translationDirectionRef.current !== "auto" || languageLockedRef.current) {
+      if (
+        headsetLanguageRef.current ||
+        translationDirectionRef.current !== "auto" ||
+        languageLockedRef.current
+      ) {
         return;
       }
 
@@ -376,34 +389,46 @@ export function useAudioTranslationOperator(options?: { churchSlug?: string }) {
 
         const preserveAutoDetection = preserveAutoDetectionRef.current;
         preserveAutoDetectionRef.current = false;
+        const fixedHeadsetLanguage = headsetLanguageRef.current;
 
-        const startingDirection =
-          translationDirectionRef.current === "auto"
-            ? preserveAutoDetection && resolvedDirectionRef.current
-              ? resolvedDirectionRef.current
-              : loadStoredAutoResolvedDirection()
-            : translationDirectionRef.current;
-        const startingOutputLanguage =
-          getAudioTranslationDirectionConfig(startingDirection).outputLanguage;
+        let startingOutputLanguage: TranslationLanguageCode;
 
-        sessionOutputLanguageRef.current = startingOutputLanguage;
-        transcriptBufferRef.current = "";
-        autoDirectionProbedRef.current = preserveAutoDetection;
-
-        if (translationDirectionRef.current === "auto") {
-          if (preserveAutoDetection && resolvedDirectionRef.current) {
-            languageLockedRef.current = true;
-            setResolvedDirection(resolvedDirectionRef.current);
-          } else {
-            languageLockedRef.current = false;
-            resolvedDirectionRef.current = null;
-            setResolvedDirection(null);
-          }
-        } else {
+        if (fixedHeadsetLanguage) {
+          startingOutputLanguage = fixedHeadsetLanguage;
           languageLockedRef.current = true;
           resolvedDirectionRef.current = null;
           setResolvedDirection(null);
+          transcriptBufferRef.current = "";
+          autoDirectionProbedRef.current = true;
+        } else {
+          const startingDirection =
+            translationDirectionRef.current === "auto"
+              ? preserveAutoDetection && resolvedDirectionRef.current
+                ? resolvedDirectionRef.current
+                : loadStoredAutoResolvedDirection()
+              : translationDirectionRef.current;
+          startingOutputLanguage =
+            getAudioTranslationDirectionConfig(startingDirection).outputLanguage;
+          transcriptBufferRef.current = "";
+          autoDirectionProbedRef.current = preserveAutoDetection;
+
+          if (translationDirectionRef.current === "auto") {
+            if (preserveAutoDetection && resolvedDirectionRef.current) {
+              languageLockedRef.current = true;
+              setResolvedDirection(resolvedDirectionRef.current);
+            } else {
+              languageLockedRef.current = false;
+              resolvedDirectionRef.current = null;
+              setResolvedDirection(null);
+            }
+          } else {
+            languageLockedRef.current = true;
+            resolvedDirectionRef.current = null;
+            setResolvedDirection(null);
+          }
         }
+
+        sessionOutputLanguageRef.current = startingOutputLanguage;
 
         const connection = await connectOpenAIAudioTranslation({
           deviceId: resolvedInput.deviceId,
@@ -545,6 +570,7 @@ export function useAudioTranslationOperator(options?: { churchSlug?: string }) {
 
   useEffect(() => {
     if (
+      options?.headsetLanguage ||
       session.status !== "live" ||
       translationDirection !== "auto" ||
       isTranslating
@@ -579,6 +605,7 @@ export function useAudioTranslationOperator(options?: { churchSlug?: string }) {
   }, [
     applyDetectedDirection,
     isTranslating,
+    options?.headsetLanguage,
     session.status,
     translationDirection,
   ]);

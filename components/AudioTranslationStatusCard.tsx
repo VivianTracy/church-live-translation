@@ -8,6 +8,7 @@ type AudioTranslationStatusCardProps = {
   seconds: number;
   autoReconnectsUsed: number;
   error: string;
+  startDisabled?: boolean;
   onStart: () => void;
   onStop: () => void;
 };
@@ -62,6 +63,7 @@ export function AudioTranslationStatusCard({
   seconds,
   autoReconnectsUsed,
   error,
+  startDisabled = false,
   onStart,
   onStop,
 }: AudioTranslationStatusCardProps) {
@@ -117,10 +119,11 @@ export function AudioTranslationStatusCard({
         <button
           type="button"
           onClick={onStart}
-          className={`w-full rounded-2xl px-6 py-5 text-xl font-bold text-white transition ${
+          disabled={startDisabled}
+          className={`w-full rounded-2xl px-6 py-5 text-xl font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
             status === "failed"
-              ? "bg-amber-600 hover:bg-amber-700"
-              : "bg-emerald-600 hover:bg-emerald-700"
+              ? "bg-amber-600 hover:bg-amber-700 disabled:hover:bg-amber-600"
+              : "bg-emerald-600 hover:bg-emerald-700 disabled:hover:bg-emerald-600"
           }`}
         >
           {status === "failed" ? "Reconnect" : "Start translation"}

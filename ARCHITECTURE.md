@@ -14,7 +14,7 @@ OBS / mic → Chrome (/operator-live)
         translated audio → PC audio out → transmitter → wireless headsets
 ```
 
-**Operator:** `/operator-live` after church sign-in  
+**Operator:** `/operator-live` for Chinese and English. A fresh sign-in with no saved page opens `/operator`, which can also open `/operator-languages`.  
 **Public phones:** `/listen` (no sign-in)  
 **API:** `POST /api/openai/audio-translation-session`
 
@@ -35,5 +35,6 @@ Operator session states: Off → Connecting → Live, with Reconnecting (up to t
 ## Design
 
 - One volunteer on the church computer.
-- Auto-detect Chinese or English, or lock a fixed direction.
+- Chinese and English stays on `/operator-live`: auto-detect, or lock a fixed direction.
+- `/operator-languages` adds Korean, French, and Spanish. The volunteer picks the sermon language and the headset language. The headset language is the only value sent to OpenAI.
 - Do not change church production AV unless necessary.

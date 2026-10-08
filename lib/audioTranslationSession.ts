@@ -7,6 +7,7 @@ import { touchCurrentOperatorTranslation } from "@/lib/operatorLoginAccess";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { getOpenAIApiKey } from "@/lib/openaiServer";
 import { recordTranslationSessionEvent } from "@/lib/translationSessionAudit";
+import type { TranslationLanguageCode } from "@/lib/translationLanguages";
 import { consumeTranslationSessionRateLimit } from "@/lib/translationSessionRateLimit";
 import type { ChurchOperatorContext } from "@/lib/churchOperator";
 
@@ -120,7 +121,7 @@ export async function authorizeAudioTranslationSession(): Promise<AudioTranslati
 
 export async function recordAuthorizedTranslationSession(input: {
   operator: ChurchOperatorContext | null;
-  outputLanguage: "en" | "zh";
+  outputLanguage: TranslationLanguageCode;
 }): Promise<string | null> {
   if (!input.operator) {
     return null;

@@ -41,10 +41,13 @@ describe("audio translation session auth mode", () => {
     expect(canUseLocalOpenAIKey()).toBe(true);
   });
 
-  it("defaults the output language to English", () => {
+  it("defaults the output language to English and accepts the five headset languages", () => {
     expect(resolveOutputLanguage(undefined)).toBe("en");
     expect(resolveOutputLanguage("zh")).toBe("zh");
-    expect(resolveOutputLanguage("fr")).toBe("en");
+    expect(resolveOutputLanguage("ko")).toBe("ko");
+    expect(resolveOutputLanguage("fr")).toBe("fr");
+    expect(resolveOutputLanguage("es")).toBe("es");
+    expect(resolveOutputLanguage("de")).toBe("en");
   });
 
   it("uses far-field noise reduction only for a room microphone", () => {

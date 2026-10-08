@@ -3,12 +3,16 @@ import { clampAudioOutputVolume } from "@/lib/audioOutputVolumeStorage";
 import { getTranslationMicrophoneStream } from "@/lib/microphoneStream";
 import { startAudioNodePcmUploader } from "@/lib/pcmAudioCapture";
 import { OPENAI_TRANSLATION_CALLS_URL } from "@/lib/openaiModels";
+import type { TranslationLanguageCode } from "@/lib/translationLanguages";
 import { startInputSpeechGate } from "@/lib/speechGate";
 import {
   createTranslationSessionResources,
   stopTranslationSessionResources,
 } from "@/lib/translationSessionResources";
-import { createTranslationToneGraph } from "@/lib/translationOutputTone";
+import {
+  createTranslationToneGraph,
+  routeTranslationOutputDevice,
+} from "@/lib/translationOutputTone";
 
 /** Brief Wi-Fi blips can report disconnected before ICE recovers. */
 const DISCONNECT_GRACE_MS = 1500;
@@ -57,7 +61,7 @@ export type AudioTranslationConnection = {
   stop: () => void;
   setOutputDeviceId: (deviceId: string) => Promise<void>;
   setOutputVolume: (volume: number) => void;
-  updateOutputLanguage: (language: "en" | "zh") => void;
+  updateOutputLanguage: (language: TranslationLanguageCode) => void;
 };
 
 type ConnectOptions = {
@@ -65,7 +69,7 @@ type ConnectOptions = {
   inputSource?: "obs-streaming" | "microphone";
   outputDeviceId?: string;
   outputVolume?: number;
-  outputLanguage?: "en" | "zh";
+  outputLanguage?: TranslationLanguageCode;
   onTranslatingChange: (isTranslating: boolean) => void;
   onInputLevels: (level: number, peak: number) => void;
   onOutputLevels: (level: number, peak: number) => void;
@@ -77,7 +81,7 @@ type ConnectOptions = {
   onConnectionLost: (reason: string) => void;
 };
 
-function buildOutputLanguageUpdate(language: "en" | "zh"): string {
+function buildOutputLanguageUpdate(language: TranslationLanguageCode): string {
   return JSON.stringify({
     type: "session.update",
     session: {
@@ -167,12 +171,13 @@ export async function connectOpenAIAudioTranslation(
   let outputDeviceId = options.outputDeviceId ?? "";
   let outputVolume = clampAudioOutputVolume(options.outputVolume ?? 1);
   let outputLanguage = options.outputLanguage ?? "en";
-  let pendingOutputLanguage: "en" | "zh" | null = null;
+  let pendingOutputLanguage: TranslationLanguageCode | null = null;
   let hasReceivedOutput = false;
   let attachGeneration = 0;
   let activeOutputTrackId: string | null = null;
   let events: RTCDataChannel | null = null;
   let outputGain: GainNode | null = null;
+  let activeToneContext: AudioContext | null = null;
 
   const cleanup = () => {
     if (stopped) {
@@ -263,7 +268,7 @@ export async function connectOpenAIAudioTranslation(
     const transmitterAudio = createPlaybackElement(outputVolume);
     resources.transmitterAudio = transmitterAudio;
 
-    const sendOutputLanguageUpdate = (language: "en" | "zh") => {
+    const sendOutputLanguageUpdate = (language: TranslationLanguageCode) => {
       if (stopped) {
         return;
       }
@@ -287,6 +292,7 @@ export async function connectOpenAIAudioTranslation(
 
     const releaseToneGraph = () => {
       outputGain = null;
+      activeToneContext = null;
       void resources.toneContext?.close();
       resources.toneContext = null;
     };
@@ -301,9 +307,14 @@ export async function connectOpenAIAudioTranslation(
 
       let playbackStream = outputStream;
       transmitterAudio.volume = outputVolume;
+      let toneAnalyser: AnalyserNode | null = null;
 
       try {
-        const tone = await createTranslationToneGraph(outputStream, outputVolume);
+        const tone = await createTranslationToneGraph(
+          outputStream,
+          outputVolume,
+          outputDeviceId
+        );
 
         if (generation !== attachGeneration || stopped) {
           void tone.context.close();
@@ -311,12 +322,14 @@ export async function connectOpenAIAudioTranslation(
         }
 
         resources.toneContext = tone.context;
+        activeToneContext = tone.context;
         outputGain = tone.gain;
+        toneAnalyser = tone.analyser;
         playbackStream = tone.stream;
-        transmitterAudio.volume = 1;
       } catch (error) {
         console.error("Output tone processing unavailable.", error);
         outputGain = null;
+        activeToneContext = null;
         playbackStream = outputStream;
         transmitterAudio.volume = outputVolume;
       }
@@ -325,64 +338,68 @@ export async function connectOpenAIAudioTranslation(
         return;
       }
 
-      let captureStream = playbackStream;
-
-      try {
-        await playRoutedAudio(transmitterAudio, playbackStream, outputDeviceId);
-        captureStream = getPlayedAudioStream(transmitterAudio, playbackStream);
-      } catch (error) {
-        if (generation === attachGeneration) {
-          releaseToneGraph();
-          transmitterAudio.volume = outputVolume;
-        }
-        if (generation === attachGeneration && !stopped) {
-          options.onError(
-            error instanceof Error
-              ? error.message
-              : "Failed to play translated audio."
-          );
-        }
-        return;
-      }
-
-      if (generation !== attachGeneration || stopped) {
-        return;
-      }
-
       teardownOutputMonitor();
 
-      try {
-        const monitorContext = new AudioContext();
-        resources.monitorContext = monitorContext;
-
-        if (monitorContext.state === "suspended") {
-          await monitorContext.resume();
-        }
-
-        const outputSource = monitorContext.createMediaStreamSource(captureStream);
-        const outputAnalyser = monitorContext.createAnalyser();
-        outputAnalyser.fftSize = 2048;
-        outputSource.connect(outputAnalyser);
-
-        if (generation !== attachGeneration || stopped) {
-          return;
-        }
-
+      if (toneAnalyser && activeToneContext) {
         resources.stopOutputMonitor = startAudioLevelMonitor(
-          outputAnalyser,
+          toneAnalyser,
           options.onOutputLevels
         );
 
-        if (options.onWavChunk) {
+        if (options.onWavChunk && outputGain) {
           resources.stopPcmUpload = startAudioNodePcmUploader(
-            monitorContext,
-            outputSource,
+            activeToneContext,
+            outputGain,
             800,
             options.onWavChunk
           );
         }
-      } catch {
-        resources.monitorContext = null;
+      } else {
+        try {
+          await playRoutedAudio(transmitterAudio, playbackStream, outputDeviceId);
+          const captureStream = getPlayedAudioStream(
+            transmitterAudio,
+            playbackStream
+          );
+          const monitorContext = new AudioContext();
+          resources.monitorContext = monitorContext;
+
+          if (monitorContext.state === "suspended") {
+            await monitorContext.resume();
+          }
+
+          const outputSource = monitorContext.createMediaStreamSource(captureStream);
+          const outputAnalyser = monitorContext.createAnalyser();
+          outputAnalyser.fftSize = 2048;
+          outputSource.connect(outputAnalyser);
+
+          if (generation !== attachGeneration || stopped) {
+            return;
+          }
+
+          resources.stopOutputMonitor = startAudioLevelMonitor(
+            outputAnalyser,
+            options.onOutputLevels
+          );
+
+          if (options.onWavChunk) {
+            resources.stopPcmUpload = startAudioNodePcmUploader(
+              monitorContext,
+              outputSource,
+              800,
+              options.onWavChunk
+            );
+          }
+        } catch (error) {
+          if (generation === attachGeneration && !stopped) {
+            options.onError(
+              error instanceof Error
+                ? error.message
+                : "Failed to play translated audio."
+            );
+          }
+          return;
+        }
       }
 
       if (generation !== attachGeneration || stopped) {
@@ -527,7 +544,7 @@ export async function connectOpenAIAudioTranslation(
     });
 
     return {
-      updateOutputLanguage(language: "en" | "zh") {
+      updateOutputLanguage(language: TranslationLanguageCode) {
         if (stopped || language === outputLanguage) {
           return;
         }
@@ -540,6 +557,11 @@ export async function connectOpenAIAudioTranslation(
         outputDeviceId = deviceId;
 
         try {
+          if (activeToneContext) {
+            await routeTranslationOutputDevice(activeToneContext, deviceId);
+            return;
+          }
+
           await applyAudioOutputDevice(transmitterAudio, deviceId);
 
           if (transmitterAudio.srcObject) {

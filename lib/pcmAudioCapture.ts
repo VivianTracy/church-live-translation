@@ -108,7 +108,7 @@ export function encodePcm16ToWavBase64(
 
 export function startAudioNodePcmUploader(
   audioContext: AudioContext,
-  sourceNode: MediaStreamAudioSourceNode,
+  sourceNode: AudioNode,
   chunkMs: number,
   onChunk: (wavBase64: string) => void
 ): () => void {

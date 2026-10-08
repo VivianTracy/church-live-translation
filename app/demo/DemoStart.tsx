@@ -1,5 +1,6 @@
 "use client";
 
+import { OPERATOR_CHOOSER_PATH } from "@/lib/operatorRoutes";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -52,7 +53,7 @@ export function DemoStart() {
         }
 
         if (!cancelled) {
-          router.replace("/operator-live");
+          router.replace(OPERATOR_CHOOSER_PATH);
           router.refresh();
         }
       } catch {

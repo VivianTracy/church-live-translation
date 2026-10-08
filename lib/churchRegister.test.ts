@@ -20,6 +20,8 @@ describe("church registration input", () => {
   it("rejects reserved or empty brief names", () => {
     expect(parseRegisterChurchSlug("local")).toBeNull();
     expect(parseRegisterChurchSlug("login")).toBeNull();
+    expect(parseRegisterChurchSlug("operator")).toBeNull();
+    expect(parseRegisterChurchSlug("operator-languages")).toBeNull();
     expect(parseChurchNickname("local")).toBeNull();
     expect(parseChurchNickname("")).toBeNull();
     expect(parseChurchNickname("和平教会")).toBeNull();
