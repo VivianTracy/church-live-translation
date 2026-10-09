@@ -143,28 +143,6 @@ export function RegisterChurchForm() {
         />
       </label>
 
-      <div className="space-y-3 rounded-2xl bg-slate-50 px-4 py-4 ring-1 ring-slate-200">
-        <p className="text-sm font-medium text-slate-900">Get an OpenAI API key</p>
-        <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-600">
-          <li>Sign in, or create an account, with the operator email above.</li>
-          <li>Create a secret key.</li>
-          <li>Paste it into the field below.</li>
-        </ol>
-        <a
-          href="https://platform.openai.com/api-keys"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex w-full items-center justify-center rounded-2xl bg-white px-4 py-3 text-base font-semibold text-emerald-800 ring-1 ring-slate-200 hover:bg-emerald-50"
-        >
-          Open OpenAI API keys
-          <span className="sr-only"> (opens in a new tab)</span>
-        </a>
-        <p className="text-xs text-slate-500">
-          OpenAI confirms the email and asks for a payment method before the
-          key works. Usage is billed to that OpenAI account.
-        </p>
-      </div>
-
       <label className="block space-y-2">
         <span className="text-sm font-medium text-slate-700">
           OpenAI API key

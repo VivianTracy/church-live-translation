@@ -407,7 +407,6 @@ export function useAudioTranslationOperator(options?: { churchSlug?: string }) {
 
         const connection = await connectOpenAIAudioTranslation({
           deviceId: resolvedInput.deviceId,
-          inputSource: audioInputSourceRef.current,
           outputDeviceId: outputDeviceIdRef.current || undefined,
           outputVolume: outputVolumeRef.current,
           outputLanguage: startingOutputLanguage,
