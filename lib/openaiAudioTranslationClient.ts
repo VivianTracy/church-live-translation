@@ -137,29 +137,21 @@ async function playRoutedAudio(
   stream: MediaStream,
   deviceId: string
 ): Promise<void> {
+  audio.muted = false;
   audio.srcObject = stream;
   await applyAudioOutputDevice(audio, deviceId);
   await audio.play();
 }
 
-function getPlayedAudioStream(
+/** Chrome withholds a remote WebRTC track from Web Audio until a media element is playing it. */
+async function playRemoteTrackForCapture(
   audio: HTMLAudioElement,
-  fallback: MediaStream
-): MediaStream {
-  const capture = (
-    audio as HTMLAudioElement & { captureStream?: () => MediaStream }
-  ).captureStream;
-
-  if (typeof capture !== "function") {
-    return fallback;
-  }
-
-  try {
-    const played = capture.call(audio);
-    return played.getAudioTracks().length > 0 ? played : fallback;
-  } catch {
-    return fallback;
-  }
+  stream: MediaStream
+): Promise<void> {
+  audio.muted = true;
+  audio.volume = 0;
+  audio.srcObject = stream;
+  await audio.play();
 }
 
 export async function connectOpenAIAudioTranslation(
@@ -305,8 +297,23 @@ export async function connectOpenAIAudioTranslation(
       const generation = ++attachGeneration;
       releaseToneGraph();
 
-      let playbackStream = outputStream;
-      transmitterAudio.volume = outputVolume;
+      try {
+        await playRemoteTrackForCapture(transmitterAudio, outputStream);
+      } catch (error) {
+        if (generation === attachGeneration && !stopped) {
+          options.onError(
+            error instanceof Error
+              ? error.message
+              : "Failed to play translated audio."
+          );
+        }
+        return;
+      }
+
+      if (generation !== attachGeneration || stopped) {
+        return;
+      }
+
       let toneAnalyser: AnalyserNode | null = null;
 
       try {
@@ -325,13 +332,10 @@ export async function connectOpenAIAudioTranslation(
         activeToneContext = tone.context;
         outputGain = tone.gain;
         toneAnalyser = tone.analyser;
-        playbackStream = tone.stream;
       } catch (error) {
         console.error("Output tone processing unavailable.", error);
         outputGain = null;
         activeToneContext = null;
-        playbackStream = outputStream;
-        transmitterAudio.volume = outputVolume;
       }
 
       if (generation !== attachGeneration || stopped) {
@@ -340,13 +344,13 @@ export async function connectOpenAIAudioTranslation(
 
       teardownOutputMonitor();
 
-      if (toneAnalyser && activeToneContext) {
+      if (toneAnalyser && activeToneContext && outputGain) {
         resources.stopOutputMonitor = startAudioLevelMonitor(
           toneAnalyser,
           options.onOutputLevels
         );
 
-        if (options.onWavChunk && outputGain) {
+        if (options.onWavChunk) {
           resources.stopPcmUpload = startAudioNodePcmUploader(
             activeToneContext,
             outputGain,
@@ -356,11 +360,9 @@ export async function connectOpenAIAudioTranslation(
         }
       } else {
         try {
-          await playRoutedAudio(transmitterAudio, playbackStream, outputDeviceId);
-          const captureStream = getPlayedAudioStream(
-            transmitterAudio,
-            playbackStream
-          );
+          transmitterAudio.muted = false;
+          transmitterAudio.volume = outputVolume;
+          await playRoutedAudio(transmitterAudio, outputStream, outputDeviceId);
           const monitorContext = new AudioContext();
           resources.monitorContext = monitorContext;
 
@@ -368,7 +370,7 @@ export async function connectOpenAIAudioTranslation(
             await monitorContext.resume();
           }
 
-          const outputSource = monitorContext.createMediaStreamSource(captureStream);
+          const outputSource = monitorContext.createMediaStreamSource(outputStream);
           const outputAnalyser = monitorContext.createAnalyser();
           outputAnalyser.fftSize = 2048;
           outputSource.connect(outputAnalyser);
@@ -585,10 +587,12 @@ export async function connectOpenAIAudioTranslation(
 
         if (outputGain) {
           outputGain.gain.value = outputVolume;
-          transmitterAudio.volume = 1;
+          transmitterAudio.muted = true;
+          transmitterAudio.volume = 0;
           return;
         }
 
+        transmitterAudio.muted = false;
         transmitterAudio.volume = outputVolume;
       },
 
