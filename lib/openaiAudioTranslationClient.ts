@@ -8,7 +8,10 @@ import {
   createTranslationSessionResources,
   stopTranslationSessionResources,
 } from "@/lib/translationSessionResources";
-import { createTranslationToneGraph } from "@/lib/translationOutputTone";
+import {
+  createTranslationToneGraph,
+  routeTranslationOutputDevice,
+} from "@/lib/translationOutputTone";
 
 /** Brief Wi-Fi blips can report disconnected before ICE recovers. */
 const DISCONNECT_GRACE_MS = 1500;
@@ -133,29 +136,21 @@ async function playRoutedAudio(
   stream: MediaStream,
   deviceId: string
 ): Promise<void> {
+  audio.muted = false;
   audio.srcObject = stream;
   await applyAudioOutputDevice(audio, deviceId);
   await audio.play();
 }
 
-function getPlayedAudioStream(
+/** Chrome withholds a remote WebRTC track from Web Audio until a media element is playing it. */
+async function playRemoteTrackForCapture(
   audio: HTMLAudioElement,
-  fallback: MediaStream
-): MediaStream {
-  const capture = (
-    audio as HTMLAudioElement & { captureStream?: () => MediaStream }
-  ).captureStream;
-
-  if (typeof capture !== "function") {
-    return fallback;
-  }
-
-  try {
-    const played = capture.call(audio);
-    return played.getAudioTracks().length > 0 ? played : fallback;
-  } catch {
-    return fallback;
-  }
+  stream: MediaStream
+): Promise<void> {
+  audio.muted = true;
+  audio.volume = 0;
+  audio.srcObject = stream;
+  await audio.play();
 }
 
 export async function connectOpenAIAudioTranslation(
@@ -173,6 +168,7 @@ export async function connectOpenAIAudioTranslation(
   let activeOutputTrackId: string | null = null;
   let events: RTCDataChannel | null = null;
   let outputGain: GainNode | null = null;
+  let activeToneContext: AudioContext | null = null;
 
   const cleanup = () => {
     if (stopped) {
@@ -287,6 +283,7 @@ export async function connectOpenAIAudioTranslation(
 
     const releaseToneGraph = () => {
       outputGain = null;
+      activeToneContext = null;
       void resources.toneContext?.close();
       resources.toneContext = null;
     };
@@ -299,42 +296,9 @@ export async function connectOpenAIAudioTranslation(
       const generation = ++attachGeneration;
       releaseToneGraph();
 
-      let playbackStream = outputStream;
-      transmitterAudio.volume = outputVolume;
-
       try {
-        const tone = await createTranslationToneGraph(outputStream, outputVolume);
-
-        if (generation !== attachGeneration || stopped) {
-          void tone.context.close();
-          return;
-        }
-
-        resources.toneContext = tone.context;
-        outputGain = tone.gain;
-        playbackStream = tone.stream;
-        transmitterAudio.volume = 1;
+        await playRemoteTrackForCapture(transmitterAudio, outputStream);
       } catch (error) {
-        console.error("Output tone processing unavailable.", error);
-        outputGain = null;
-        playbackStream = outputStream;
-        transmitterAudio.volume = outputVolume;
-      }
-
-      if (generation !== attachGeneration || stopped) {
-        return;
-      }
-
-      let captureStream = playbackStream;
-
-      try {
-        await playRoutedAudio(transmitterAudio, playbackStream, outputDeviceId);
-        captureStream = getPlayedAudioStream(transmitterAudio, playbackStream);
-      } catch (error) {
-        if (generation === attachGeneration) {
-          releaseToneGraph();
-          transmitterAudio.volume = outputVolume;
-        }
         if (generation === attachGeneration && !stopped) {
           options.onError(
             error instanceof Error
@@ -349,40 +313,94 @@ export async function connectOpenAIAudioTranslation(
         return;
       }
 
-      teardownOutputMonitor();
+      let toneAnalyser: AnalyserNode | null = null;
 
       try {
-        const monitorContext = new AudioContext();
-        resources.monitorContext = monitorContext;
-
-        if (monitorContext.state === "suspended") {
-          await monitorContext.resume();
-        }
-
-        const outputSource = monitorContext.createMediaStreamSource(captureStream);
-        const outputAnalyser = monitorContext.createAnalyser();
-        outputAnalyser.fftSize = 2048;
-        outputSource.connect(outputAnalyser);
+        const tone = await createTranslationToneGraph(
+          outputStream,
+          outputVolume,
+          outputDeviceId
+        );
 
         if (generation !== attachGeneration || stopped) {
+          void tone.context.close();
           return;
         }
 
+        resources.toneContext = tone.context;
+        activeToneContext = tone.context;
+        outputGain = tone.gain;
+        toneAnalyser = tone.analyser;
+      } catch (error) {
+        console.error("Output tone processing unavailable.", error);
+        outputGain = null;
+        activeToneContext = null;
+      }
+
+      if (generation !== attachGeneration || stopped) {
+        return;
+      }
+
+      teardownOutputMonitor();
+
+      if (toneAnalyser && activeToneContext && outputGain) {
         resources.stopOutputMonitor = startAudioLevelMonitor(
-          outputAnalyser,
+          toneAnalyser,
           options.onOutputLevels
         );
 
         if (options.onWavChunk) {
           resources.stopPcmUpload = startAudioNodePcmUploader(
-            monitorContext,
-            outputSource,
+            activeToneContext,
+            outputGain,
             800,
             options.onWavChunk
           );
         }
-      } catch {
-        resources.monitorContext = null;
+      } else {
+        try {
+          transmitterAudio.muted = false;
+          transmitterAudio.volume = outputVolume;
+          await playRoutedAudio(transmitterAudio, outputStream, outputDeviceId);
+          const monitorContext = new AudioContext();
+          resources.monitorContext = monitorContext;
+
+          if (monitorContext.state === "suspended") {
+            await monitorContext.resume();
+          }
+
+          const outputSource = monitorContext.createMediaStreamSource(outputStream);
+          const outputAnalyser = monitorContext.createAnalyser();
+          outputAnalyser.fftSize = 2048;
+          outputSource.connect(outputAnalyser);
+
+          if (generation !== attachGeneration || stopped) {
+            return;
+          }
+
+          resources.stopOutputMonitor = startAudioLevelMonitor(
+            outputAnalyser,
+            options.onOutputLevels
+          );
+
+          if (options.onWavChunk) {
+            resources.stopPcmUpload = startAudioNodePcmUploader(
+              monitorContext,
+              outputSource,
+              800,
+              options.onWavChunk
+            );
+          }
+        } catch (error) {
+          if (generation === attachGeneration && !stopped) {
+            options.onError(
+              error instanceof Error
+                ? error.message
+                : "Failed to play translated audio."
+            );
+          }
+          return;
+        }
       }
 
       if (generation !== attachGeneration || stopped) {
@@ -540,6 +558,11 @@ export async function connectOpenAIAudioTranslation(
         outputDeviceId = deviceId;
 
         try {
+          if (activeToneContext) {
+            await routeTranslationOutputDevice(activeToneContext, deviceId);
+            return;
+          }
+
           await applyAudioOutputDevice(transmitterAudio, deviceId);
 
           if (transmitterAudio.srcObject) {
@@ -563,10 +586,12 @@ export async function connectOpenAIAudioTranslation(
 
         if (outputGain) {
           outputGain.gain.value = outputVolume;
-          transmitterAudio.volume = 1;
+          transmitterAudio.muted = true;
+          transmitterAudio.volume = 0;
           return;
         }
 
+        transmitterAudio.muted = false;
         transmitterAudio.volume = outputVolume;
       },
 

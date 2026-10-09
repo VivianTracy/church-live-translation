@@ -39,12 +39,32 @@ export function applyTranslationCompressor(compressor: {
 export type TranslationToneGraph = {
   context: AudioContext;
   gain: GainNode;
+  analyser: AnalyserNode;
   stream: MediaStream;
 };
 
+type AudioContextWithSink = AudioContext & {
+  setSinkId?: (sinkId: string) => Promise<void>;
+};
+
+/** Play through the chosen output. An empty id keeps the system default. */
+export async function routeTranslationOutputDevice(
+  context: AudioContext,
+  deviceId: string
+): Promise<void> {
+  const sinkContext = context as AudioContextWithSink;
+
+  if (typeof sinkContext.setSinkId !== "function") {
+    return;
+  }
+
+  await sinkContext.setSinkId(deviceId);
+}
+
 export async function createTranslationToneGraph(
   outputStream: MediaStream,
-  volume: number
+  volume: number,
+  deviceId = ""
 ): Promise<TranslationToneGraph> {
   const context = new AudioContext();
 
@@ -53,22 +73,28 @@ export async function createTranslationToneGraph(
       await context.resume();
     }
 
+    await routeTranslationOutputDevice(context, deviceId);
+
     const source = context.createMediaStreamSource(outputStream);
     const highShelf = context.createBiquadFilter();
     const compressor = context.createDynamicsCompressor();
     const gain = context.createGain();
+    const analyser = context.createAnalyser();
     const destination = context.createMediaStreamDestination();
 
     applyTranslationHighShelf(highShelf);
     applyTranslationCompressor(compressor);
     gain.gain.value = volume;
+    analyser.fftSize = 2048;
 
     source.connect(highShelf);
     highShelf.connect(compressor);
     compressor.connect(gain);
+    gain.connect(analyser);
+    analyser.connect(context.destination);
     gain.connect(destination);
 
-    return { context, gain, stream: destination.stream };
+    return { context, gain, analyser, stream: destination.stream };
   } catch (error) {
     void context.close();
     throw error;
