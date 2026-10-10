@@ -31,6 +31,7 @@ export type TranslationSessionResources = {
   stopInputMonitor: (() => void) | null;
   peerConnection: StoppablePeerConnection | null;
   transmitterAudio: StoppablePlaybackElement | null;
+  captureAudio: StoppablePlaybackElement | null;
   monitorContext: StoppableAudioContext | null;
   stopOutputMonitor: (() => void) | null;
   stopPcmUpload: (() => void) | null;
@@ -46,6 +47,7 @@ export function createTranslationSessionResources(): TranslationSessionResources
     stopInputMonitor: null,
     peerConnection: null,
     transmitterAudio: null,
+    captureAudio: null,
     monitorContext: null,
     stopOutputMonitor: null,
     stopPcmUpload: null,
@@ -99,6 +101,11 @@ export function stopTranslationSessionResources(
   if (resources.transmitterAudio) {
     stopPlaybackElement(resources.transmitterAudio);
     resources.transmitterAudio = null;
+  }
+
+  if (resources.captureAudio) {
+    stopPlaybackElement(resources.captureAudio);
+    resources.captureAudio = null;
   }
 
   if (resources.peerConnection) {

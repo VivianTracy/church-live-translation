@@ -63,8 +63,7 @@ export async function routeTranslationOutputDevice(
 
 export async function createTranslationToneGraph(
   outputStream: MediaStream,
-  volume: number,
-  deviceId = ""
+  volume: number
 ): Promise<TranslationToneGraph> {
   const context = new AudioContext();
 
@@ -72,8 +71,6 @@ export async function createTranslationToneGraph(
     if (context.state === "suspended") {
       await context.resume();
     }
-
-    await routeTranslationOutputDevice(context, deviceId);
 
     const source = context.createMediaStreamSource(outputStream);
     const highShelf = context.createBiquadFilter();
@@ -91,8 +88,7 @@ export async function createTranslationToneGraph(
     highShelf.connect(compressor);
     compressor.connect(gain);
     gain.connect(analyser);
-    analyser.connect(context.destination);
-    gain.connect(destination);
+    analyser.connect(destination);
 
     return { context, gain, analyser, stream: destination.stream };
   } catch (error) {

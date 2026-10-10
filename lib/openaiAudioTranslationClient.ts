@@ -6,12 +6,10 @@ import { OPENAI_TRANSLATION_CALLS_URL } from "@/lib/openaiModels";
 import { startInputSpeechGate } from "@/lib/speechGate";
 import {
   createTranslationSessionResources,
+  stopPlaybackElement,
   stopTranslationSessionResources,
 } from "@/lib/translationSessionResources";
-import {
-  createTranslationToneGraph,
-  routeTranslationOutputDevice,
-} from "@/lib/translationOutputTone";
+import { createTranslationToneGraph } from "@/lib/translationOutputTone";
 
 /** Brief Wi-Fi blips can report disconnected before ICE recovers. */
 const DISCONNECT_GRACE_MS = 1500;
@@ -168,7 +166,6 @@ export async function connectOpenAIAudioTranslation(
   let activeOutputTrackId: string | null = null;
   let events: RTCDataChannel | null = null;
   let outputGain: GainNode | null = null;
-  let activeToneContext: AudioContext | null = null;
 
   const cleanup = () => {
     if (stopped) {
@@ -274,9 +271,13 @@ export async function connectOpenAIAudioTranslation(
 
     const releaseToneGraph = () => {
       outputGain = null;
-      activeToneContext = null;
       void resources.toneContext?.close();
       resources.toneContext = null;
+
+      if (resources.captureAudio) {
+        stopPlaybackElement(resources.captureAudio);
+        resources.captureAudio = null;
+      }
     };
 
     const teardownOutputMonitor = () => {
@@ -296,8 +297,11 @@ export async function connectOpenAIAudioTranslation(
       const generation = ++attachGeneration;
       releaseToneGraph();
 
+      const captureAudio = createPlaybackElement(0);
+      resources.captureAudio = captureAudio;
+
       try {
-        await playRemoteTrackForCapture(transmitterAudio, outputStream);
+        await playRemoteTrackForCapture(captureAudio, outputStream);
       } catch (error) {
         if (generation === attachGeneration && !stopped) {
           options.onError(
@@ -314,13 +318,10 @@ export async function connectOpenAIAudioTranslation(
       }
 
       let toneAnalyser: AnalyserNode | null = null;
+      let toneContext: AudioContext | null = null;
 
       try {
-        const tone = await createTranslationToneGraph(
-          outputStream,
-          outputVolume,
-          outputDeviceId
-        );
+        const tone = await createTranslationToneGraph(outputStream, outputVolume);
 
         if (generation !== attachGeneration || stopped) {
           void tone.context.close();
@@ -328,13 +329,15 @@ export async function connectOpenAIAudioTranslation(
         }
 
         resources.toneContext = tone.context;
-        activeToneContext = tone.context;
+        toneContext = tone.context;
         outputGain = tone.gain;
         toneAnalyser = tone.analyser;
+        transmitterAudio.volume = 1;
+        await playRoutedAudio(transmitterAudio, tone.stream, outputDeviceId);
       } catch (error) {
         console.error("Output tone processing unavailable.", error);
         outputGain = null;
-        activeToneContext = null;
+        toneContext = null;
       }
 
       if (generation !== attachGeneration || stopped) {
@@ -343,7 +346,7 @@ export async function connectOpenAIAudioTranslation(
 
       teardownOutputMonitor();
 
-      if (toneAnalyser && activeToneContext && outputGain) {
+      if (toneAnalyser && toneContext && outputGain) {
         resources.stopOutputMonitor = startAudioLevelMonitor(
           toneAnalyser,
           options.onOutputLevels
@@ -351,7 +354,7 @@ export async function connectOpenAIAudioTranslation(
 
         if (options.onWavChunk) {
           resources.stopPcmUpload = startAudioNodePcmUploader(
-            activeToneContext,
+            toneContext,
             outputGain,
             800,
             options.onWavChunk
@@ -558,11 +561,6 @@ export async function connectOpenAIAudioTranslation(
         outputDeviceId = deviceId;
 
         try {
-          if (activeToneContext) {
-            await routeTranslationOutputDevice(activeToneContext, deviceId);
-            return;
-          }
-
           await applyAudioOutputDevice(transmitterAudio, deviceId);
 
           if (transmitterAudio.srcObject) {
@@ -586,8 +584,8 @@ export async function connectOpenAIAudioTranslation(
 
         if (outputGain) {
           outputGain.gain.value = outputVolume;
-          transmitterAudio.muted = true;
-          transmitterAudio.volume = 0;
+          transmitterAudio.muted = false;
+          transmitterAudio.volume = 1;
           return;
         }
 
