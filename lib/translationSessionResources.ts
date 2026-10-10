@@ -34,6 +34,8 @@ export type TranslationSessionResources = {
   monitorContext: StoppableAudioContext | null;
   stopOutputMonitor: (() => void) | null;
   stopPcmUpload: (() => void) | null;
+  stopCompactedInput: (() => void) | null;
+  closeTranslationSocket: (() => void) | null;
   disconnectTimer: ReturnType<typeof setTimeout> | null;
 };
 
@@ -47,6 +49,8 @@ export function createTranslationSessionResources(): TranslationSessionResources
     monitorContext: null,
     stopOutputMonitor: null,
     stopPcmUpload: null,
+    stopCompactedInput: null,
+    closeTranslationSocket: null,
     disconnectTimer: null,
   };
 }
@@ -86,6 +90,10 @@ export function stopTranslationSessionResources(
   resources.stopOutputMonitor = null;
   resources.stopPcmUpload?.();
   resources.stopPcmUpload = null;
+  resources.stopCompactedInput?.();
+  resources.stopCompactedInput = null;
+  resources.closeTranslationSocket?.();
+  resources.closeTranslationSocket = null;
 
   if (resources.transmitterAudio) {
     stopPlaybackElement(resources.transmitterAudio);

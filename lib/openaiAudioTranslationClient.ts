@@ -1,8 +1,16 @@
 import { startAudioLevelMonitor } from "@/lib/audioLevelMonitor";
 import { clampAudioOutputVolume } from "@/lib/audioOutputVolumeStorage";
+import { pcm16ToBase64, startCompactedMicSender } from "@/lib/compactedMicSender";
 import { getTranslationMicrophoneStream } from "@/lib/microphoneStream";
-import { startAudioNodePcmUploader } from "@/lib/pcmAudioCapture";
-import { OPENAI_TRANSLATION_CALLS_URL } from "@/lib/openaiModels";
+import { encodePcm16ToWavBase64, startAudioNodePcmUploader } from "@/lib/pcmAudioCapture";
+import {
+  OPENAI_AUDIO_TRANSLATION_MODEL,
+  OPENAI_TRANSLATION_CALLS_URL,
+} from "@/lib/openaiModels";
+import {
+  readTranslationAudioDelta,
+  startTranslatedPcmPlayback,
+} from "@/lib/translatedPcmPlayback";
 import {
   createTranslationSessionResources,
   stopTranslationSessionResources,
@@ -10,6 +18,98 @@ import {
 
 /** Brief Wi-Fi blips can report disconnected before ICE recovers. */
 const DISCONNECT_GRACE_MS = 1500;
+const TRANSLATION_SOCKET_TIMEOUT_MS = 4000;
+const TRANSLATION_SESSION_READY_MS = 800;
+
+function openTranslationSocket(clientSecret: string): Promise<WebSocket> {
+  const socket = new WebSocket(
+    `wss://api.openai.com/v1/realtime/translations?model=${OPENAI_AUDIO_TRANSLATION_MODEL}`,
+    ["realtime", `openai-insecure-api-key.${clientSecret}`]
+  );
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      finish(false, "Translation socket timed out.");
+    }, TRANSLATION_SOCKET_TIMEOUT_MS);
+
+    const finish = (opened: boolean, message: string) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timer);
+      socket.onopen = null;
+      socket.onerror = null;
+
+      if (opened) {
+        resolve(socket);
+        return;
+      }
+
+      socket.close();
+      reject(new Error(message));
+    };
+
+    socket.onopen = () => {
+      finish(true, "");
+    };
+
+    socket.onerror = () => {
+      finish(false, "Translation socket failed to open.");
+    };
+  });
+}
+
+function waitForTranslationSession(socket: WebSocket): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const finish = (error?: Error) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+
+      if (timer) {
+        clearTimeout(timer);
+      }
+
+      socket.onmessage = null;
+
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    };
+    timer = setTimeout(() => {
+      finish();
+    }, TRANSLATION_SESSION_READY_MS);
+
+    socket.onmessage = ({ data }) => {
+      let event: RealtimeTranslationEvent;
+
+      try {
+        event = JSON.parse(String(data)) as RealtimeTranslationEvent;
+      } catch {
+        return;
+      }
+
+      if (event.type === "session.created" || event.type === "session.updated") {
+        finish();
+        return;
+      }
+
+      if (event.type === "error" || event.type?.includes("error")) {
+        finish(new Error(formatTranslationError(event)));
+      }
+    };
+  });
+}
 
 type RealtimeTranslationEvent = {
   type?: string;
@@ -238,12 +338,239 @@ export async function connectOpenAIAudioTranslation(
       options.onInputLevels
     );
 
+    const transmitterAudio = createPlaybackElement(outputVolume);
+    resources.transmitterAudio = transmitterAudio;
+
+    let translationSocket: WebSocket | null = null;
+
+    try {
+      translationSocket = await openTranslationSocket(sessionData.clientSecret);
+    } catch (error) {
+      console.error(
+        "Pause shortening unavailable. Sending the microphone directly.",
+        error
+      );
+    }
+
+    if (translationSocket) {
+      const socket = translationSocket;
+
+      try {
+        await waitForTranslationSession(socket);
+
+        const playback = startTranslatedPcmPlayback();
+        resources.monitorContext = playback.context;
+
+        if (playback.context.state === "suspended") {
+          await playback.context.resume();
+        }
+
+        await playRoutedAudio(transmitterAudio, playback.stream, outputDeviceId);
+
+        const stopLevels = startAudioLevelMonitor(
+          playback.analyser,
+          options.onOutputLevels
+        );
+        resources.stopOutputMonitor = () => {
+          stopLevels();
+          playback.stop();
+        };
+
+        const wavChunks: Int16Array[] = [];
+
+        if (options.onWavChunk) {
+          const onWavChunk = options.onWavChunk;
+          const flushWav = () => {
+            if (wavChunks.length === 0) {
+              return;
+            }
+
+            const total = wavChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+            const merged = new Int16Array(total);
+            let offset = 0;
+
+            for (const chunk of wavChunks) {
+              merged.set(chunk, offset);
+              offset += chunk.length;
+            }
+
+            wavChunks.length = 0;
+            onWavChunk(encodePcm16ToWavBase64(merged));
+          };
+          const wavTimer = setInterval(flushWav, 800);
+          resources.stopPcmUpload = () => {
+            clearInterval(wavTimer);
+            flushWav();
+          };
+        }
+
+        const sendSocket = (payload: string) => {
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(payload);
+          }
+        };
+
+        resources.closeTranslationSocket = () => {
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: "session.close" }));
+          }
+
+          socket.onmessage = null;
+          socket.onclose = null;
+          socket.close();
+        };
+
+        resources.stopCompactedInput = startCompactedMicSender(
+          inputContext,
+          inputSource,
+          (pcm16) => {
+            if (stopped) {
+              return;
+            }
+
+            sendSocket(
+              JSON.stringify({
+                type: "session.input_audio_buffer.append",
+                audio: pcm16ToBase64(pcm16),
+              })
+            );
+          }
+        );
+
+        sendSocket(buildOutputLanguageUpdate(outputLanguage));
+
+        socket.onmessage = ({ data }) => {
+          if (stopped) {
+            return;
+          }
+
+          let event: RealtimeTranslationEvent;
+
+          try {
+            event = JSON.parse(String(data)) as RealtimeTranslationEvent;
+          } catch {
+            return;
+          }
+
+          if (event.type === "session.output_audio.delta") {
+            const pcm16 = readTranslationAudioDelta(event);
+
+            if (!pcm16) {
+              return;
+            }
+
+            playback.pushPcm16(pcm16);
+
+            if (options.onWavChunk) {
+              wavChunks.push(pcm16);
+            }
+
+            if (!hasReceivedOutput) {
+              hasReceivedOutput = true;
+              options.onTranslatingChange(true);
+              options.onFirstOutputAudio?.();
+            }
+
+            return;
+          }
+
+          if (event.type === "session.output_transcript.delta") {
+            if (!hasReceivedOutput) {
+              hasReceivedOutput = true;
+              options.onTranslatingChange(true);
+              options.onFirstOutputAudio?.();
+            }
+
+            return;
+          }
+
+          if (isInputTranscriptEvent(event.type)) {
+            const text = readTranscriptText(event);
+
+            if (text) {
+              options.onInputTranscript?.(text);
+            }
+
+            return;
+          }
+
+          if (event.type === "error" || event.type?.includes("error")) {
+            options.onError(formatTranslationError(event));
+          }
+        };
+
+        socket.onclose = () => {
+          if (!stopped) {
+            notifyConnectionLost("closed");
+          }
+        };
+
+        return {
+          updateOutputLanguage(language: "en" | "zh") {
+            if (stopped || language === outputLanguage) {
+              return;
+            }
+
+            outputLanguage = language;
+            sendSocket(buildOutputLanguageUpdate(language));
+          },
+
+          async setOutputDeviceId(deviceId: string) {
+            outputDeviceId = deviceId;
+
+            try {
+              await applyAudioOutputDevice(transmitterAudio, deviceId);
+
+              if (transmitterAudio.srcObject) {
+                await transmitterAudio.play();
+              }
+            } catch (error) {
+              options.onError(
+                error instanceof Error
+                  ? error.message
+                  : "Failed to route translated audio to the transmitter output."
+              );
+            }
+          },
+
+          setOutputVolume(volume: number) {
+            outputVolume = clampAudioOutputVolume(volume);
+
+            if (!stopped) {
+              transmitterAudio.volume = outputVolume;
+            }
+          },
+
+          stop: cleanup,
+        };
+      } catch (error) {
+        console.error(
+          "Pause shortening unavailable. Sending the microphone directly.",
+          error
+        );
+        socket.onmessage = null;
+        socket.onclose = null;
+
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: "session.close" }));
+        }
+
+        socket.close();
+        resources.stopCompactedInput?.();
+        resources.stopCompactedInput = null;
+        resources.closeTranslationSocket = null;
+        resources.stopOutputMonitor?.();
+        resources.stopOutputMonitor = null;
+        resources.stopPcmUpload?.();
+        resources.stopPcmUpload = null;
+        void resources.monitorContext?.close();
+        resources.monitorContext = null;
+      }
+    }
+
     const peerConnection = new RTCPeerConnection();
     resources.peerConnection = peerConnection;
     events = peerConnection.createDataChannel("oai-events");
-
-    const transmitterAudio = createPlaybackElement(outputVolume);
-    resources.transmitterAudio = transmitterAudio;
 
     const sendOutputLanguageUpdate = (language: "en" | "zh") => {
       if (stopped) {
