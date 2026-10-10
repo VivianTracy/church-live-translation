@@ -30,7 +30,8 @@ const SILENT_WAV_DATA_URL =
   "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
 const PLAYBACK_BUFFER_SECONDS = 0.8;
 const UNDERRUN_PREROLL_SECONDS = 0.2;
-const PLAYBACK_GAIN = 1.8;
+/** Unity gain. Headset tone is already shaped before these chunks are recorded. */
+const PLAYBACK_GAIN = 1;
 
 export function unlockMobileAudioPlayback(): HTMLAudioElement {
   const audio = new Audio(SILENT_WAV_DATA_URL);

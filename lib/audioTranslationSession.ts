@@ -13,6 +13,7 @@ import type { ChurchOperatorContext } from "@/lib/churchOperator";
 export {
   canUseLocalOpenAIKey,
   requiresChurchLogin,
+  resolveNoiseReduction,
   resolveOutputLanguage,
 } from "@/lib/audioTranslationSessionMode";
 
