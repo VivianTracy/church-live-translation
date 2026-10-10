@@ -1,7 +1,6 @@
 import {
   canUseLocalOpenAIKey,
   requiresChurchLogin,
-  resolveNoiseReduction,
   resolveOutputLanguage,
 } from "@/lib/audioTranslationSessionMode";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -45,11 +44,5 @@ describe("audio translation session auth mode", () => {
     expect(resolveOutputLanguage(undefined)).toBe("en");
     expect(resolveOutputLanguage("zh")).toBe("zh");
     expect(resolveOutputLanguage("fr")).toBe("en");
-  });
-
-  it("uses far-field noise reduction only for a room microphone", () => {
-    expect(resolveNoiseReduction("microphone")).toBe("far_field");
-    expect(resolveNoiseReduction("obs-streaming")).toBe("near_field");
-    expect(resolveNoiseReduction(undefined)).toBe("near_field");
   });
 });

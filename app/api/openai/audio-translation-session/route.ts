@@ -7,13 +7,11 @@ import { createOpenAITranslationClientSecret } from "@/lib/openaiServer";
 import {
   authorizeAudioTranslationSession,
   recordAuthorizedTranslationSession,
-  resolveNoiseReduction,
   resolveOutputLanguage,
 } from "@/lib/audioTranslationSession";
 
 type AudioTranslationSessionRequest = {
   outputLanguage?: string;
-  inputSource?: string;
 };
 
 export async function POST(request: Request) {
@@ -33,7 +31,6 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => ({}))) as AudioTranslationSessionRequest;
   const outputLanguage = resolveOutputLanguage(body.outputLanguage);
-  const noiseReduction = resolveNoiseReduction(body.inputSource);
 
   try {
     const secret = await createOpenAITranslationClientSecret(
@@ -43,9 +40,6 @@ export async function POST(request: Request) {
           input: {
             transcription: {
               model: OPENAI_TRANSCRIPTION_MODEL,
-            },
-            noise_reduction: {
-              type: noiseReduction,
             },
           },
           output: {

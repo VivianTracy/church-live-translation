@@ -12,8 +12,6 @@ describe("stopTranslationSessionResources", () => {
     const inputMonitorStop = vi.fn();
     const outputMonitorStop = vi.fn();
     const pcmUploadStop = vi.fn();
-    const speechGateStop = vi.fn();
-    const toneClose = vi.fn();
     const peerClose = vi.fn();
     const inputClose = vi.fn();
     const monitorClose = vi.fn();
@@ -42,8 +40,6 @@ describe("stopTranslationSessionResources", () => {
     resources.monitorContext = { close: monitorClose };
     resources.stopOutputMonitor = outputMonitorStop;
     resources.stopPcmUpload = pcmUploadStop;
-    resources.stopSpeechGate = speechGateStop;
-    resources.toneContext = { close: toneClose };
     resources.disconnectTimer = disconnectTimer;
 
     stopTranslationSessionResources(resources);
@@ -51,8 +47,6 @@ describe("stopTranslationSessionResources", () => {
     expect(inputMonitorStop).toHaveBeenCalledTimes(1);
     expect(outputMonitorStop).toHaveBeenCalledTimes(1);
     expect(pcmUploadStop).toHaveBeenCalledTimes(1);
-    expect(speechGateStop).toHaveBeenCalledTimes(1);
-    expect(toneClose).toHaveBeenCalledTimes(1);
     expect(audio.pause).toHaveBeenCalledTimes(1);
     expect(audio.remove).toHaveBeenCalledTimes(1);
     expect(receiverStop).toHaveBeenCalledTimes(1);
