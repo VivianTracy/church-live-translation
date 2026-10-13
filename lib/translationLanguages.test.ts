@@ -45,6 +45,8 @@ describe("translation languages", () => {
     expect(isTranslationLanguageCode("ja")).toBe(true);
     expect(isTranslationLanguageCode("fr")).toBe(true);
     expect(isTranslationLanguageCode("es")).toBe(true);
+    expect(isTranslationLanguageCode("pt")).toBe(true);
+    expect(isTranslationLanguageCode("pt-BR")).toBe(false);
     expect(isTranslationLanguageCode("zh-CN")).toBe(false);
     expect(isTranslationLanguageCode("de")).toBe(false);
     expect(isTranslationLanguageCode(undefined)).toBe(false);
@@ -80,7 +82,7 @@ describe("translation languages", () => {
   it("ignores an unknown stored language", () => {
     const store = mockLocalStorage();
     store.set(SERMON_LANGUAGE_STORAGE_KEY, "de");
-    store.set(HEADSET_LANGUAGE_STORAGE_KEY, "pt");
+    store.set(HEADSET_LANGUAGE_STORAGE_KEY, "ru");
 
     expect(loadStoredSermonLanguage()).toBe("zh");
     expect(loadStoredHeadsetLanguage()).toBe("en");

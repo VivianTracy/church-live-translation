@@ -48,6 +48,8 @@ describe("audio translation session auth mode", () => {
     expect(resolveOutputLanguage("ja")).toBe("ja");
     expect(resolveOutputLanguage("fr")).toBe("fr");
     expect(resolveOutputLanguage("es")).toBe("es");
+    expect(resolveOutputLanguage("pt")).toBe("pt");
+    expect(resolveOutputLanguage("pt-BR")).toBe("en");
     expect(resolveOutputLanguage("zh-CN")).toBe("en");
     expect(resolveOutputLanguage("de")).toBe("en");
   });

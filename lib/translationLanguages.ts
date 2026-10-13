@@ -1,4 +1,4 @@
-export const TRANSLATION_LANGUAGES = ["en", "zh", "ko", "ja", "fr", "es"] as const;
+export const TRANSLATION_LANGUAGES = ["en", "zh", "ko", "ja", "fr", "es", "pt"] as const;
 
 export type TranslationLanguageCode = (typeof TRANSLATION_LANGUAGES)[number];
 
@@ -12,6 +12,7 @@ export const TRANSLATION_LANGUAGE_LABELS: Record<
   ja: "Japanese",
   fr: "French",
   es: "Spanish",
+  pt: "Portuguese",
 };
 
 export const SERMON_LANGUAGE_STORAGE_KEY = "church-caption-sermon-language";
@@ -29,7 +30,8 @@ export function isTranslationLanguageCode(
     value === "ko" ||
     value === "ja" ||
     value === "fr" ||
-    value === "es"
+    value === "es" ||
+    value === "pt"
   );
 }
 

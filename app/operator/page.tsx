@@ -38,7 +38,7 @@ export default function OperatorChooserPage() {
 
           <p className="text-xs text-slate-500">
             Chinese and English can auto-detect the sermon. More languages
-            covers English, Chinese, Korean, Japanese, French, and Spanish.
+            covers English, Chinese, Korean, Japanese, French, Spanish, and Portuguese.
           </p>
         </section>
 
