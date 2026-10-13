@@ -1,0 +1,464 @@
+"use client";
+
+import { AudioInputSourceCard } from "@/components/AudioInputSourceCard";
+import { AudioMonitorCard } from "@/components/AudioMonitorCard";
+import { AudioOutputDeviceCard } from "@/components/AudioOutputDeviceCard";
+import { AudioTranslationStatusCard } from "@/components/AudioTranslationStatusCard";
+import { ChurchAccountCard } from "@/components/ChurchAccountCard";
+import { ChurchTranslationHeader } from "@/components/ChurchTranslationHeader";
+import { ContactFootnote } from "@/components/ContactFootnote";
+import { TranslationAudienceCard } from "@/components/TranslationAudienceCard";
+import { TranslationLanguageCard } from "@/components/TranslationLanguageCard";
+import { TranslationSetupSummary } from "@/components/TranslationSetupSummary";
+import { TranslationUsageCard } from "@/components/TranslationUsageCard";
+import {
+  parseOperatorLoginReason,
+  type OperatorLoginReason,
+} from "@/lib/operatorLogin";
+import { expireOperatorSession, useOperatorSessionGuard } from "@/lib/useOperatorSessionGuard";
+import { isOperatorSessionTiming } from "@/lib/operatorSessionState";
+import {
+  clearTranslationListenState,
+  loadTranslationRelayStatus,
+  saveTranslationListenState,
+} from "@/lib/translationListenApi";
+import {
+  getTranslationRelayOrigin,
+  isLocalDevHostname,
+  isUsingRemoteTranslationRelay,
+} from "@/lib/translationRelayUrl";
+import {
+  DEFAULT_HEADSET_LANGUAGE,
+  DEFAULT_SERMON_LANGUAGE,
+  TRANSLATION_LANGUAGE_LABELS,
+  formatTranslationLanguagePair,
+  loadStoredHeadsetLanguage,
+  loadStoredSermonLanguage,
+  saveStoredHeadsetLanguage,
+  saveStoredSermonLanguage,
+  translationLanguagesMatch,
+  type TranslationLanguageCode,
+} from "@/lib/translationLanguages";
+import { useAudioTranslationOperator } from "@/lib/useAudioTranslationOperator";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+type OperatorAccount = {
+  mode: "local" | "church";
+  churchName: string | null;
+  churchSlug: string;
+  email: string | null;
+  keyLastFour: string | null;
+  demo?: boolean;
+  idleDeadlineAt?: string | null;
+};
+
+export default function OperatorLanguagesPage() {
+  const [seconds, setSeconds] = useState(0);
+  const [sermonLanguage, setSermonLanguage] =
+    useState<TranslationLanguageCode>(DEFAULT_SERMON_LANGUAGE);
+  const [headsetLanguage, setHeadsetLanguage] =
+    useState<TranslationLanguageCode>(DEFAULT_HEADSET_LANGUAGE);
+  const [account, setAccount] = useState<OperatorAccount | null>(null);
+  const [accountError, setAccountError] = useState("");
+  const [idleDeadlineAt, setIdleDeadlineAt] = useState<string | null>(null);
+  const [relayError, setRelayError] = useState("");
+  const [relayReady, setRelayReady] = useState<boolean | null>(null);
+  const [showMissingRelayConfig, setShowMissingRelayConfig] = useState(false);
+  const [relayOrigin, setRelayOrigin] = useState<string | undefined>(undefined);
+  const [usingRemoteRelay, setUsingRemoteRelay] = useState(false);
+  const audienceWasActiveRef = useRef(false);
+
+  const {
+    isTranslating,
+    micDeviceId,
+    setMicDeviceId,
+    audioInputSource,
+    setAudioInputSource,
+    audioInputSourceLabel,
+    inputDeviceLabel,
+    outputDeviceId,
+    setOutputDeviceId,
+    outputVolume,
+    setOutputVolume,
+    outputDeviceLabel,
+    micError,
+    translationError,
+    audienceBroadcastError,
+    chunksUploaded,
+    latencyMs,
+    inputLevel,
+    inputPeak,
+    outputLevel,
+    outputPeak,
+    sessionStatus,
+    autoReconnectsUsed,
+    settingsLocked,
+    startListening,
+    stopListening,
+  } = useAudioTranslationOperator({
+    churchSlug: account?.churchSlug,
+    headsetLanguage,
+  });
+
+  const handleUnauthorized = useCallback((reason?: OperatorLoginReason) => {
+    stopListening();
+    expireOperatorSession(reason);
+  }, [stopListening]);
+
+  useOperatorSessionGuard({
+    enabled: account?.mode === "church",
+    isTranslationActive: isOperatorSessionTiming(sessionStatus),
+    idleDeadlineAt,
+    onUnauthorized: handleUnauthorized,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void Promise.resolve().then(() => {
+      if (cancelled) {
+        return;
+      }
+
+      setSermonLanguage(loadStoredSermonLanguage());
+      setHeadsetLanguage(loadStoredHeadsetLanguage());
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    void fetch("/api/operator/me", { cache: "no-store" })
+      .then(async (response) => {
+        const body = (await response.json().catch(() => ({}))) as OperatorAccount & {
+          error?: string;
+          reason?: string;
+          idleDeadlineAt?: string;
+        };
+
+        if (response.status === 401) {
+          expireOperatorSession(parseOperatorLoginReason(body.reason));
+          return;
+        }
+
+        if (response.status === 403) {
+          setAccountError(
+            body.error ?? "This account is not an authorized church operator."
+          );
+          return;
+        }
+
+        if (!response.ok) {
+          setAccountError(body.error ?? "Could not confirm church sign-in.");
+          return;
+        }
+
+        setAccount({
+          mode: body.mode,
+          churchName: body.churchName,
+          churchSlug: body.churchSlug || "local",
+          email: body.email,
+          keyLastFour: body.keyLastFour ?? null,
+          demo: Boolean(body.demo),
+        });
+        setIdleDeadlineAt(body.idleDeadlineAt ?? null);
+        setAccountError("");
+      })
+      .catch(() => {
+        setAccountError("Could not confirm church sign-in.");
+      });
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setRelayOrigin(getTranslationRelayOrigin());
+      setUsingRemoteRelay(isUsingRemoteTranslationRelay());
+      setShowMissingRelayConfig(
+        isLocalDevHostname(window.location.hostname) &&
+          !getTranslationRelayOrigin()
+      );
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!account?.churchSlug) {
+      return;
+    }
+
+    void loadTranslationRelayStatus(account.churchSlug)
+      .then((status) => {
+        setRelayReady(status.relayConfigured);
+        setRelayError("");
+      })
+      .catch((error) => {
+        setRelayReady(null);
+        setRelayError(
+          error instanceof Error
+            ? `Phone relay status unavailable: ${error.message}`
+            : "Phone relay status unavailable. Headset audio still works."
+        );
+      });
+  }, [account?.churchSlug]);
+
+  const markAudienceLive = useCallback(() => {
+    if (!account?.churchSlug) {
+      return;
+    }
+
+    void saveTranslationListenState(
+      {
+        isLive: true,
+        updatedAt: Date.now(),
+      },
+      account.churchSlug
+    )
+      .then(() => {
+        setRelayError("");
+      })
+      .catch((error) => {
+        setRelayError(
+          error instanceof Error
+            ? `Phone relay: ${error.message}`
+            : "Phone relay: Failed to save listen state."
+        );
+      });
+  }, [account]);
+
+  useEffect(() => {
+    const audienceActive =
+      sessionStatus === "live" ||
+      sessionStatus === "connecting" ||
+      sessionStatus === "reconnecting";
+
+    if (audienceActive) {
+      audienceWasActiveRef.current = true;
+      markAudienceLive();
+      const timer = setInterval(markAudienceLive, 5000);
+      return () => clearInterval(timer);
+    }
+
+    if (
+      audienceWasActiveRef.current &&
+      account?.churchSlug &&
+      (sessionStatus === "off" || sessionStatus === "failed")
+    ) {
+      audienceWasActiveRef.current = false;
+      void clearTranslationListenState(account.churchSlug).catch((error) => {
+        setRelayError(
+          error instanceof Error
+            ? `Phone relay: ${error.message}`
+            : "Phone relay: Failed to clear listen state."
+        );
+      });
+    }
+  }, [account, markAudienceLive, sessionStatus]);
+
+  useEffect(() => {
+    if (!isOperatorSessionTiming(sessionStatus)) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setSeconds((value) => value + 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [sessionStatus]);
+
+  return (
+    <main className="min-h-screen bg-stone-50 px-6 py-10 text-slate-900">
+      <div className="mx-auto max-w-2xl space-y-6">
+        <ChurchTranslationHeader
+          churchName={account?.churchName}
+          email={account?.email}
+          showSignOut={account?.mode === "church"}
+        />
+
+        {accountError ? (
+          <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
+            {accountError}
+          </p>
+        ) : null}
+        {account?.mode === "church" ? (
+          <TranslationUsageCard refreshKey={sessionStatus} />
+        ) : null}
+
+        {account?.demo ? (
+          <div className="space-y-1 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
+            <p>This demo signs out after 5 minutes.</p>
+            <p>
+              For a quick test, speak to your phone and use a wireless earpiece
+              to receive the translation.
+            </p>
+          </div>
+        ) : null}
+
+        {account?.mode === "church" &&
+        !account.demo &&
+        account.churchName &&
+        account.churchSlug ? (
+          <ChurchAccountCard
+            churchName={account.churchName}
+            keyLastFour={account.keyLastFour}
+            onChurchNameChange={(churchName) => {
+              setAccount((current) =>
+                current ? { ...current, churchName } : current
+              );
+            }}
+          />
+        ) : null}
+
+        <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 space-y-8">
+          <TranslationLanguageCard
+            sermonLanguage={sermonLanguage}
+            headsetLanguage={headsetLanguage}
+            disabled={settingsLocked}
+            onSermonLanguageChange={(language) => {
+              setSermonLanguage(language);
+              saveStoredSermonLanguage(language);
+            }}
+            onHeadsetLanguageChange={(language) => {
+              setHeadsetLanguage(language);
+              saveStoredHeadsetLanguage(language);
+            }}
+          />
+
+          <div className="border-t border-slate-200 pt-8 space-y-8">
+            <AudioInputSourceCard
+              selectedSource={audioInputSource}
+              selectedDeviceId={micDeviceId}
+              disabled={settingsLocked}
+              onSourceChange={(source) => {
+                void setAudioInputSource(source);
+              }}
+              onDeviceChange={setMicDeviceId}
+            />
+
+            <AudioOutputDeviceCard
+              selectedDeviceId={outputDeviceId}
+              outputVolume={outputVolume}
+              disabled={settingsLocked}
+              onDeviceChange={setOutputDeviceId}
+              onVolumeChange={setOutputVolume}
+              outputLanguageLabel={TRANSLATION_LANGUAGE_LABELS[headsetLanguage]}
+            />
+          </div>
+
+          <p className="text-xs text-slate-500 border-t border-slate-200 pt-4">
+            Stop translation before changing devices or languages. Volume can
+            be adjusted anytime. Connect a 3.5 mm cable from audio out to the
+            TT125-TX MIC port.
+          </p>
+        </section>
+
+        {showMissingRelayConfig ? (
+          <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
+            Add{" "}
+            <span className="font-mono">
+              NEXT_PUBLIC_AUDIENCE_URL=https://church-translation.vercel.app
+            </span>{" "}
+            to <span className="font-mono">.env.local</span> and restart so the
+            QR code stays permanent for phones.
+          </p>
+        ) : null}
+
+        {usingRemoteRelay && relayOrigin ? (
+          <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200">
+            Phone QR points to{" "}
+            <span className="font-mono">
+              {relayOrigin}/listen/{account?.churchSlug ?? "your-church"}
+            </span>
+            .
+          </p>
+        ) : null}
+
+        {relayReady === false ? (
+          <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
+            Vercel has the keys in Settings, but the running deploy cannot see
+            them yet. Headset translation still works. Open{" "}
+            <span className="font-medium">Deployments</span>, click{" "}
+            <span className="font-medium">Redeploy</span>, and uncheck{" "}
+            <span className="font-medium">Use existing Build Cache</span>.
+          </p>
+        ) : null}
+
+        {relayError ? (
+          <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
+            {relayError}
+          </p>
+        ) : null}
+
+        <TranslationAudienceCard />
+
+        <TranslationSetupSummary
+          directionLabel={formatTranslationLanguagePair(
+            sermonLanguage,
+            headsetLanguage
+          )}
+          inputSourceLabel={audioInputSourceLabel}
+          inputDeviceLabel={inputDeviceLabel}
+          outputDeviceLabel={outputDeviceLabel}
+          isRouting={sessionStatus === "live" && isTranslating}
+        />
+
+        <AudioTranslationStatusCard
+          status={sessionStatus}
+          seconds={seconds}
+          autoReconnectsUsed={autoReconnectsUsed}
+          error={translationError || audienceBroadcastError}
+          startDisabled={translationLanguagesMatch(
+            sermonLanguage,
+            headsetLanguage
+          )}
+          onStart={() => {
+            if (translationLanguagesMatch(sermonLanguage, headsetLanguage)) {
+              return;
+            }
+
+            setSeconds(0);
+            void startListening("user");
+          }}
+          onStop={() => {
+            setSeconds(0);
+            stopListening();
+          }}
+        />
+
+        <AudioMonitorCard
+          status={sessionStatus}
+          isTranslating={isTranslating}
+          inputLevel={inputLevel}
+          inputPeak={inputPeak}
+          outputLevel={outputLevel}
+          outputPeak={outputPeak}
+          latencyMs={latencyMs}
+          inputLanguageLabel={TRANSLATION_LANGUAGE_LABELS[sermonLanguage]}
+          outputLanguageLabel={TRANSLATION_LANGUAGE_LABELS[headsetLanguage]}
+          micError={micError}
+          translationError={translationError || audienceBroadcastError}
+        />
+
+        {sessionStatus === "live" && isTranslating && chunksUploaded > 0 ? (
+          <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200">
+            Phone relay active: {chunksUploaded} audio chunks sent.
+          </p>
+        ) : null}
+
+        {sessionStatus === "live" && isTranslating && chunksUploaded === 0 ? (
+          <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
+            Translation is playing locally, but no chunks have reached the phone
+            relay yet. If this stays at 0, check that{" "}
+            <span className="font-mono">https://church-translation.vercel.app</span>{" "}
+            is online.
+          </p>
+        ) : null}
+
+        <ContactFootnote />
+      </div>
+    </main>
+  );
+}

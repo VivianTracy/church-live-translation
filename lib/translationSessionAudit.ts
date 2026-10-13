@@ -1,9 +1,10 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import type { TranslationLanguageCode } from "@/lib/translationLanguages";
 
 export type TranslationSessionEvent = {
   churchId: string;
   userId: string;
-  outputLanguage: "en" | "zh";
+  outputLanguage: TranslationLanguageCode;
 };
 
 export async function recordTranslationSessionEvent(

@@ -1,6 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  OPERATOR_CHOOSER_PATH,
+  OPERATOR_LANGUAGES_PATH,
+  OPERATOR_LIVE_PATH,
+} from "@/lib/operatorRoutes";
+import {
   getSupabaseAnonKey,
   getSupabaseUrl,
   isSupabaseConfigured,
@@ -8,7 +13,10 @@ import {
 
 function isProtectedOperatorPage(pathname: string): boolean {
   return (
-    pathname === "/" || pathname.startsWith("/operator-live")
+    pathname === "/" ||
+    pathname.startsWith(OPERATOR_LIVE_PATH) ||
+    pathname === OPERATOR_CHOOSER_PATH ||
+    pathname.startsWith(OPERATOR_LANGUAGES_PATH)
   );
 }
 
@@ -71,7 +79,7 @@ export async function proxy(request: NextRequest) {
     const nextPath = request.nextUrl.searchParams.get("next");
     const destination = request.nextUrl.clone();
     destination.pathname =
-      nextPath && nextPath.startsWith("/") ? nextPath : "/operator-live";
+      nextPath && nextPath.startsWith("/") ? nextPath : OPERATOR_CHOOSER_PATH;
     destination.search = "";
     return copyCookies(supabaseResponse, NextResponse.redirect(destination));
   }

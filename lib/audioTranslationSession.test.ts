@@ -40,9 +40,15 @@ describe("audio translation session auth mode", () => {
     expect(canUseLocalOpenAIKey()).toBe(true);
   });
 
-  it("defaults the output language to English", () => {
+  it("keeps Chinese and English and accepts the extra headset languages", () => {
     expect(resolveOutputLanguage(undefined)).toBe("en");
+    expect(resolveOutputLanguage("en")).toBe("en");
     expect(resolveOutputLanguage("zh")).toBe("zh");
-    expect(resolveOutputLanguage("fr")).toBe("en");
+    expect(resolveOutputLanguage("ko")).toBe("ko");
+    expect(resolveOutputLanguage("ja")).toBe("ja");
+    expect(resolveOutputLanguage("fr")).toBe("fr");
+    expect(resolveOutputLanguage("es")).toBe("es");
+    expect(resolveOutputLanguage("zh-CN")).toBe("en");
+    expect(resolveOutputLanguage("de")).toBe("en");
   });
 });

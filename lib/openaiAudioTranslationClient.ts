@@ -2,6 +2,7 @@ import { startAudioLevelMonitor } from "@/lib/audioLevelMonitor";
 import { clampAudioOutputVolume } from "@/lib/audioOutputVolumeStorage";
 import { pcm16ToBase64, startCompactedMicSender } from "@/lib/compactedMicSender";
 import { getTranslationMicrophoneStream } from "@/lib/microphoneStream";
+import type { TranslationLanguageCode } from "@/lib/translationLanguages";
 import { encodePcm16ToWavBase64, startAudioNodePcmUploader } from "@/lib/pcmAudioCapture";
 import {
   OPENAI_AUDIO_TRANSLATION_MODEL,
@@ -155,14 +156,14 @@ export type AudioTranslationConnection = {
   stop: () => void;
   setOutputDeviceId: (deviceId: string) => Promise<void>;
   setOutputVolume: (volume: number) => void;
-  updateOutputLanguage: (language: "en" | "zh") => void;
+  updateOutputLanguage: (language: TranslationLanguageCode) => void;
 };
 
 type ConnectOptions = {
   deviceId?: string;
   outputDeviceId?: string;
   outputVolume?: number;
-  outputLanguage?: "en" | "zh";
+  outputLanguage?: TranslationLanguageCode;
   onTranslatingChange: (isTranslating: boolean) => void;
   onInputLevels: (level: number, peak: number) => void;
   onOutputLevels: (level: number, peak: number) => void;
@@ -174,7 +175,7 @@ type ConnectOptions = {
   onConnectionLost: (reason: string) => void;
 };
 
-function buildOutputLanguageUpdate(language: "en" | "zh"): string {
+function buildOutputLanguageUpdate(language: TranslationLanguageCode): string {
   return JSON.stringify({
     type: "session.update",
     session: {
@@ -264,7 +265,7 @@ export async function connectOpenAIAudioTranslation(
   let outputDeviceId = options.outputDeviceId ?? "";
   let outputVolume = clampAudioOutputVolume(options.outputVolume ?? 1);
   let outputLanguage = options.outputLanguage ?? "en";
-  let pendingOutputLanguage: "en" | "zh" | null = null;
+  let pendingOutputLanguage: TranslationLanguageCode | null = null;
   let hasReceivedOutput = false;
   let attachGeneration = 0;
   let activeOutputTrackId: string | null = null;
@@ -506,7 +507,7 @@ export async function connectOpenAIAudioTranslation(
         };
 
         return {
-          updateOutputLanguage(language: "en" | "zh") {
+          updateOutputLanguage(language: TranslationLanguageCode) {
             if (stopped || language === outputLanguage) {
               return;
             }
@@ -572,7 +573,7 @@ export async function connectOpenAIAudioTranslation(
     resources.peerConnection = peerConnection;
     events = peerConnection.createDataChannel("oai-events");
 
-    const sendOutputLanguageUpdate = (language: "en" | "zh") => {
+    const sendOutputLanguageUpdate = (language: TranslationLanguageCode) => {
       if (stopped) {
         return;
       }
@@ -799,7 +800,7 @@ export async function connectOpenAIAudioTranslation(
     });
 
     return {
-      updateOutputLanguage(language: "en" | "zh") {
+      updateOutputLanguage(language: TranslationLanguageCode) {
         if (stopped || language === outputLanguage) {
           return;
         }

@@ -1,6 +1,7 @@
 "use client";
 
 import { claimOperatorLogin } from "@/lib/operatorLoginClient";
+import { OPERATOR_CHOOSER_PATH } from "@/lib/operatorRoutes";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -68,7 +69,7 @@ export function RegisterChurchForm() {
         return;
       }
 
-      router.replace("/operator-live");
+      router.replace(OPERATOR_CHOOSER_PATH);
       router.refresh();
     } catch {
       setError("Could not register this church.");

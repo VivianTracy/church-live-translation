@@ -1,4 +1,5 @@
 import type { OperatorLoginReason } from "@/lib/operatorLogin";
+import { operatorSessionReturnPath } from "@/lib/operatorRoutes";
 
 type OperatorAuthBody = {
   error?: string;
@@ -91,7 +92,12 @@ export async function redirectToOperatorLogin(reason?: OperatorLoginReason) {
   }
 
   const params = new URLSearchParams();
-  params.set("next", "/operator-live");
+  params.set(
+    "next",
+    operatorSessionReturnPath(
+      typeof window === "undefined" ? "" : window.location.pathname
+    )
+  );
 
   if (reason) {
     params.set("reason", reason);

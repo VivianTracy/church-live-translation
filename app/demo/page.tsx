@@ -15,8 +15,9 @@ export default function DemoPage() {
             5-minute demo
           </h2>
           <p className="text-sm text-slate-600">
-            This opens the sample church account. It signs out on its own after
-            5 minutes.
+            This opens the sample church account, then the same choice as
+            church sign-in. Pick Chinese and English, or more languages. It
+            signs out on its own after 5 minutes.
           </p>
 
           {isSupabaseConfigured() ? (

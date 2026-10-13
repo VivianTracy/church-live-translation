@@ -5,6 +5,7 @@ import {
   parseOperatorPassword,
 } from "@/lib/churchRegister";
 import { claimOperatorLogin } from "@/lib/operatorLoginClient";
+import { OPERATOR_CHOOSER_PATH } from "@/lib/operatorRoutes";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -91,7 +92,7 @@ export function ResetPasswordForm() {
         return;
       }
 
-      router.replace("/operator-live");
+      router.replace(OPERATOR_CHOOSER_PATH);
       router.refresh();
     } catch {
       setError("Could not save the new password.");
