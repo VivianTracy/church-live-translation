@@ -12,6 +12,8 @@ import { TranslationDirectionCard } from "@/components/TranslationDirectionCard"
 import { TranslationSetupSummary } from "@/components/TranslationSetupSummary";
 import { TranslationUsageCard } from "@/components/TranslationUsageCard";
 import { formatAudioTranslationDirectionLabel } from "@/lib/audioTranslationDirection";
+import { OPERATOR_LANGUAGES_PATH } from "@/lib/operatorRoutes";
+import Link from "next/link";
 import {
   parseOperatorLoginReason,
   type OperatorLoginReason,
@@ -283,6 +285,13 @@ export default function OperatorLivePage() {
             }}
           />
         ) : null}
+
+        <Link
+          href={OPERATOR_LANGUAGES_PATH}
+          className="block rounded-3xl bg-white px-6 py-5 text-center text-lg font-bold text-slate-900 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50"
+        >
+          More languages
+        </Link>
 
         <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 space-y-8">
           <TranslationDirectionCard

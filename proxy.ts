@@ -71,7 +71,10 @@ export async function proxy(request: NextRequest) {
   if (isProtectedOperatorPage(pathname) && !user) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
-    loginUrl.searchParams.set("next", pathname);
+    loginUrl.searchParams.set(
+      "next",
+      pathname === "/" ? OPERATOR_CHOOSER_PATH : pathname
+    );
     return copyCookies(supabaseResponse, NextResponse.redirect(loginUrl));
   }
 

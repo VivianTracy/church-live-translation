@@ -9,7 +9,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 function safeNextPath(value: string | null): string {
-  return value && value.startsWith("/") ? value : OPERATOR_CHOOSER_PATH;
+  if (!value || value === "/") {
+    return OPERATOR_CHOOSER_PATH;
+  }
+
+  return value.startsWith("/") ? value : OPERATOR_CHOOSER_PATH;
 }
 
 export function LoginForm() {
