@@ -49,8 +49,15 @@ describe("audio translation session auth mode", () => {
     expect(resolveOutputLanguage("fr")).toBe("fr");
     expect(resolveOutputLanguage("es")).toBe("es");
     expect(resolveOutputLanguage("pt")).toBe("pt");
+    expect(resolveOutputLanguage("de")).toBe("de");
+    expect(resolveOutputLanguage("hi")).toBe("hi");
+    expect(resolveOutputLanguage("id")).toBe("id");
+    expect(resolveOutputLanguage("it")).toBe("it");
+    expect(resolveOutputLanguage("ru")).toBe("ru");
+    expect(resolveOutputLanguage("vi")).toBe("vi");
+    expect(resolveOutputLanguage("th")).toBe("en");
+    expect(resolveOutputLanguage("my")).toBe("en");
     expect(resolveOutputLanguage("pt-BR")).toBe("en");
     expect(resolveOutputLanguage("zh-CN")).toBe("en");
-    expect(resolveOutputLanguage("de")).toBe("en");
   });
 });

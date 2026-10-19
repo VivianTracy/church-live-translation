@@ -2,10 +2,14 @@ import { operatorSessionReturnPath } from "@/lib/operatorRoutes";
 import {
   DEFAULT_HEADSET_LANGUAGE,
   DEFAULT_SERMON_LANGUAGE,
+  HEADSET_LANGUAGES,
   HEADSET_LANGUAGE_STORAGE_KEY,
+  SERMON_LANGUAGES,
   SERMON_LANGUAGE_STORAGE_KEY,
   formatTranslationLanguagePair,
   headsetChannelSummary,
+  isHeadsetLanguageCode,
+  isSermonLanguageCode,
   isTranslationLanguageCode,
   loadStoredHeadsetLanguage,
   loadStoredSermonLanguage,
@@ -38,29 +42,61 @@ afterEach(() => {
 });
 
 describe("translation languages", () => {
-  it("accepts Chinese, English, and the extra headset languages", () => {
-    expect(isTranslationLanguageCode("en")).toBe(true);
-    expect(isTranslationLanguageCode("zh")).toBe(true);
-    expect(isTranslationLanguageCode("ko")).toBe(true);
-    expect(isTranslationLanguageCode("ja")).toBe(true);
-    expect(isTranslationLanguageCode("fr")).toBe(true);
-    expect(isTranslationLanguageCode("es")).toBe(true);
-    expect(isTranslationLanguageCode("pt")).toBe(true);
+  it("keeps a short sermon list and every language the translator can speak", () => {
+    expect(SERMON_LANGUAGES).toEqual([
+      "en",
+      "zh",
+      "ko",
+      "ja",
+      "fr",
+      "es",
+      "pt",
+      "th",
+      "my",
+      "vi",
+    ]);
+    expect(HEADSET_LANGUAGES).toEqual([
+      "zh",
+      "en",
+      "fr",
+      "de",
+      "hi",
+      "id",
+      "it",
+      "ja",
+      "ko",
+      "pt",
+      "ru",
+      "es",
+      "vi",
+    ]);
+    expect(isSermonLanguageCode("th")).toBe(true);
+    expect(isSermonLanguageCode("my")).toBe(true);
+    expect(isSermonLanguageCode("vi")).toBe(true);
+    expect(isSermonLanguageCode("de")).toBe(false);
+    expect(isHeadsetLanguageCode("de")).toBe(true);
+    expect(isHeadsetLanguageCode("vi")).toBe(true);
+    expect(isHeadsetLanguageCode("th")).toBe(false);
+    expect(isHeadsetLanguageCode("my")).toBe(false);
+    expect(isTranslationLanguageCode("ru")).toBe(true);
+    expect(isTranslationLanguageCode("th")).toBe(false);
     expect(isTranslationLanguageCode("pt-BR")).toBe(false);
     expect(isTranslationLanguageCode("zh-CN")).toBe(false);
-    expect(isTranslationLanguageCode("de")).toBe(false);
     expect(isTranslationLanguageCode(undefined)).toBe(false);
   });
 
   it("blocks a sermon and headset in the same language", () => {
     expect(translationLanguagesMatch("ja", "ja")).toBe(true);
     expect(translationLanguagesMatch("zh", "en")).toBe(false);
+    expect(translationLanguagesMatch("th", "en")).toBe(false);
+    expect(translationLanguagesMatch("vi", "vi")).toBe(true);
   });
 
   it("formats the pair for the operator summary", () => {
     expect(formatTranslationLanguagePair("ja", "en")).toBe("Japanese → English");
-    expect(headsetChannelSummary("fr", "es")).toBe(
-      "French audio becomes Spanish audio for wireless receivers."
+    expect(formatTranslationLanguagePair("th", "vi")).toBe("Thai → Vietnamese");
+    expect(headsetChannelSummary("my", "en")).toBe(
+      "Burmese audio becomes English audio for wireless receivers."
     );
   });
 
@@ -70,19 +106,19 @@ describe("translation languages", () => {
     expect(loadStoredSermonLanguage()).toBe(DEFAULT_SERMON_LANGUAGE);
     expect(loadStoredHeadsetLanguage()).toBe(DEFAULT_HEADSET_LANGUAGE);
 
-    saveStoredSermonLanguage("ja");
-    saveStoredHeadsetLanguage("ko");
+    saveStoredSermonLanguage("th");
+    saveStoredHeadsetLanguage("vi");
 
-    expect(store.get(SERMON_LANGUAGE_STORAGE_KEY)).toBe("ja");
-    expect(store.get(HEADSET_LANGUAGE_STORAGE_KEY)).toBe("ko");
-    expect(loadStoredSermonLanguage()).toBe("ja");
-    expect(loadStoredHeadsetLanguage()).toBe("ko");
+    expect(store.get(SERMON_LANGUAGE_STORAGE_KEY)).toBe("th");
+    expect(store.get(HEADSET_LANGUAGE_STORAGE_KEY)).toBe("vi");
+    expect(loadStoredSermonLanguage()).toBe("th");
+    expect(loadStoredHeadsetLanguage()).toBe("vi");
   });
 
   it("ignores an unknown stored language", () => {
     const store = mockLocalStorage();
     store.set(SERMON_LANGUAGE_STORAGE_KEY, "de");
-    store.set(HEADSET_LANGUAGE_STORAGE_KEY, "ru");
+    store.set(HEADSET_LANGUAGE_STORAGE_KEY, "th");
 
     expect(loadStoredSermonLanguage()).toBe("zh");
     expect(loadStoredHeadsetLanguage()).toBe("en");

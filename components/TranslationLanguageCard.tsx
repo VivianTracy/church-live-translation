@@ -2,33 +2,39 @@
 
 import { OPERATOR_LIVE_PATH } from "@/lib/operatorRoutes";
 import {
-  TRANSLATION_LANGUAGES,
+  HEADSET_LANGUAGES,
+  SERMON_LANGUAGES,
   TRANSLATION_LANGUAGE_LABELS,
   translationLanguagesMatch,
-  type TranslationLanguageCode,
+  type HeadsetLanguageCode,
+  type SermonLanguageCode,
 } from "@/lib/translationLanguages";
 import Link from "next/link";
 
+type LabeledLanguageCode = SermonLanguageCode | HeadsetLanguageCode;
+
 type TranslationLanguageCardProps = {
-  sermonLanguage: TranslationLanguageCode;
-  headsetLanguage: TranslationLanguageCode;
+  sermonLanguage: SermonLanguageCode;
+  headsetLanguage: HeadsetLanguageCode;
   disabled?: boolean;
-  onSermonLanguageChange: (language: TranslationLanguageCode) => void;
-  onHeadsetLanguageChange: (language: TranslationLanguageCode) => void;
+  onSermonLanguageChange: (language: SermonLanguageCode) => void;
+  onHeadsetLanguageChange: (language: HeadsetLanguageCode) => void;
 };
 
-function LanguageSelect({
+function LanguageSelect<Code extends LabeledLanguageCode>({
   id,
   label,
   value,
+  languages,
   disabled,
   onChange,
 }: {
   id: string;
   label: string;
-  value: TranslationLanguageCode;
+  value: Code;
+  languages: readonly Code[];
   disabled?: boolean;
-  onChange: (language: TranslationLanguageCode) => void;
+  onChange: (language: Code) => void;
 }) {
   return (
     <label htmlFor={id} className="block space-y-2">
@@ -37,10 +43,16 @@ function LanguageSelect({
         id={id}
         value={value}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.value as TranslationLanguageCode)}
+        onChange={(event) => {
+          const next = languages.find((language) => language === event.target.value);
+
+          if (next) {
+            onChange(next);
+          }
+        }}
         className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {TRANSLATION_LANGUAGES.map((language) => (
+        {languages.map((language) => (
           <option key={language} value={language}>
             {TRANSLATION_LANGUAGE_LABELS[language]}
           </option>
@@ -66,7 +78,8 @@ export function TranslationLanguageCard({
         <p className="text-sm text-slate-600">
           Sermon language is what you expect to hear. Headset language is what
           listeners hear. The translator will recognize the spoken language
-          on its own.
+          on its own. Thai and Burmese can be the sermon. They are not headset
+          languages.
         </p>
       </div>
 
@@ -74,6 +87,7 @@ export function TranslationLanguageCard({
         id="sermon-language"
         label="Sermon language"
         value={sermonLanguage}
+        languages={SERMON_LANGUAGES}
         disabled={disabled}
         onChange={onSermonLanguageChange}
       />
@@ -82,6 +96,7 @@ export function TranslationLanguageCard({
         id="headset-language"
         label="Headset language"
         value={headsetLanguage}
+        languages={HEADSET_LANGUAGES}
         disabled={disabled}
         onChange={onHeadsetLanguageChange}
       />

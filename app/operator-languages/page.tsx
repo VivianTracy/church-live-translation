@@ -37,7 +37,8 @@ import {
   saveStoredHeadsetLanguage,
   saveStoredSermonLanguage,
   translationLanguagesMatch,
-  type TranslationLanguageCode,
+  type HeadsetLanguageCode,
+  type SermonLanguageCode,
 } from "@/lib/translationLanguages";
 import { useAudioTranslationOperator } from "@/lib/useAudioTranslationOperator";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -55,9 +56,9 @@ type OperatorAccount = {
 export default function OperatorLanguagesPage() {
   const [seconds, setSeconds] = useState(0);
   const [sermonLanguage, setSermonLanguage] =
-    useState<TranslationLanguageCode>(DEFAULT_SERMON_LANGUAGE);
+    useState<SermonLanguageCode>(DEFAULT_SERMON_LANGUAGE);
   const [headsetLanguage, setHeadsetLanguage] =
-    useState<TranslationLanguageCode>(DEFAULT_HEADSET_LANGUAGE);
+    useState<HeadsetLanguageCode>(DEFAULT_HEADSET_LANGUAGE);
   const [account, setAccount] = useState<OperatorAccount | null>(null);
   const [accountError, setAccountError] = useState("");
   const [idleDeadlineAt, setIdleDeadlineAt] = useState<string | null>(null);
