@@ -5,7 +5,11 @@ import {
   loadStoredAudioOutputDeviceId,
   saveStoredAudioOutputDeviceId,
 } from "@/lib/audioOutputDeviceStorage";
-import { useEffect, useState } from "react";
+import {
+  playOutputTestTone,
+  stopOutputTestTone,
+} from "@/lib/audioOutputTest";
+import { useEffect, useRef, useState } from "react";
 
 type AudioOutputDeviceCardProps = {
   selectedDeviceId: string;
@@ -15,6 +19,24 @@ type AudioOutputDeviceCardProps = {
   onDeviceChange: (deviceId: string) => void;
   onVolumeChange: (volume: number) => void;
 };
+
+function SpeakerIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    >
+      <path d="M4 10v4h4l5 4V6L8 10H4z" />
+      <path d="M16.5 9.5a3.5 3.5 0 0 1 0 5" />
+      <path d="M19 7a7 7 0 0 1 0 10" />
+    </svg>
+  );
+}
 
 export function AudioOutputDeviceCard({
   selectedDeviceId,
@@ -26,7 +48,10 @@ export function AudioOutputDeviceCard({
 }: AudioOutputDeviceCardProps) {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [loadError, setLoadError] = useState("");
+  const [testMessage, setTestMessage] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const mountedRef = useRef(true);
 
   const refreshDevices = async () => {
     setIsRefreshing(true);
@@ -54,10 +79,32 @@ export function AudioOutputDeviceCard({
   };
 
   useEffect(() => {
+    mountedRef.current = true;
     void Promise.resolve().then(() => refreshDevices());
+    return () => {
+      mountedRef.current = false;
+      stopOutputTestTone();
+    };
     // Load the device list once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleTest = async () => {
+    setIsTesting(true);
+    setTestMessage("");
+
+    const message = await playOutputTestTone({
+      deviceId: selectedDeviceId,
+      volume: outputVolume,
+    });
+
+    if (!mountedRef.current) {
+      return;
+    }
+
+    setIsTesting(false);
+    setTestMessage(message ?? "");
+  };
 
   const handleChange = (deviceId: string) => {
     saveStoredAudioOutputDeviceId(deviceId);
@@ -95,6 +142,19 @@ export function AudioOutputDeviceCard({
 
         <button
           type="button"
+          disabled={disabled || isTesting}
+          onClick={() => {
+            void handleTest();
+          }}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+          aria-label="Play a test sound on the selected output"
+        >
+          <SpeakerIcon />
+          {isTesting ? "Playing…" : "Test sound"}
+        </button>
+
+        <button
+          type="button"
           disabled={disabled || isRefreshing}
           onClick={() => {
             void refreshDevices();
@@ -104,6 +164,16 @@ export function AudioOutputDeviceCard({
           {isRefreshing ? "Refreshing..." : "Refresh list"}
         </button>
       </div>
+
+      <p className="text-xs text-slate-500">
+        Test sound plays a short chime on this output. Translation stays off.
+      </p>
+
+      {testMessage ? (
+        <p className="rounded-xl bg-amber-50 p-3 text-sm font-medium text-amber-950">
+          {testMessage}
+        </p>
+      ) : null}
 
       {loadError ? (
         <p className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700">
