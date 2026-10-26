@@ -8,6 +8,7 @@ import { ChurchAccountCard } from "@/components/ChurchAccountCard";
 import { ChurchTranslationHeader } from "@/components/ChurchTranslationHeader";
 import { ContactFootnote } from "@/components/ContactFootnote";
 import { TranslationAudienceCard } from "@/components/TranslationAudienceCard";
+import { TranslationCaptionCard } from "@/components/TranslationCaptionCard";
 import { TranslationLanguageCard } from "@/components/TranslationLanguageCard";
 import { TranslationSetupSummary } from "@/components/TranslationSetupSummary";
 import { TranslationUsageCard } from "@/components/TranslationUsageCard";
@@ -17,6 +18,7 @@ import {
 } from "@/lib/operatorLogin";
 import { expireOperatorSession, useOperatorSessionGuard } from "@/lib/useOperatorSessionGuard";
 import { isOperatorSessionTiming } from "@/lib/operatorSessionState";
+import { clearTranslationCaptions } from "@/lib/translationCaptionBroadcast";
 import {
   clearTranslationListenState,
   loadTranslationRelayStatus,
@@ -99,6 +101,7 @@ export default function OperatorLanguagesPage() {
   } = useAudioTranslationOperator({
     churchSlug: account?.churchSlug,
     headsetLanguage,
+    sermonLanguage,
   });
 
   const handleUnauthorized = useCallback((reason?: OperatorLoginReason) => {
@@ -255,6 +258,13 @@ export default function OperatorLanguagesPage() {
             : "Phone relay: Failed to clear listen state."
         );
       });
+      void clearTranslationCaptions(account.churchSlug).catch((error) => {
+        setRelayError(
+          error instanceof Error
+            ? `Captions: ${error.message}`
+            : "Captions: Failed to clear caption text."
+        );
+      });
     }
   }, [account, markAudienceLive, sessionStatus]);
 
@@ -394,6 +404,8 @@ export default function OperatorLanguagesPage() {
         ) : null}
 
         <TranslationAudienceCard />
+
+        <TranslationCaptionCard />
 
         <TranslationSetupSummary
           directionLabel={formatTranslationLanguagePair(

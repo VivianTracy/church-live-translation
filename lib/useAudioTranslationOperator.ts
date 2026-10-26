@@ -17,7 +17,12 @@ import {
   type ResolvedAudioTranslationDirection,
 } from "@/lib/audioTranslationDirection";
 import { detectSpeechLanguage } from "@/lib/detectSpeechLanguage";
-import type { TranslationLanguageCode } from "@/lib/translationLanguages";
+import { createTranslationCaptionPublisher } from "@/lib/translationCaptionBroadcast";
+import { resolveCaptionLanguages } from "@/lib/translationCaptionTrack";
+import type {
+  SermonLanguageCode,
+  TranslationLanguageCode,
+} from "@/lib/translationLanguages";
 import {
   getAudioInputSourceLabel,
   loadStoredAudioInputSource,
@@ -76,6 +81,7 @@ function deviceLabel(deviceId: string, devices: MediaDeviceInfo[], fallback: str
 export function useAudioTranslationOperator(options?: {
   churchSlug?: string;
   headsetLanguage?: TranslationLanguageCode;
+  sermonLanguage?: SermonLanguageCode;
 }) {
   const [session, setSession] = useState<OperatorSessionState>(
     INITIAL_OPERATOR_SESSION_STATE
@@ -116,6 +122,10 @@ export function useAudioTranslationOperator(options?: {
   );
   const sessionOutputLanguageRef = useRef<TranslationLanguageCode>("en");
   const headsetLanguageRef = useRef(options?.headsetLanguage);
+  const sermonLanguageRef = useRef(options?.sermonLanguage);
+  const captionPublisherRef = useRef<ReturnType<
+    typeof createTranslationCaptionPublisher
+  > | null>(null);
   const transcriptBufferRef = useRef("");
   const languageLockedRef = useRef(false);
   const preserveAutoDetectionRef = useRef(false);
@@ -131,6 +141,7 @@ export function useAudioTranslationOperator(options?: {
     translationDirection === "auto" ? resolvedDirection : null
   );
   const settingsLocked = isOperatorSessionLocked(session.status);
+  const churchSlug = options?.churchSlug || LOCAL_LISTEN_CHURCH_SLUG;
   const outputDeviceLabel = deviceLabel(
     outputDeviceId,
     outputDevices,
@@ -143,7 +154,8 @@ export function useAudioTranslationOperator(options?: {
 
   useEffect(() => {
     headsetLanguageRef.current = options?.headsetLanguage;
-  }, [options?.headsetLanguage]);
+    sermonLanguageRef.current = options?.sermonLanguage;
+  }, [options?.headsetLanguage, options?.sermonLanguage]);
 
   const applySession = useCallback((next: OperatorSessionState) => {
     sessionRef.current = next;
@@ -218,6 +230,8 @@ export function useAudioTranslationOperator(options?: {
       sessionGenerationRef.current += 1;
       connectionRef.current?.stop();
       connectionRef.current = null;
+      captionPublisherRef.current?.stop();
+      captionPublisherRef.current = null;
     };
   }, []);
 
@@ -342,6 +356,8 @@ export function useAudioTranslationOperator(options?: {
   const tearDownConnection = useCallback(() => {
     connectionRef.current?.stop();
     connectionRef.current = null;
+    captionPublisherRef.current?.stop();
+    captionPublisherRef.current = null;
     startingRef.current = false;
     uploadWavChunkRef.current = null;
     setIsTranslating(false);
@@ -362,7 +378,7 @@ export function useAudioTranslationOperator(options?: {
       setMicError("");
       resetSessionMeters();
       uploadWavChunkRef.current = createTranslationWavUploader(
-        options?.churchSlug || LOCAL_LISTEN_CHURCH_SLUG,
+        churchSlug,
         setAudienceBroadcastError,
         () => {
           setChunksUploaded((count) => count + 1);
@@ -429,6 +445,26 @@ export function useAudioTranslationOperator(options?: {
 
         sessionOutputLanguageRef.current = startingOutputLanguage;
 
+        captionPublisherRef.current?.stop();
+        const captionPublisher = createTranslationCaptionPublisher({
+          churchSlug,
+          getLanguage: (track) =>
+            resolveCaptionLanguages({
+              sermonLanguage: sermonLanguageRef.current,
+              headsetLanguage: headsetLanguageRef.current,
+              direction: translationDirectionRef.current,
+              resolvedDirection: resolvedDirectionRef.current,
+            })[track],
+          onError: (message) => {
+            setAudienceBroadcastError(message);
+          },
+        });
+        captionPublisherRef.current = captionPublisher;
+
+        if (reason === "user") {
+          captionPublisher.clear();
+        }
+
         const connection = await connectOpenAIAudioTranslation({
           deviceId: resolvedInput.deviceId,
           outputDeviceId: outputDeviceIdRef.current || undefined,
@@ -451,6 +487,20 @@ export function useAudioTranslationOperator(options?: {
             }));
           },
           onInputTranscript: handleInputTranscript,
+          onCaption: (update) => {
+            const publisher = captionPublisherRef.current;
+
+            if (!publisher) {
+              return;
+            }
+
+            if (update.final) {
+              publisher.finish(update.track, update.text);
+              return;
+            }
+
+            publisher.append(update.track, update.text);
+          },
           onFirstOutputAudio: () => {
             if (sessionStartedAtRef.current !== null) {
               setLatencyMs(Date.now() - sessionStartedAtRef.current);
@@ -491,6 +541,8 @@ export function useAudioTranslationOperator(options?: {
 
         if (sessionGenerationRef.current !== generation) {
           connection.stop();
+          captionPublisherRef.current?.stop();
+          captionPublisherRef.current = null;
           startingRef.current = false;
           return false;
         }
@@ -502,6 +554,8 @@ export function useAudioTranslationOperator(options?: {
         );
         return true;
       } catch (error) {
+        captionPublisherRef.current?.stop();
+        captionPublisherRef.current = null;
         const message = error instanceof Error ? error.message : String(error);
 
         if (sessionGenerationRef.current !== generation) {
@@ -534,7 +588,7 @@ export function useAudioTranslationOperator(options?: {
     [
       applySession,
       handleInputTranscript,
-      options?.churchSlug,
+      churchSlug,
       resetSessionMeters,
       syncInputDeviceForSource,
       tearDownConnection,

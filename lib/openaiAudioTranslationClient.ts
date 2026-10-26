@@ -2,6 +2,7 @@ import { startAudioLevelMonitor } from "@/lib/audioLevelMonitor";
 import { clampAudioOutputVolume } from "@/lib/audioOutputVolumeStorage";
 import { pcm16ToBase64, startCompactedMicSender } from "@/lib/compactedMicSender";
 import { getTranslationMicrophoneStream } from "@/lib/microphoneStream";
+import type { CaptionTrack } from "@/lib/translationCaptionTrack";
 import type { TranslationLanguageCode } from "@/lib/translationLanguages";
 import { encodePcm16ToWavBase64, startAudioNodePcmUploader } from "@/lib/pcmAudioCapture";
 import {
@@ -152,6 +153,26 @@ function isInputTranscriptEvent(type: string | undefined): boolean {
   );
 }
 
+function isOutputTranscriptEvent(type: string | undefined): boolean {
+  if (!type) {
+    return false;
+  }
+
+  return (
+    type === "session.output_transcript.delta" ||
+    type === "session.output_transcript.done" ||
+    type.includes("output_transcript")
+  );
+}
+
+function isTranscriptFinal(type: string | undefined): boolean {
+  if (!type) {
+    return false;
+  }
+
+  return type.endsWith(".done") || type.endsWith(".completed");
+}
+
 export type AudioTranslationConnection = {
   stop: () => void;
   setOutputDeviceId: (deviceId: string) => Promise<void>;
@@ -168,6 +189,11 @@ type ConnectOptions = {
   onInputLevels: (level: number, peak: number) => void;
   onOutputLevels: (level: number, peak: number) => void;
   onInputTranscript?: (delta: string) => void;
+  onCaption?: (update: {
+    track: CaptionTrack;
+    text: string;
+    final: boolean;
+  }) => void;
   onFirstOutputAudio?: () => void;
   onWavChunk?: (wavBase64: string) => void;
   onSessionEvent?: (sessionEventId: string | null) => void;
@@ -290,6 +316,45 @@ export async function connectOpenAIAudioTranslation(
 
     connectionLostNotified = true;
     options.onConnectionLost(`Translation connection ${state}.`);
+  };
+
+  const dispatchTranscriptEvent = (event: RealtimeTranslationEvent): boolean => {
+    const type = event.type;
+    const outputTranscript = isOutputTranscriptEvent(type);
+
+    if (!outputTranscript && !isInputTranscriptEvent(type)) {
+      return false;
+    }
+
+    const deltaText = readTranscriptText(event);
+    const final = isTranscriptFinal(type);
+    const captionText =
+      final && typeof event.transcript === "string" && event.transcript
+        ? event.transcript
+        : deltaText;
+    const track: CaptionTrack = outputTranscript ? "translation" : "original";
+
+    if (outputTranscript && !hasReceivedOutput) {
+      hasReceivedOutput = true;
+      options.onTranslatingChange(true);
+      options.onFirstOutputAudio?.();
+    }
+
+    if (track === "original" && deltaText) {
+      options.onInputTranscript?.(deltaText);
+    }
+
+    try {
+      if (final) {
+        options.onCaption?.({ track, text: captionText, final: true });
+      } else if (captionText) {
+        options.onCaption?.({ track, text: captionText, final: false });
+      }
+    } catch {
+      // Caption publishing must not affect headset audio.
+    }
+
+    return true;
   };
 
   try {
@@ -475,23 +540,7 @@ export async function connectOpenAIAudioTranslation(
             return;
           }
 
-          if (event.type === "session.output_transcript.delta") {
-            if (!hasReceivedOutput) {
-              hasReceivedOutput = true;
-              options.onTranslatingChange(true);
-              options.onFirstOutputAudio?.();
-            }
-
-            return;
-          }
-
-          if (isInputTranscriptEvent(event.type)) {
-            const text = readTranscriptText(event);
-
-            if (text) {
-              options.onInputTranscript?.(text);
-            }
-
+          if (dispatchTranscriptEvent(event)) {
             return;
           }
 
@@ -712,23 +761,7 @@ export async function connectOpenAIAudioTranslation(
         return;
       }
 
-      if (event.type === "session.output_transcript.delta") {
-        if (!hasReceivedOutput) {
-          hasReceivedOutput = true;
-          options.onTranslatingChange(true);
-          options.onFirstOutputAudio?.();
-        }
-
-        return;
-      }
-
-      if (isInputTranscriptEvent(event.type)) {
-        const text = readTranscriptText(event);
-
-        if (text) {
-          options.onInputTranscript?.(text);
-        }
-
+      if (dispatchTranscriptEvent(event)) {
         return;
       }
 

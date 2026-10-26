@@ -1,4 +1,7 @@
-import { getTranslationListenUrl } from "@/lib/audienceUrl";
+import {
+  getTranslationCaptionUrl,
+  getTranslationListenUrl,
+} from "@/lib/audienceUrl";
 import { requiresChurchLogin } from "@/lib/audioTranslationSessionMode";
 import { getChurchOperatorFromRequest } from "@/lib/churchOperatorAccess";
 import { LOCAL_LISTEN_CHURCH_SLUG } from "@/lib/churchSlug";
@@ -45,6 +48,10 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     listenUrl: getTranslationListenUrl(origin, churchSlug),
+    captionUrls: {
+      original: getTranslationCaptionUrl(origin, churchSlug, "original"),
+      translation: getTranslationCaptionUrl(origin, churchSlug, "translation"),
+    },
     churchSlug,
     source,
   });

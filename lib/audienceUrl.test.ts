@@ -1,4 +1,7 @@
-import { getTranslationListenUrl } from "@/lib/audienceUrl";
+import {
+  getTranslationCaptionUrl,
+  getTranslationListenUrl,
+} from "@/lib/audienceUrl";
 import { shouldProxyTranslationRelay } from "@/lib/translationRelayProxy";
 import {
   getTranslationRelayApiUrl,
@@ -18,6 +21,17 @@ describe("audience listen URL", () => {
     expect(getTranslationListenUrl("http://localhost:3000", "pvccc")).toBe(
       "https://church-translation.vercel.app/listen/pvccc"
     );
+  });
+
+  it("builds original and translation caption URLs on the same site", () => {
+    vi.stubEnv("NEXT_PUBLIC_AUDIENCE_URL", "https://church-translation.vercel.app/");
+
+    expect(getTranslationCaptionUrl("http://localhost:3000", "pvccc", "original")).toBe(
+      "https://church-translation.vercel.app/captions/pvccc/original"
+    );
+    expect(
+      getTranslationCaptionUrl("http://localhost:3000", "pvccc", "translation")
+    ).toBe("https://church-translation.vercel.app/captions/pvccc/translation");
   });
 
   it("falls back to the current origin when no audience URL is set", () => {
