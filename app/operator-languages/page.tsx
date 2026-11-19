@@ -7,6 +7,7 @@ import { AudioTranslationStatusCard } from "@/components/AudioTranslationStatusC
 import { ChurchAccountCard } from "@/components/ChurchAccountCard";
 import { ChurchTranslationHeader } from "@/components/ChurchTranslationHeader";
 import { ContactFootnote } from "@/components/ContactFootnote";
+import { PhoneSecondLanguageCard } from "@/components/PhoneSecondLanguageCard";
 import { TranslationAudienceCard } from "@/components/TranslationAudienceCard";
 import { TranslationCaptionCard } from "@/components/TranslationCaptionCard";
 import { TranslationLanguageCard } from "@/components/TranslationLanguageCard";
@@ -404,6 +405,13 @@ export default function OperatorLanguagesPage() {
         ) : null}
 
         <TranslationAudienceCard />
+
+        <PhoneSecondLanguageCard
+          churchSlug={account?.churchSlug}
+          deviceId={micDeviceId}
+          primaryLive={sessionStatus === "live"}
+          blockedLanguage={headsetLanguage}
+        />
 
         <TranslationCaptionCard />
 

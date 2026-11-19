@@ -13,6 +13,7 @@ import {
   readRecentLiveHint,
   writeLiveHint,
 } from "@/lib/translationListenCursor";
+import type { TranslationAudioLine } from "@/lib/translationPhoneLine";
 import {
   EMPTY_TRANSLATION_LISTEN_STATE,
   isTranslationSessionLive,
@@ -26,11 +27,13 @@ const NOT_LIVE_CONFIRMATIONS = 3;
 type TranslationListenPageProps = {
   churchSlug: string;
   churchName?: string;
+  line?: TranslationAudioLine;
 };
 
 export function TranslationListenPage({
   churchSlug,
   churchName: initialChurchName = "",
+  line = "primary",
 }: TranslationListenPageProps) {
   const parsedSlug = parseChurchSlug(churchSlug);
   const [state, setState] = useState(EMPTY_TRANSLATION_LISTEN_STATE);
@@ -62,8 +65,8 @@ export function TranslationListenPage({
     const loadState = async () => {
       try {
         const [listenResult, audioResult] = await Promise.allSettled([
-          loadTranslationListenState(parsedSlug),
-          fetchTranslationAudioAfter(parsedSlug, LATEST_AUDIO_SEQUENCE),
+          loadTranslationListenState(parsedSlug, line),
+          fetchTranslationAudioAfter(parsedSlug, LATEST_AUDIO_SEQUENCE, line),
         ]);
 
         if (
@@ -137,7 +140,7 @@ export function TranslationListenPage({
       window.removeEventListener("visibilitychange", retryNow);
       window.removeEventListener("pageshow", retryNow);
     };
-  }, [initialChurchName, parsedSlug]);
+  }, [initialChurchName, line, parsedSlug]);
 
   useEffect(() => {
     if (!isPlaying || !parsedSlug) {
@@ -158,7 +161,8 @@ export function TranslationListenPage({
         if (resyncRef.current) {
           const liveEdge = await fetchTranslationAudioAfter(
             parsedSlug,
-            LATEST_AUDIO_SEQUENCE
+            LATEST_AUDIO_SEQUENCE,
+            line
           );
 
           if (cancelled) {
@@ -171,7 +175,8 @@ export function TranslationListenPage({
 
         const payload = await fetchTranslationAudioAfter(
           parsedSlug,
-          lastSeqRef.current
+          lastSeqRef.current,
+          line
         );
 
         if (cancelled) {
@@ -249,7 +254,7 @@ export function TranslationListenPage({
       window.removeEventListener("online", retryNow);
       window.removeEventListener("visibilitychange", retryNow);
     };
-  }, [isPlaying, parsedSlug]);
+  }, [isPlaying, line, parsedSlug]);
 
   useEffect(() => {
     if (!wasLiveRef.current || state.isLive || !isPlaying) {
@@ -289,7 +294,8 @@ export function TranslationListenPage({
       try {
         const payload = await fetchTranslationAudioAfter(
           parsedSlug,
-          LATEST_AUDIO_SEQUENCE
+          LATEST_AUDIO_SEQUENCE,
+          line
         );
         lastSeqRef.current = liveListenCursor(payload.meta.latestSeq);
       } catch {
@@ -317,9 +323,13 @@ export function TranslationListenPage({
           <p className="text-sm font-semibold uppercase tracking-wide text-emerald-400">
             Church Translation
           </p>
-          <h1 className="mt-2 text-3xl font-bold">Live translation</h1>
+          <h1 className="mt-2 text-3xl font-bold">
+            {line === "phone" ? "Second language" : "Live translation"}
+          </h1>
           <p className="mt-2 text-zinc-400">
-            {churchName || "教会翻译 · 点击收听"}
+            {line === "phone"
+              ? "Phone only. Use headphones."
+              : churchName || "教会翻译 · 点击收听"}
           </p>
         </div>
 

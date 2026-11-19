@@ -1,5 +1,8 @@
-import { withChurchSearchParam } from "@/lib/churchSlug";
 import { getTranslationRelayApiUrl } from "@/lib/translationRelayUrl";
+import {
+  withTranslationLineQuery,
+  type TranslationAudioLine,
+} from "@/lib/translationPhoneLine";
 
 export const TRANSLATION_BROADCAST_MIME_TYPE = "audio/wav";
 
@@ -21,11 +24,12 @@ export function uploadTranslationWavChunk(
   churchSlug: string,
   wavBase64: string,
   onError: (message: string) => void,
-  onUploaded?: () => void
+  onUploaded?: () => void,
+  line: TranslationAudioLine = "primary"
 ): void {
   void fetch(
     getTranslationRelayApiUrl(
-      withChurchSearchParam("/api/translation-audio", churchSlug)
+      withTranslationLineQuery("/api/translation-audio", churchSlug, line)
     ),
     {
       method: "POST",
@@ -58,7 +62,8 @@ export function uploadTranslationWavChunk(
 export function createTranslationWavUploader(
   churchSlug: string,
   onError: (message: string) => void,
-  onUploaded?: () => void
+  onUploaded?: () => void,
+  line: TranslationAudioLine = "primary"
 ) {
   let lastErrorAt = 0;
 
@@ -80,7 +85,8 @@ export function createTranslationWavUploader(
         lastErrorAt = now;
         onError(message);
       },
-      onUploaded
+      onUploaded,
+      line
     );
   };
 }

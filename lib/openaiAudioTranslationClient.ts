@@ -185,6 +185,8 @@ type ConnectOptions = {
   outputDeviceId?: string;
   outputVolume?: number;
   outputLanguage?: TranslationLanguageCode;
+  /** Phone-only sessions upload audio and do not play through the transmitter. */
+  playLocally?: boolean;
   onTranslatingChange: (isTranslating: boolean) => void;
   onInputLevels: (level: number, peak: number) => void;
   onOutputLevels: (level: number, peak: number) => void;
@@ -291,6 +293,7 @@ export async function connectOpenAIAudioTranslation(
   let outputDeviceId = options.outputDeviceId ?? "";
   let outputVolume = clampAudioOutputVolume(options.outputVolume ?? 1);
   let outputLanguage = options.outputLanguage ?? "en";
+  const playLocally = options.playLocally !== false;
   let pendingOutputLanguage: TranslationLanguageCode | null = null;
   let hasReceivedOutput = false;
   let attachGeneration = 0;
@@ -431,7 +434,9 @@ export async function connectOpenAIAudioTranslation(
           await playback.context.resume();
         }
 
-        await playRoutedAudio(transmitterAudio, playback.stream, outputDeviceId);
+        if (playLocally) {
+          await playRoutedAudio(transmitterAudio, playback.stream, outputDeviceId);
+        }
 
         const stopLevels = startAudioLevelMonitor(
           playback.analyser,
@@ -653,9 +658,11 @@ export async function connectOpenAIAudioTranslation(
       let captureStream = outputStream;
 
       try {
-        transmitterAudio.volume = outputVolume;
-        await playRoutedAudio(transmitterAudio, outputStream, outputDeviceId);
-        captureStream = getPlayedAudioStream(transmitterAudio, outputStream);
+        if (playLocally) {
+          transmitterAudio.volume = outputVolume;
+          await playRoutedAudio(transmitterAudio, outputStream, outputDeviceId);
+          captureStream = getPlayedAudioStream(transmitterAudio, outputStream);
+        }
       } catch (error) {
         if (generation === attachGeneration && !stopped) {
           options.onError(

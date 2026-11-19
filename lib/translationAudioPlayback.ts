@@ -1,5 +1,8 @@
 import type { TranslationAudioChunk } from "@/types/translationListen";
-import { withChurchSearchParam } from "@/lib/churchSlug";
+import {
+  withTranslationLineQuery,
+  type TranslationAudioLine,
+} from "@/lib/translationPhoneLine";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 function base64ToBytes(base64: string): Uint8Array {
@@ -307,12 +310,14 @@ export class TranslationAudioChunkPlayer {
 
 export async function fetchTranslationAudioAfter(
   churchSlug: string,
-  afterSeq: number
+  afterSeq: number,
+  line: TranslationAudioLine = "primary"
 ) {
   const response = await fetchWithTimeout(
-    withChurchSearchParam(
+    withTranslationLineQuery(
       `/api/translation-audio?after=${afterSeq}`,
-      churchSlug
+      churchSlug,
+      line
     ),
     {
       cache: "no-store",

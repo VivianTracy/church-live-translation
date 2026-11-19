@@ -1,4 +1,5 @@
 import { getTranslationListenPath } from "@/lib/churchSlug";
+import { getPhoneTranslationListenPath } from "@/lib/translationPhoneLine";
 import {
   getTranslationCaptionPath,
   type CaptionTrack,
@@ -24,6 +25,13 @@ export function getTranslationListenUrl(
   churchSlug: string
 ): string {
   return getPublicAudienceUrl(origin, getTranslationListenPath(churchSlug));
+}
+
+export function getPhoneTranslationListenUrl(
+  origin: string | undefined,
+  churchSlug: string
+): string {
+  return getPublicAudienceUrl(origin, getPhoneTranslationListenPath(churchSlug));
 }
 
 export function getTranslationCaptionUrl(

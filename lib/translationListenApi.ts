@@ -1,5 +1,9 @@
 import { withChurchSearchParam } from "@/lib/churchSlug";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+import {
+  withTranslationLineQuery,
+  type TranslationAudioLine,
+} from "@/lib/translationPhoneLine";
 import { getTranslationRelayApiUrl } from "@/lib/translationRelayUrl";
 import type { TranslationListenState } from "@/types/translationListen";
 
@@ -33,11 +37,12 @@ async function readApiError(response: Response, fallback: string): Promise<strin
 
 export async function saveTranslationListenState(
   state: TranslationListenState,
-  churchSlug: string
+  churchSlug: string,
+  line: TranslationAudioLine = "primary"
 ): Promise<void> {
   const response = await fetchTranslationRelay(
     getTranslationRelayApiUrl(
-      withChurchSearchParam("/api/translation-listen-state", churchSlug)
+      withTranslationLineQuery("/api/translation-listen-state", churchSlug, line)
     ),
     {
       method: "POST",
@@ -56,10 +61,11 @@ export async function saveTranslationListenState(
 }
 
 export async function loadTranslationListenState(
-  churchSlug: string
+  churchSlug: string,
+  line: TranslationAudioLine = "primary"
 ): Promise<TranslationListenState & { churchName?: string | null }> {
   const response = await fetchWithTimeout(
-    withChurchSearchParam("/api/translation-listen-state", churchSlug),
+    withTranslationLineQuery("/api/translation-listen-state", churchSlug, line),
     {
       cache: "no-store",
     },
@@ -83,11 +89,13 @@ export async function loadTranslationListenState(
 }
 
 export async function clearTranslationListenState(
-  churchSlug: string
+  churchSlug: string,
+  line: TranslationAudioLine = "primary"
 ): Promise<void> {
   await saveTranslationListenState(
     { isLive: false, updatedAt: Date.now() },
-    churchSlug
+    churchSlug,
+    line
   );
 }
 

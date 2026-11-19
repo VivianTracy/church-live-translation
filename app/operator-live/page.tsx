@@ -7,12 +7,16 @@ import { AudioTranslationStatusCard } from "@/components/AudioTranslationStatusC
 import { ChurchAccountCard } from "@/components/ChurchAccountCard";
 import { ChurchTranslationHeader } from "@/components/ChurchTranslationHeader";
 import { ContactFootnote } from "@/components/ContactFootnote";
+import { PhoneSecondLanguageCard } from "@/components/PhoneSecondLanguageCard";
 import { TranslationAudienceCard } from "@/components/TranslationAudienceCard";
 import { TranslationCaptionCard } from "@/components/TranslationCaptionCard";
 import { TranslationDirectionCard } from "@/components/TranslationDirectionCard";
 import { TranslationSetupSummary } from "@/components/TranslationSetupSummary";
 import { TranslationUsageCard } from "@/components/TranslationUsageCard";
-import { formatAudioTranslationDirectionLabel } from "@/lib/audioTranslationDirection";
+import {
+  formatAudioTranslationDirectionLabel,
+  getAudioTranslationDirectionConfig,
+} from "@/lib/audioTranslationDirection";
 import { OPERATOR_LANGUAGES_PATH } from "@/lib/operatorRoutes";
 import Link from "next/link";
 import {
@@ -381,6 +385,18 @@ export default function OperatorLivePage() {
         ) : null}
 
         <TranslationAudienceCard />
+
+        <PhoneSecondLanguageCard
+          churchSlug={account?.churchSlug}
+          deviceId={micDeviceId}
+          primaryLive={sessionStatus === "live"}
+          blockedLanguage={
+            getAudioTranslationDirectionConfig(
+              translationDirection,
+              translationDirection === "auto" ? resolvedDirection : null
+            ).outputLanguage
+          }
+        />
 
         <TranslationCaptionCard />
 

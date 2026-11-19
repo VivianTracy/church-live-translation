@@ -13,6 +13,11 @@ import {
   translationRelayOptionsResponse,
 } from "@/lib/translationRelayCors";
 import {
+  InvalidTranslationLineError,
+  readTranslationAudioLine,
+  translationAudioStreamId,
+} from "@/lib/translationPhoneLine";
+import {
   proxyTranslationRelay,
   shouldProxyTranslationRelay,
 } from "@/lib/translationRelayProxy";
@@ -35,6 +40,14 @@ function errorResponse(request: NextRequest, error: unknown, fallback: string) {
     );
   }
 
+  if (error instanceof InvalidTranslationLineError) {
+    return translationRelayJsonResponse(
+      request,
+      { error: error.message },
+      { status: 400 }
+    );
+  }
+
   const message = error instanceof Error ? error.message : fallback;
 
   return translationRelayJsonResponse(request, { error: message }, { status: 500 });
@@ -53,9 +66,13 @@ export async function GET(request: NextRequest) {
     const { slug, church } = await requireListenChurchSlug(
       request.nextUrl.searchParams.get("church")
     );
+    const streamId = translationAudioStreamId(
+      slug,
+      readTranslationAudioLine(request.nextUrl.searchParams.get("line"))
+    );
 
     return translationRelayJsonResponse(request, {
-      ...(await getTranslationListenState(slug)),
+      ...(await getTranslationListenState(streamId)),
       churchName: church?.name ?? null,
       relayConfigured: isTranslationRelayConfigured(),
     });
@@ -73,6 +90,10 @@ export async function POST(request: NextRequest) {
     const { slug } = await requireListenChurchSlug(
       request.nextUrl.searchParams.get("church")
     );
+    const streamId = translationAudioStreamId(
+      slug,
+      readTranslationAudioLine(request.nextUrl.searchParams.get("line"))
+    );
     const body = (await request.json()) as { isLive?: boolean };
 
     if (typeof body.isLive !== "boolean") {
@@ -83,7 +104,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await setTranslationListenLive(slug, body.isLive);
+    await setTranslationListenLive(streamId, body.isLive);
 
     return translationRelayJsonResponse(request, { success: true });
   } catch (error) {
