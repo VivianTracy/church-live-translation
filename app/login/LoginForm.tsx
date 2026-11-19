@@ -2,18 +2,14 @@
 
 import { claimOperatorLogin } from "@/lib/operatorLoginClient";
 import { operatorLoginReasonMessage } from "@/lib/operatorLogin";
-import { OPERATOR_CHOOSER_PATH } from "@/lib/operatorRoutes";
+import { operatorLoginNextPath } from "@/lib/operatorRoutes";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 function safeNextPath(value: string | null): string {
-  if (!value || value === "/") {
-    return OPERATOR_CHOOSER_PATH;
-  }
-
-  return value.startsWith("/") ? value : OPERATOR_CHOOSER_PATH;
+  return operatorLoginNextPath(value);
 }
 
 export function LoginForm() {

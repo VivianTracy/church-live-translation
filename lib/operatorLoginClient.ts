@@ -95,7 +95,8 @@ export async function redirectToOperatorLogin(reason?: OperatorLoginReason) {
   params.set(
     "next",
     operatorSessionReturnPath(
-      typeof window === "undefined" ? "" : window.location.pathname
+      typeof window === "undefined" ? "" : window.location.pathname,
+      typeof window === "undefined" ? "" : window.location.search
     )
   );
 

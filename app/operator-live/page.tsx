@@ -387,10 +387,8 @@ export default function OperatorLivePage() {
         <TranslationAudienceCard />
 
         <PhoneSecondLanguageCard
-          churchSlug={account?.churchSlug}
-          deviceId={micDeviceId}
           primaryLive={sessionStatus === "live"}
-          blockedLanguage={
+          headsetLanguage={
             getAudioTranslationDirectionConfig(
               translationDirection,
               translationDirection === "auto" ? resolvedDirection : null

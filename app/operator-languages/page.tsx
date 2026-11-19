@@ -407,10 +407,8 @@ export default function OperatorLanguagesPage() {
         <TranslationAudienceCard />
 
         <PhoneSecondLanguageCard
-          churchSlug={account?.churchSlug}
-          deviceId={micDeviceId}
           primaryLive={sessionStatus === "live"}
-          blockedLanguage={headsetLanguage}
+          headsetLanguage={headsetLanguage}
         />
 
         <TranslationCaptionCard />

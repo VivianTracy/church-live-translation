@@ -1,4 +1,7 @@
-import { operatorSessionReturnPath } from "@/lib/operatorRoutes";
+import {
+  operatorLoginNextPath,
+  operatorSessionReturnPath,
+} from "@/lib/operatorRoutes";
 import {
   DEFAULT_HEADSET_LANGUAGE,
   DEFAULT_SERMON_LANGUAGE,
@@ -130,5 +133,16 @@ describe("translation languages", () => {
       "/operator-languages"
     );
     expect(operatorSessionReturnPath("/operator")).toBe("/operator-live");
+    expect(operatorSessionReturnPath("/operator-phone", "?line=ab23cd")).toBe(
+      "/operator-phone?line=ab23cd"
+    );
+    expect(operatorSessionReturnPath("/operator-phone", "?line=phone")).toBe(
+      "/operator-live"
+    );
+    expect(operatorLoginNextPath("/operator-phone?line=ab23cd")).toBe(
+      "/operator-phone?line=ab23cd"
+    );
+    expect(operatorLoginNextPath("/operator-live")).toBe("/operator-live");
+    expect(operatorLoginNextPath("//evil.example")).toBe("/operator");
   });
 });

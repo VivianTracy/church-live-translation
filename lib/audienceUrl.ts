@@ -29,9 +29,13 @@ export function getTranslationListenUrl(
 
 export function getPhoneTranslationListenUrl(
   origin: string | undefined,
-  churchSlug: string
+  churchSlug: string,
+  lineId: string
 ): string {
-  return getPublicAudienceUrl(origin, getPhoneTranslationListenPath(churchSlug));
+  return getPublicAudienceUrl(
+    origin,
+    getPhoneTranslationListenPath(churchSlug, lineId)
+  );
 }
 
 export function getTranslationCaptionUrl(

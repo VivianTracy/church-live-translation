@@ -8,6 +8,7 @@ import {
   saveTranslationListenState,
 } from "@/lib/translationListenApi";
 import type { HeadsetLanguageCode } from "@/lib/translationLanguages";
+import { isPhoneLineId } from "@/lib/translationPhoneLine";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type PhoneLineStatus = "off" | "connecting" | "live" | "failed";
@@ -16,6 +17,7 @@ export function usePhoneTranslationLine(options: {
   churchSlug?: string;
   deviceId: string;
   primaryLive: boolean;
+  lineId: string;
 }) {
   const [status, setStatus] = useState<PhoneLineStatus>("off");
   const [error, setError] = useState("");
@@ -29,12 +31,14 @@ export function usePhoneTranslationLine(options: {
   const churchSlugRef = useRef(churchSlug);
   const deviceIdRef = useRef(options.deviceId);
   const primaryLiveRef = useRef(options.primaryLive);
+  const lineIdRef = useRef(options.lineId);
 
   useEffect(() => {
     churchSlugRef.current = churchSlug;
     deviceIdRef.current = options.deviceId;
     primaryLiveRef.current = options.primaryLive;
-  }, [churchSlug, options.deviceId, options.primaryLive]);
+    lineIdRef.current = options.lineId;
+  }, [churchSlug, options.deviceId, options.lineId, options.primaryLive]);
 
   const stopPhoneLine = useCallback(() => {
     generationRef.current += 1;
@@ -46,8 +50,10 @@ export function usePhoneTranslationLine(options: {
     setChunksUploaded(0);
 
     const slug = churchSlugRef.current;
-    if (slug) {
-      void clearTranslationListenState(slug, "phone").catch(() => undefined);
+    const lineId = lineIdRef.current;
+
+    if (slug && isPhoneLineId(lineId)) {
+      void clearTranslationListenState(slug, lineId).catch(() => undefined);
     }
   }, []);
 
@@ -62,11 +68,17 @@ export function usePhoneTranslationLine(options: {
       return;
     }
 
+    const lineId = lineIdRef.current;
+
+    if (!isPhoneLineId(lineId)) {
+      return;
+    }
+
     const markLive = () => {
       void saveTranslationListenState(
         { isLive: true, updatedAt: Date.now() },
         churchSlug,
-        "phone"
+        lineId
       ).catch((markError) => {
         setError(
           markError instanceof Error
@@ -86,14 +98,28 @@ export function usePhoneTranslationLine(options: {
       generationRef.current += 1;
       const connection = connectionRef.current;
       connectionRef.current = null;
+      activeRef.current = false;
       void connection?.then((session) => session.stop());
+
+      const slug = churchSlugRef.current;
+      const lineId = lineIdRef.current;
+
+      if (slug && isPhoneLineId(lineId)) {
+        void clearTranslationListenState(slug, lineId).catch(() => undefined);
+      }
     };
   }, []);
 
   const startPhoneLine = useCallback(
-    async (language: HeadsetLanguageCode) => {
-      if (!primaryLiveRef.current || activeRef.current) {
+    async (language: HeadsetLanguageCode, inputDeviceId = "") => {
+      const lineId = lineIdRef.current;
+
+      if (!primaryLiveRef.current || activeRef.current || !isPhoneLineId(lineId)) {
         return;
+      }
+
+      if (inputDeviceId) {
+        deviceIdRef.current = inputDeviceId;
       }
 
       const generation = generationRef.current + 1;
@@ -108,14 +134,14 @@ export function usePhoneTranslationLine(options: {
         slug,
         (message) => setError(message),
         () => setChunksUploaded((count) => count + 1),
-        "phone"
+        lineId
       );
 
       try {
         await saveTranslationListenState(
           { isLive: true, updatedAt: Date.now() },
           slug,
-          "phone"
+          lineId
         );
 
         const connection = connectOpenAIAudioTranslation({
@@ -143,7 +169,7 @@ export function usePhoneTranslationLine(options: {
             setStatus("failed");
             activeRef.current = false;
             void connection.then((session) => session.stop());
-            void clearTranslationListenState(slug, "phone").catch(() => undefined);
+            void clearTranslationListenState(slug, lineId).catch(() => undefined);
           },
           onConnectionLost: () => {
             if (generationRef.current !== generation) {
@@ -154,7 +180,7 @@ export function usePhoneTranslationLine(options: {
             setStatus("failed");
             activeRef.current = false;
             void connection.then((session) => session.stop());
-            void clearTranslationListenState(slug, "phone").catch(() => undefined);
+            void clearTranslationListenState(slug, lineId).catch(() => undefined);
           },
         });
 
@@ -178,7 +204,7 @@ export function usePhoneTranslationLine(options: {
             ? startError.message
             : "Could not start phone translation."
         );
-        void clearTranslationListenState(slug, "phone").catch(() => undefined);
+        void clearTranslationListenState(slug, lineId).catch(() => undefined);
       }
     },
     []

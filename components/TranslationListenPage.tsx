@@ -36,6 +36,11 @@ export function TranslationListenPage({
   line = "primary",
 }: TranslationListenPageProps) {
   const parsedSlug = parseChurchSlug(churchSlug);
+  const listenHintId = parsedSlug
+    ? line === "primary"
+      ? parsedSlug
+      : `${parsedSlug}:${line}`
+    : "";
   const [state, setState] = useState(EMPTY_TRANSLATION_LISTEN_STATE);
   const [churchName, setChurchName] = useState(initialChurchName);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -52,10 +57,10 @@ export function TranslationListenPage({
   const unlockedAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    if (parsedSlug && readRecentLiveHint(parsedSlug)) {
+    if (parsedSlug && readRecentLiveHint(listenHintId)) {
       setState({ isLive: true, updatedAt: Date.now() });
     }
-  }, [parsedSlug]);
+  }, [listenHintId, parsedSlug]);
 
   useEffect(() => {
     if (!parsedSlug) {
@@ -90,7 +95,7 @@ export function TranslationListenPage({
         if (isLive) {
           notLiveCountRef.current = 0;
           wasLiveRef.current = true;
-          writeLiveHint(parsedSlug, true);
+          writeLiveHint(listenHintId, true);
           setState({
             isLive: true,
             updatedAt: Math.max(listenState.updatedAt, audioMeta.updatedAt),
@@ -98,7 +103,7 @@ export function TranslationListenPage({
         } else {
           notLiveCountRef.current += 1;
           if (notLiveCountRef.current >= NOT_LIVE_CONFIRMATIONS) {
-            writeLiveHint(parsedSlug, false);
+            writeLiveHint(listenHintId, false);
             setState({
               isLive: false,
               updatedAt: Math.max(listenState.updatedAt, audioMeta.updatedAt),
@@ -186,7 +191,7 @@ export function TranslationListenPage({
         if (payload.meta.isLive || payload.meta.latestSeq > 0) {
           notLiveCountRef.current = 0;
           wasLiveRef.current = true;
-          writeLiveHint(parsedSlug, true);
+          writeLiveHint(listenHintId, true);
           setState({
             isLive: true,
             updatedAt: payload.meta.updatedAt,
@@ -324,12 +329,12 @@ export function TranslationListenPage({
             Church Translation
           </p>
           <h1 className="mt-2 text-3xl font-bold">
-            {line === "phone" ? "Second language" : "Live translation"}
+            {line === "primary" ? "Live translation" : "Phone translation"}
           </h1>
           <p className="mt-2 text-zinc-400">
-            {line === "phone"
-              ? "Phone only. Use headphones."
-              : churchName || "教会翻译 · 点击收听"}
+            {line === "primary"
+              ? churchName || "教会翻译 · 点击收听"
+              : "Phone only. Use headphones."}
           </p>
         </div>
 
