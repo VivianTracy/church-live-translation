@@ -1,9 +1,9 @@
 import {
-  createPhoneLineId,
   defaultPhoneLineLanguage,
   getPhoneLineOperatorPath,
   getPhoneTranslationListenPath,
-  isPhoneLineId,
+  headsetLanguageFromPhoneLine,
+  phoneLanguageSlug,
   readTranslationAudioLine,
   translationAudioStreamId,
   withTranslationLineQuery,
@@ -12,25 +12,26 @@ import {
 import { describe, expect, it } from "vitest";
 
 describe("phone translation line", () => {
-  it("keeps the primary church stream and stores each phone window separately", () => {
+  it("stores each phone language separately from the headset stream", () => {
     expect(translationAudioStreamId("pvccc", "primary")).toBe("pvccc");
-    expect(translationAudioStreamId("pvccc", "ab23cd")).toBe(
-      "pvccc:phone:ab23cd"
+    expect(translationAudioStreamId("pvccc", "english")).toBe(
+      "pvccc:phone:english"
     );
-    expect(translationAudioStreamId("pvccc", "k7m2np")).not.toBe(
-      translationAudioStreamId("pvccc", "ab23cd")
+    expect(translationAudioStreamId("pvccc", "chinese")).toBe(
+      "pvccc:phone:chinese"
     );
     expect(readTranslationAudioLine(null)).toBe("primary");
-    expect(readTranslationAudioLine("ab23cd")).toBe("ab23cd");
+    expect(readTranslationAudioLine("english")).toBe("english");
+    expect(readTranslationAudioLine("zh")).toBe("chinese");
     expect(() => readTranslationAudioLine("phone")).toThrow(
       InvalidTranslationLineError
     );
-    expect(() => readTranslationAudioLine("caption")).toThrow(
+    expect(() => readTranslationAudioLine("thai")).toThrow(
       InvalidTranslationLineError
     );
   });
 
-  it("adds the phone line only to that window's requests", () => {
+  it("puts the selected language in the public listen address", () => {
     expect(
       withTranslationLineQuery("/api/translation-audio?after=3", "pvccc")
     ).toBe("/api/translation-audio?after=3&church=pvccc");
@@ -38,28 +39,18 @@ describe("phone translation line", () => {
       withTranslationLineQuery(
         "/api/translation-audio?after=3",
         "pvccc",
-        "ab23cd"
+        "english"
       )
-    ).toBe("/api/translation-audio?after=3&church=pvccc&line=ab23cd");
-    expect(getPhoneTranslationListenPath("pvccc", "ab23cd")).toBe(
-      "/listen/pvccc/phone/ab23cd"
+    ).toBe("/api/translation-audio?after=3&church=pvccc&line=english");
+    expect(getPhoneTranslationListenPath("pvccc", "en")).toBe(
+      "/listen/pvccc/phone/english"
     );
-    expect(getPhoneLineOperatorPath("ab23cd")).toBe(
-      "/operator-phone?line=ab23cd"
+    expect(getPhoneTranslationListenPath("pvccc", phoneLanguageSlug("vi"))).toBe(
+      "/listen/pvccc/phone/vietnamese"
     );
-  });
-
-  it("creates a short id for each new window", () => {
-    const ids = new Set(Array.from({ length: 20 }, () => createPhoneLineId()));
-
-    expect(ids.size).toBe(20);
-
-    for (const id of ids) {
-      expect(isPhoneLineId(id)).toBe(true);
-    }
-
-    expect(isPhoneLineId("phone")).toBe(false);
-    expect(isPhoneLineId("abc")).toBe(false);
+    expect(getPhoneLineOperatorPath()).toBe("/operator-phone");
+    expect(headsetLanguageFromPhoneLine("Chinese")).toBe("zh");
+    expect(headsetLanguageFromPhoneLine("caption")).toBeNull();
   });
 
   it("picks a phone language that is not the headset language", () => {

@@ -4,10 +4,7 @@ import {
   clearPhoneLineOperatorLive,
   writePhoneLineOperatorContext,
 } from "@/lib/phoneLineOperatorContext";
-import {
-  createPhoneLineId,
-  getPhoneLineOperatorPath,
-} from "@/lib/translationPhoneLine";
+import { getPhoneLineOperatorPath } from "@/lib/translationPhoneLine";
 import type { HeadsetLanguageCode } from "@/lib/translationLanguages";
 import { useEffect, useState } from "react";
 
@@ -48,10 +45,9 @@ export function PhoneSecondLanguageCard({
       <button
         type="button"
         onClick={() => {
-          const lineId = createPhoneLineId();
           const popup = window.open(
-            getPhoneLineOperatorPath(lineId),
-            `church-phone-${lineId}`,
+            getPhoneLineOperatorPath(),
+            `church-phone-${Date.now()}`,
             "popup,width=460,height=900"
           );
 

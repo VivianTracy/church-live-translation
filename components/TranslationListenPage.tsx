@@ -13,7 +13,11 @@ import {
   readRecentLiveHint,
   writeLiveHint,
 } from "@/lib/translationListenCursor";
-import type { TranslationAudioLine } from "@/lib/translationPhoneLine";
+import { TRANSLATION_LANGUAGE_LABELS } from "@/lib/translationLanguages";
+import {
+  headsetLanguageFromPhoneLine,
+  type TranslationAudioLine,
+} from "@/lib/translationPhoneLine";
 import {
   EMPTY_TRANSLATION_LISTEN_STATE,
   isTranslationSessionLive,
@@ -320,6 +324,8 @@ export function TranslationListenPage({
 
   const listenDisabled = !parsedSlug;
   const listenLabel = isPlaying ? "Tap to restart sound" : "Tap to Listen";
+  const phoneLanguage =
+    line === "primary" ? null : headsetLanguageFromPhoneLine(line);
 
   return (
     <main className="min-h-screen bg-stone-950 px-5 py-10 text-white">
@@ -329,7 +335,11 @@ export function TranslationListenPage({
             Church Translation
           </p>
           <h1 className="mt-2 text-3xl font-bold">
-            {line === "primary" ? "Live translation" : "Phone translation"}
+            {line === "primary"
+              ? "Live translation"
+              : phoneLanguage
+                ? TRANSLATION_LANGUAGE_LABELS[phoneLanguage]
+                : "Phone translation"}
           </h1>
           <p className="mt-2 text-zinc-400">
             {line === "primary"

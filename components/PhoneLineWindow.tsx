@@ -24,9 +24,8 @@ import {
 } from "@/lib/translationLanguages";
 import {
   defaultPhoneLineLanguage,
-  isPhoneLineId,
+  phoneLanguageSlug,
 } from "@/lib/translationPhoneLine";
-import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 type OperatorAccount = {
@@ -37,9 +36,6 @@ type OperatorAccount = {
 };
 
 export function PhoneLineWindow() {
-  const searchParams = useSearchParams();
-  const lineId = searchParams.get("line") ?? "";
-  const lineReady = isPhoneLineId(lineId);
   const [account, setAccount] = useState<OperatorAccount | null>(null);
   const [accountError, setAccountError] = useState("");
   const [idleDeadlineAt, setIdleDeadlineAt] = useState<string | null>(null);
@@ -49,6 +45,7 @@ export function PhoneLineWindow() {
   const [primaryLive, setPrimaryLive] = useState(false);
   const [listenUrl, setListenUrl] = useState("");
   const churchSlug = account?.churchSlug;
+  const lineId = phoneLanguageSlug(language);
 
   const { status, error, chunksUploaded, startPhoneLine, stopPhoneLine } =
     usePhoneTranslationLine({
@@ -75,11 +72,8 @@ export function PhoneLineWindow() {
   });
 
   useEffect(() => {
-    const languageLabel = TRANSLATION_LANGUAGE_LABELS[language];
-    document.title = lineReady
-      ? `${languageLabel} phone translation`
-      : "Phone translation";
-  }, [language, lineReady]);
+    document.title = `${TRANSLATION_LANGUAGE_LABELS[language]} phone translation`;
+  }, [language]);
 
   useEffect(() => {
     void fetch("/api/operator/me", { cache: "no-store" })
@@ -137,10 +131,6 @@ export function PhoneLineWindow() {
   }, []);
 
   useEffect(() => {
-    if (!lineReady) {
-      return;
-    }
-
     const slug = churchSlug || LOCAL_LISTEN_CHURCH_SLUG;
 
     void fetch("/api/audience-url")
@@ -153,24 +143,16 @@ export function PhoneLineWindow() {
           return;
         }
 
-        setListenUrl(getPhoneTranslationListenUrl(window.location.origin, slug, lineId));
+        setListenUrl(
+          getPhoneTranslationListenUrl(window.location.origin, slug, lineId)
+        );
       })
       .catch(() => {
-        setListenUrl(getPhoneTranslationListenUrl(window.location.origin, slug, lineId));
+        setListenUrl(
+          getPhoneTranslationListenUrl(window.location.origin, slug, lineId)
+        );
       });
-  }, [churchSlug, lineId, lineReady]);
-
-  if (!lineReady) {
-    return (
-      <section className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-        <h1 className="text-2xl font-bold text-slate-900">Phone language</h1>
-        <p className="mt-3 text-sm text-slate-600">
-          This window has no language id. Go back to the main page and click
-          Open another language.
-        </p>
-      </section>
-    );
-  }
+  }, [churchSlug, lineId]);
 
   return (
     <section className="mx-auto max-w-md space-y-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">

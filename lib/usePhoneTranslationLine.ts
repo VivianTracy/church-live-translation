@@ -8,7 +8,7 @@ import {
   saveTranslationListenState,
 } from "@/lib/translationListenApi";
 import type { HeadsetLanguageCode } from "@/lib/translationLanguages";
-import { isPhoneLineId } from "@/lib/translationPhoneLine";
+import { readPhoneLineSlug } from "@/lib/translationPhoneLine";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type PhoneLineStatus = "off" | "connecting" | "live" | "failed";
@@ -50,9 +50,9 @@ export function usePhoneTranslationLine(options: {
     setChunksUploaded(0);
 
     const slug = churchSlugRef.current;
-    const lineId = lineIdRef.current;
+    const lineId = readPhoneLineSlug(lineIdRef.current);
 
-    if (slug && isPhoneLineId(lineId)) {
+    if (slug && lineId) {
       void clearTranslationListenState(slug, lineId).catch(() => undefined);
     }
   }, []);
@@ -68,9 +68,9 @@ export function usePhoneTranslationLine(options: {
       return;
     }
 
-    const lineId = lineIdRef.current;
+    const lineId = readPhoneLineSlug(lineIdRef.current);
 
-    if (!isPhoneLineId(lineId)) {
+    if (!lineId) {
       return;
     }
 
@@ -102,9 +102,9 @@ export function usePhoneTranslationLine(options: {
       void connection?.then((session) => session.stop());
 
       const slug = churchSlugRef.current;
-      const lineId = lineIdRef.current;
+      const lineId = readPhoneLineSlug(lineIdRef.current);
 
-      if (slug && isPhoneLineId(lineId)) {
+      if (slug && lineId) {
         void clearTranslationListenState(slug, lineId).catch(() => undefined);
       }
     };
@@ -112,9 +112,9 @@ export function usePhoneTranslationLine(options: {
 
   const startPhoneLine = useCallback(
     async (language: HeadsetLanguageCode, inputDeviceId = "") => {
-      const lineId = lineIdRef.current;
+      const lineId = readPhoneLineSlug(lineIdRef.current);
 
-      if (!primaryLiveRef.current || activeRef.current || !isPhoneLineId(lineId)) {
+      if (!primaryLiveRef.current || activeRef.current || !lineId) {
         return;
       }
 

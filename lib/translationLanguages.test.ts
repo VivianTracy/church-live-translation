@@ -133,14 +133,9 @@ describe("translation languages", () => {
       "/operator-languages"
     );
     expect(operatorSessionReturnPath("/operator")).toBe("/operator-live");
-    expect(operatorSessionReturnPath("/operator-phone", "?line=ab23cd")).toBe(
-      "/operator-phone?line=ab23cd"
-    );
-    expect(operatorSessionReturnPath("/operator-phone", "?line=phone")).toBe(
-      "/operator-live"
-    );
-    expect(operatorLoginNextPath("/operator-phone?line=ab23cd")).toBe(
-      "/operator-phone?line=ab23cd"
+    expect(operatorSessionReturnPath("/operator-phone")).toBe("/operator-phone");
+    expect(operatorLoginNextPath("/operator-phone?line=english")).toBe(
+      "/operator-phone"
     );
     expect(operatorLoginNextPath("/operator-live")).toBe("/operator-live");
     expect(operatorLoginNextPath("//evil.example")).toBe("/operator");

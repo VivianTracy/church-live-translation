@@ -1,8 +1,9 @@
 import { withChurchSearchParam } from "@/lib/churchSlug";
-import type { HeadsetLanguageCode } from "@/lib/translationLanguages";
-
-const PHONE_LINE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
-const PHONE_LINE_ID_PATTERN = /^[abcdefghjkmnpqrstuvwxyz23456789]{6}$/;
+import {
+  HEADSET_LANGUAGES,
+  TRANSLATION_LANGUAGE_LABELS,
+  type HeadsetLanguageCode,
+} from "@/lib/translationLanguages";
 
 export type TranslationAudioLine = "primary" | string;
 
@@ -12,20 +13,34 @@ export class InvalidTranslationLineError extends Error {
   }
 }
 
-export function isPhoneLineId(
-  value: string | null | undefined
-): value is string {
-  return typeof value === "string" && PHONE_LINE_ID_PATTERN.test(value);
+/** Public path segment, such as "english" or "chinese". */
+export function phoneLanguageSlug(language: HeadsetLanguageCode): string {
+  return TRANSLATION_LANGUAGE_LABELS[language].toLowerCase();
 }
 
-export function createPhoneLineId(): string {
-  const bytes = new Uint8Array(6);
-  crypto.getRandomValues(bytes);
+export function headsetLanguageFromPhoneLine(
+  value: string | null | undefined
+): HeadsetLanguageCode | null {
+  if (!value) {
+    return null;
+  }
 
-  return Array.from(
-    bytes,
-    (byte) => PHONE_LINE_ALPHABET[byte % PHONE_LINE_ALPHABET.length]
-  ).join("");
+  const normalized = value.trim().toLowerCase();
+
+  for (const code of HEADSET_LANGUAGES) {
+    if (normalized === code || normalized === phoneLanguageSlug(code)) {
+      return code;
+    }
+  }
+
+  return null;
+}
+
+export function readPhoneLineSlug(
+  value: string | null | undefined
+): string | null {
+  const language = headsetLanguageFromPhoneLine(value);
+  return language ? phoneLanguageSlug(language) : null;
 }
 
 export function readTranslationAudioLine(
@@ -35,8 +50,10 @@ export function readTranslationAudioLine(
     return "primary";
   }
 
-  if (isPhoneLineId(value)) {
-    return value;
+  const slug = readPhoneLineSlug(value);
+
+  if (slug) {
+    return slug;
   }
 
   throw new InvalidTranslationLineError();
@@ -50,15 +67,16 @@ export function translationAudioStreamId(
   return line === "primary" ? churchSlug : `${churchSlug}:phone:${line}`;
 }
 
-export function getPhoneLineOperatorPath(lineId: string): string {
-  return `/operator-phone?line=${lineId}`;
+export function getPhoneLineOperatorPath(): string {
+  return "/operator-phone";
 }
 
 export function getPhoneTranslationListenPath(
   churchSlug: string,
-  lineId: string
+  language: HeadsetLanguageCode | string
 ): string {
-  return `/listen/${churchSlug}/phone/${lineId}`;
+  const slug = readPhoneLineSlug(language) ?? language;
+  return `/listen/${churchSlug}/phone/${slug}`;
 }
 
 export function withTranslationLineQuery(
